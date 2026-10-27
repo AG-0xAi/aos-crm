@@ -136,6 +136,12 @@ function ConvertFrom-WslListVerbose {
 # Pure function: no process calls, so it is unit-testable in -SelfTest.
 function Resolve-TargetDistro {
   param([object[]] $Distributions, [string] $RequestedName)
+  # A collection with zero elements collapses to $null when captured (e.g.
+  # from ConvertFrom-WslListVerbose on a header-only `wsl -l -v`), and piping
+  # $null into Where-Object still runs the predicate once on a null item,
+  # which throws under Set-StrictMode (@($null) is a 1-element array
+  # containing null, NOT an empty array, so it does not fix this on its own).
+  if ($null -eq $Distributions) { $Distributions = @() }
   if ($RequestedName) {
     $matched = @($Distributions | Where-Object { $_.name -eq $RequestedName })
     if ($matched.Count -eq 0) {
@@ -192,6 +198,13 @@ function Invoke-SelfTest {
 
   $exactMatch = Resolve-TargetDistro -Distributions @($wsl1Distro, $wsl2Distro) -RequestedName 'Ubuntu'
   Assert-True ($null -eq $exactMatch.Error -and $exactMatch.Distro.name -eq 'Ubuntu') 'Resolve-TargetDistro picks the exact requested WSL2 distro among several'
+
+  # A header-only `wsl -l -v` (WSL installed, zero distros registered) makes
+  # ConvertFrom-WslListVerbose return an empty collection, which PowerShell
+  # collapses to $null when captured; reproduced live against this host and
+  # fixed by normalizing with @() inside Resolve-TargetDistro itself.
+  $noDistrosAtAll = Resolve-TargetDistro -Distributions $null -RequestedName ''
+  Assert-True ($null -ne $noDistrosAtAll.Error -and $null -eq $noDistrosAtAll.Distro) 'Resolve-TargetDistro fails closed (not a crash) when $Distributions is $null'
 
   Write-Output ''
   Write-Output "self-test: $(if ($failures.Count -eq 0) { 'ALL PASSED' } else { "$($failures.Count) FAILED" })"
@@ -308,7 +321,7 @@ try {
     } else {
       $listProbe = Invoke-WslSelf -Exe 'wsl.exe' -NativeArgs @('-l', '-v')
       if ($listProbe.ExitCode -eq 0) {
-        $distros = ConvertFrom-WslListVerbose -Text $listProbe.Text
+        $distros = @(ConvertFrom-WslListVerbose -Text $listProbe.Text)
         $wsl.distributions = @($distros | ForEach-Object { [ordered]@{ name = $_.Name; state = $_.State; version = $_.Version; isDefault = $_.IsDefault } })
         if ($distros.Count -eq 0) {
           Add-Missing 'WSL is installed but no Linux distribution is registered; run scripts/aos/install-host-wsl.ps1 phase 1 (wsl --install) and complete the one-time interactive user setup'
