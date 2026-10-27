@@ -1,0 +1,37 @@
+{
+  "track": "CRM-001",
+  "observedAt": "2026-10-27T11:22:09Z",
+  "upstream": {
+    "url": "https://github.com/twentyhq/twenty.git",
+    "tag": "twenty/v2.51.0",
+    "sha": "15e4826d3b5fc5867baeabeeb42b253892b2d4da",
+    "branchCount": 2337,
+    "tagCount": 629
+  },
+  "fork": {
+    "url": "https://github.com/AG-0xAi/aos-crm.git",
+    "fullName": "AG-0xAi/aos-crm",
+    "fork": true,
+    "parentFullName": "twentyhq/twenty",
+    "defaultBranch": "main",
+    "branchCount": 2336,
+    "tagCount": 629,
+    "createdVia": "gh repo fork twentyhq/twenty --fork-name aos-crm --clone=false (no --default-branch-only; all branches/tags included)"
+  },
+  "localCheckout": {
+    "branch": "codex/crm001-provenance",
+    "isShallow": false,
+    "pinnedShaIsAncestorOfHead": true,
+    "originRemote": "https://github.com/AG-0xAi/aos-crm.git",
+    "upstreamRemote": "https://github.com/twentyhq/twenty.git"
+  },
+  "githubIdentity": {
+    "effectiveApiLogin": "AG-0xAi",
+    "note": "gh auth status showed a different keyring label; gh api user confirmed AG-0xAi as the effective identity before any mutating call."
+  },
+  "notes": [
+    "Branch/tag counts are point-in-time evidence, not a gate check; upstream gains and loses branches independently of this fork.",
+    "This file documents observed state. The provenance gate (.aos/verify.json) re-derives its own checks from hardcoded expectations and does not read this file as input.",
+    "Scope: provenance only. The CRM application is not built, not running, and not covered here (see CRM-004)."
+  ]
+}
