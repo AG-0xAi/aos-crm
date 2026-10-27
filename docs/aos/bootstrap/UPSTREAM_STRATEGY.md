@@ -26,7 +26,7 @@ Git no tenía identidad configurada. Para esta entrega se configuró únicamente
 
 El fork `AG-0xAi/aos-crm` existe, con relación de fork real a `twentyhq/twenty` (no un repositorio nuevo sin parentesco) y con ramas/tags completos, no solo la rama por defecto. `origin` quedó configurado únicamente con ese remoto verificado; `upstream` no se modificó. No se hizo push ni se modificó `main`/`master` de ningún repositorio. La publicación de la rama de trabajo (`codex/crm001-provenance`) sigue pendiente de que el arnés abra el PR tras un gate verde; este worker no publica ni hace merge.
 
-Un comprobador determinista (`scripts/aos/verify-provenance.mjs`, gate en `.aos/verify.json`) revalida este estado — origen/base, no-shallow, ancestría, ausencia de runtime/secretos versionados y estado real en GitHub — en cada corrida; no se acepta una declaración de éxito sin volver a ejecutar las comprobaciones.
+Un comprobador determinista (`scripts/aos/verify-provenance.mjs`, gate en `.aos/verify.json`) revalida este estado — origen/base, no-shallow, ancestría, ausencia de runtime AOS versionado y estado real en GitHub — en cada corrida; no se acepta una declaración de éxito sin volver a ejecutar las comprobaciones. El escaneo de secretos que incluye es un conjunto fijo de patrones conocidos sobre el diff base-pinneada..HEAD (claves AWS, bloques de clave privada incluido PKCS#8, tokens de GitHub/Slack), sin análisis de entropía ni revisión de todo el historial: un PASS indica que no hubo coincidencia de esos patrones, no que el diff esté libre de secretos.
 
 ## Pendiente (fuera de CRM-001)
 
