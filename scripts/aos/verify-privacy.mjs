@@ -1,10 +1,14 @@
 // CRM-003 privacy gate. Static contract checks only: never starts the app,
 // never imports/executes any Twenty module, never resolves a real secret.
 // Two kinds of check, kept visibly separate:
-//   1. deploy/local/privacy.env's own contract (required key/value pairs,
-//      and an explicit absence of DSN/key/secret-shaped variable names --
-//      this file is a versioned, NON-SECRET flag profile, not a place for
-//      real credentials; those stay in deploy/local/.env, gitignored).
+//   1. deploy/local/privacy.env's own contract (required key/value pairs --
+//      including explicit EMPTY placeholders for METER_DRIVER/SENTRY_DSN/
+//      SENTRY_FRONT_DSN/ENTERPRISE_KEY/ENTERPRISE_VALIDITY_TOKEN, the
+//      official "off" value for each, never a real value -- plus rejection
+//      of any other secret/DSN-shaped variable name and of a non-empty
+//      OTLP_COLLECTOR_METRICS_ENDPOINT_URL; this file is a versioned,
+//      NON-SECRET flag profile, not a place for real credentials; those
+//      stay in deploy/local/.env, gitignored).
 //   2. Source-inspection checks against the REAL pinned twenty/v2.51.0
 //      files this profile depends on (config-variables.ts, twenty-config
 //      service/module, telemetry.service.ts, instrument.ts,
@@ -64,12 +68,27 @@ function parseEnvFile(text) {
 // Every key here is a real flag confirmed against the pinned
 // config-variables.ts (see the source-inspection checks below and
 // docs/aos/bootstrap/TELEMETRY_AUDIT.md) -- never an invented variable.
+// METER_DRIVER/SENTRY_DSN/SENTRY_FRONT_DSN/ENTERPRISE_KEY/
+// ENTERPRISE_VALIDITY_TOKEN are pinned to an explicit empty string (CRM-003-
+// fix1): empty is the official "off" value for each (METER_DRIVER is a CSV
+// array that falls back to [] on empty, per parse-array-env-var.ts; the
+// other four are plain optional strings with no default), not the literal
+// 'DISABLED' -- that string belongs to LOGIC_FUNCTION_TYPE/
+// CODE_INTERPRETER_TYPE's own enum, not to these. Requiring them here (not
+// just omitting them) closes the gap where adding
+// METER_DRIVER=opentelemetry + a remote OTLP endpoint previously passed this
+// contract unnoticed.
 const REQUIRED_PRIVACY_KEYS = new Map([
   ['TELEMETRY_ENABLED', 'false'],
   ['ANALYTICS_ENABLED', 'false'],
   ['MARKETPLACE_CATALOG_SYNC_CRON_ENABLED', 'false'],
   ['IS_CONFIG_VARIABLES_IN_DB_ENABLED', 'false'],
   ['EXCEPTION_HANDLER_DRIVER', 'CONSOLE'],
+  ['METER_DRIVER', ''],
+  ['SENTRY_DSN', ''],
+  ['SENTRY_FRONT_DSN', ''],
+  ['ENTERPRISE_KEY', ''],
+  ['ENTERPRISE_VALIDITY_TOKEN', ''],
   ['LOGIC_FUNCTION_TYPE', 'DISABLED'],
   ['CODE_INTERPRETER_TYPE', 'DISABLED'],
 ]);
@@ -95,14 +114,38 @@ function checkPrivacyEnvContract(text) {
 }
 
 // Guards against the file drifting from "non-secret flag profile" to
-// "accidentally holds a real DSN/key/token" -- names only, never values,
-// so this check itself can never leak a secret even if one were pasted in.
-const FORBIDDEN_SECRET_SHAPED_KEYS = new Set([
+// "accidentally holds a real DSN/key/token" -- names only, never values
+// logged, so this check itself can never leak a secret even if one were
+// pasted in.
+//
+// METER_DRIVER/SENTRY_DSN/SENTRY_FRONT_DSN/ENTERPRISE_KEY/
+// ENTERPRISE_VALIDITY_TOKEN are excluded below: they are REQUIRED, empty
+// placeholders enforced by checkPrivacyEnvContract's exact-value match
+// above, not secrets to forbid by name. A non-empty value for any of them
+// is already rejected there as a wrong-value contract violation (name only,
+// value never printed) -- flagging them here too would reject the very
+// empty placeholder this profile uses to turn each one off.
+const KEYS_REQUIRED_EMPTY_BY_CONTRACT = new Set([
+  'METER_DRIVER',
   'SENTRY_DSN',
   'SENTRY_FRONT_DSN',
-  'CLICKHOUSE_URL',
   'ENTERPRISE_KEY',
+  'ENTERPRISE_VALIDITY_TOKEN',
 ]);
+
+// Not a TwentyConfigService flag -- instrument.ts reads it straight off
+// process.env (see checkInstrumentMeterDriverDefaultsEmpty), so it is not
+// required to be present at all. METER_DRIVER='' above already makes the
+// OpenTelemetry branch that consumes this URL dead code regardless of its
+// value, but a non-empty value here is still the exact remote-export vector
+// CRM-003-fix1 closed (reproduced by adding this URL alongside
+// METER_DRIVER=opentelemetry) -- reject it defensively if present and
+// non-empty, independent of whatever METER_DRIVER says.
+const OPTIONAL_KEYS_MUST_BE_EMPTY_IF_PRESENT = new Set([
+  'OTLP_COLLECTOR_METRICS_ENDPOINT_URL',
+]);
+
+const FORBIDDEN_SECRET_SHAPED_KEYS = new Set(['CLICKHOUSE_URL']);
 const FORBIDDEN_SECRET_SHAPED_SUFFIXES = [
   '_PASSWORD',
   '_SECRET',
@@ -114,17 +157,23 @@ const FORBIDDEN_SECRET_SHAPED_SUFFIXES = [
 
 function checkPrivacyEnvCarriesNoSecretsOrDsn(text) {
   const found = parseEnvFile(text);
-  const present = [...found.keys()].filter(
+  const secretShapedNames = [...found.keys()].filter(
     (key) =>
-      FORBIDDEN_SECRET_SHAPED_KEYS.has(key) ||
-      FORBIDDEN_SECRET_SHAPED_SUFFIXES.some((suffix) => key.endsWith(suffix)),
+      !KEYS_REQUIRED_EMPTY_BY_CONTRACT.has(key) &&
+      (FORBIDDEN_SECRET_SHAPED_KEYS.has(key) ||
+        FORBIDDEN_SECRET_SHAPED_SUFFIXES.some((suffix) => key.endsWith(suffix))),
   );
+  const nonEmptyOptionalRemoteExportKeys = [...found.entries()]
+    .filter(([key]) => OPTIONAL_KEYS_MUST_BE_EMPTY_IF_PRESENT.has(key))
+    .filter(([, value]) => value !== '')
+    .map(([key]) => key);
+  const present = [...secretShapedNames, ...nonEmptyOptionalRemoteExportKeys];
   const ok = present.length === 0;
   return {
     ok,
     detail: ok
-      ? 'no DSN/key/secret-shaped variable name present (this check never reads or prints a value)'
-      : `secret-shaped key name(s) present in this versioned file: ${present.join(', ')} (name only -- value never read by this check)`,
+      ? 'no secret-shaped variable name carries a value, and no optional remote-export endpoint is set to a non-empty value (names/emptiness only -- this check never prints a value)'
+      : `secret-shaped or remote-export key name(s) present with a non-empty value in this versioned file: ${present.join(', ')} (name only -- value never printed by this check)`,
   };
 }
 
@@ -402,6 +451,11 @@ function selfTest() {
     'MARKETPLACE_CATALOG_SYNC_CRON_ENABLED=false',
     'IS_CONFIG_VARIABLES_IN_DB_ENABLED=false',
     'EXCEPTION_HANDLER_DRIVER=CONSOLE',
+    'METER_DRIVER=',
+    'SENTRY_DSN=',
+    'SENTRY_FRONT_DSN=',
+    'ENTERPRISE_KEY=',
+    'ENTERPRISE_VALIDITY_TOKEN=',
     'LOGIC_FUNCTION_TYPE=DISABLED',
     'CODE_INTERPRETER_TYPE=DISABLED',
     '',
@@ -419,15 +473,36 @@ function selfTest() {
     const dup = GOOD_PRIVACY_ENV + '\nTELEMETRY_ENABLED=true\nTELEMETRY_ENABLED=false\n';
     assertOk(checkPrivacyEnvContract(dup), true);
   });
-
-  record('checkPrivacyEnvCarriesNoSecretsOrDsn: positive', () => assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(GOOD_PRIVACY_ENV), true));
-  record('checkPrivacyEnvCarriesNoSecretsOrDsn: a SENTRY_FRONT_DSN entry is rejected even if empty', () => {
-    const bad = GOOD_PRIVACY_ENV + '\nSENTRY_FRONT_DSN=\n';
-    assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(bad), false);
+  // CRM-003-fix1: reproduces .aos/onboarding/bootstrap-2026-10-27/
+  // privacy-exporter-observation.json's defect (METER_DRIVER=opentelemetry
+  // + a remote OTLP endpoint used to pass both checks) against the current
+  // functions, and proves it is now rejected.
+  record('checkPrivacyEnvContract: METER_DRIVER=opentelemetry (the reproduced remote-exporter opt-in) is rejected', () => {
+    const bad = GOOD_PRIVACY_ENV.replace('METER_DRIVER=', 'METER_DRIVER=opentelemetry')
+      + '\nOTLP_COLLECTOR_METRICS_ENDPOINT_URL=https://collector.invalid/v1/metrics\n';
+    assertOk(checkPrivacyEnvContract(bad), false);
   });
+  record('checkPrivacyEnvContract: a real-looking SENTRY_DSN value is rejected (the placeholder must stay empty)', () => {
+    const bad = GOOD_PRIVACY_ENV.replace('SENTRY_DSN=', 'SENTRY_DSN=https://publickey@o0.ingest.sentry.io/0');
+    assertOk(checkPrivacyEnvContract(bad), false);
+  });
+  record('checkPrivacyEnvContract: a real-looking ENTERPRISE_KEY value is rejected (the placeholder must stay empty)', () => {
+    const bad = GOOD_PRIVACY_ENV.replace('ENTERPRISE_KEY=', 'ENTERPRISE_KEY=tw-enterprise-abc123');
+    assertOk(checkPrivacyEnvContract(bad), false);
+  });
+
+  record('checkPrivacyEnvCarriesNoSecretsOrDsn: positive (empty SENTRY_DSN/SENTRY_FRONT_DSN/ENTERPRISE_KEY/ENTERPRISE_VALIDITY_TOKEN placeholders are accepted, not forbidden by name)', () => assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(GOOD_PRIVACY_ENV), true));
   record('checkPrivacyEnvCarriesNoSecretsOrDsn: a *_API_KEY-suffixed key is rejected', () => {
     const bad = GOOD_PRIVACY_ENV + '\nSOME_SERVICE_API_KEY=whatever\n';
     assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(bad), false);
+  });
+  record('checkPrivacyEnvCarriesNoSecretsOrDsn: a non-empty OTLP_COLLECTOR_METRICS_ENDPOINT_URL is rejected even with METER_DRIVER left empty (defense in depth)', () => {
+    const bad = GOOD_PRIVACY_ENV + '\nOTLP_COLLECTOR_METRICS_ENDPOINT_URL=https://collector.invalid/v1/metrics\n';
+    assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(bad), false);
+  });
+  record('checkPrivacyEnvCarriesNoSecretsOrDsn: an OTLP_COLLECTOR_METRICS_ENDPOINT_URL entry left empty is accepted (it is optional, not required, but must be empty if present)', () => {
+    const ok = GOOD_PRIVACY_ENV + '\nOTLP_COLLECTOR_METRICS_ENDPOINT_URL=\n';
+    assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(ok), true);
   });
 
   const GOOD_CONFIG_VARIABLES = [

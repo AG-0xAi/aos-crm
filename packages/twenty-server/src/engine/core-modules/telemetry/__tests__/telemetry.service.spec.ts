@@ -10,7 +10,7 @@ import type { TwentyConfigService } from 'src/engine/core-modules/twenty-config/
 // way). The second test proves the same spy DOES see a request when the
 // flag is true, so the first assertion is not vacuously passing.
 describe('TelemetryService', () => {
-  const samplePayload = {
+  const samplePayload: Parameters<TelemetryService['publish']>[0] = {
     action: USER_SIGNUP_EVENT_NAME,
     events: [
       {
