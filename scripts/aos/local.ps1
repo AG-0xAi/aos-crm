@@ -1,10 +1,12 @@
 #Requires -Version 7.0
 # AOS-CRM local profile orchestrator (CRM-002). Never builds/starts anything
-# on its own: Start/Restart run a fail-closed gate (host, privacy contract,
-# secrets, loopback port) BEFORE any `docker compose build`/`up`, and every
-# docker invocation crosses into the dedicated WSL distro with --exec
-# (literal argv; see docs/aos/bootstrap/HOST_RUNTIME.md for why `--` is not
-# used here) so this script never needs Docker on the Windows host.
+# on its own: Start/Restart run a fail-closed gate (host, the real local
+# verifiers -- scripts/aos/verify-local-config.mjs and, once CRM-003 ships it,
+# scripts/aos/verify-privacy.mjs -- secrets, loopback port) BEFORE any
+# `docker compose build`/`up`, and every docker invocation crosses into the
+# dedicated WSL distro with --exec (literal argv; see
+# docs/aos/bootstrap/HOST_RUNTIME.md for why `--` is not used here) so this
+# script never needs Docker on the Windows host.
 #
 # Usage: pwsh -NoProfile -File scripts/aos/local.ps1 -Action <Status|Prepare|Start|Stop|Restart|Logs>
 # Self-test (isolated tmp fixtures; never touches deploy/local, WSL or Docker):
@@ -116,6 +118,42 @@ function Test-RequiredPresentKeys {
   return [ordered]@{ Exists = $true; MissingKeys = @($missing); PlaceholderKeys = @($placeholder) }
 }
 
+# Resolves the loopback port to gate/use: whatever deploy/local/.env sets for
+# AOS_CRM_WEB_PORT, falling back to $DefaultPort only when the file is absent
+# or the key is missing/unparseable. Never hardcodes 43000 over a real value.
+function Get-ConfiguredWebPort {
+  param([string] $EnvPath, [int] $DefaultPort)
+  $found = Read-EnvKeys -Path $EnvPath
+  if ($null -eq $found -or -not $found.ContainsKey('AOS_CRM_WEB_PORT') -or [string]::IsNullOrWhiteSpace($found['AOS_CRM_WEB_PORT'])) {
+    return $DefaultPort
+  }
+  $parsed = 0
+  if ([int]::TryParse($found['AOS_CRM_WEB_PORT'], [ref] $parsed) -and $parsed -gt 0 -and $parsed -le 65535) {
+    return $parsed
+  }
+  return $DefaultPort
+}
+
+# AOS_CRM_SERVER_URL, when set, must agree with the resolved loopback port;
+# an unset URL is not a contradiction (compose.yaml's own default applies).
+function Test-WebPortUrlCoherent {
+  param([int] $Port, [string] $ServerUrl)
+  if ([string]::IsNullOrWhiteSpace($ServerUrl)) { return $true }
+  return $ServerUrl -eq "http://127.0.0.1:$Port"
+}
+
+# A bind-test alone cannot tell a foreign listener from this project's own
+# server container (WSL2 forwards both onto the same Windows loopback port).
+# Get-PortOccupancy turns the two independent I/O results (a raw bind probe,
+# a `docker compose ps` ownership check) into one classification so the gate
+# never confuses "I am already running" with "something else is in the way".
+function Get-PortOccupancy {
+  param([bool] $PortFree, [bool] $OwnServerRunning)
+  if ($PortFree) { return 'Free' }
+  if ($OwnServerRunning) { return 'OwnedBySelf' }
+  return 'OccupiedByOther'
+}
+
 # Aggregates every gate signal into one fail-closed verdict. Pure: no I/O,
 # so -SelfTest can cover every combination without touching the host.
 function Get-StartGateVerdict {
@@ -123,7 +161,12 @@ function Get-StartGateVerdict {
     [bool] $HostReady,
     [System.Collections.Specialized.OrderedDictionary] $EnvCheck,
     [System.Collections.Specialized.OrderedDictionary] $PrivacyCheck,
-    [bool] $PortFree
+    [ValidateSet('Free', 'OwnedBySelf', 'OccupiedByOther')]
+    [string] $PortOccupancy,
+    [bool] $WebPortUrlCoherent,
+    [bool] $ConfigVerifierOk,
+    [ValidateSet('Pass', 'Fail', 'Missing')]
+    [string] $PrivacyVerifierStatus
   )
   $blockers = [System.Collections.Generic.List[string]]::new()
   if (-not $HostReady) { $blockers.Add('host: preflight-host.ps1 did not report ready') }
@@ -139,29 +182,219 @@ function Get-StartGateVerdict {
     if ($PrivacyCheck.MissingKeys.Count -gt 0) { $blockers.Add("privacy: deploy/local/privacy.env missing key(s): $($PrivacyCheck.MissingKeys -join ', ')") }
     if ($PrivacyCheck.WrongValueKeys.Count -gt 0) { $blockers.Add("privacy: deploy/local/privacy.env key(s) not at the required value: $($PrivacyCheck.WrongValueKeys -join ', ')") }
   }
-  if (-not $PortFree) { $blockers.Add('port: the configured loopback web port is not free right now') }
+  if ($PortOccupancy -eq 'OccupiedByOther') { $blockers.Add('port: the configured loopback web port is occupied by a process outside this project') }
+  if (-not $WebPortUrlCoherent) { $blockers.Add('port: AOS_CRM_SERVER_URL does not match http://127.0.0.1:<AOS_CRM_WEB_PORT>') }
+  if (-not $ConfigVerifierOk) { $blockers.Add('config: node scripts/aos/verify-local-config.mjs did not pass') }
+  switch ($PrivacyVerifierStatus) {
+    'Missing' { $blockers.Add('privacy-verifier: scripts/aos/verify-privacy.mjs (CRM-003) is not delivered yet; blocking honestly until it exists') }
+    'Fail' { $blockers.Add('privacy-verifier: scripts/aos/verify-privacy.mjs reported failures') }
+  }
   return [ordered]@{ Proceed = ($blockers.Count -eq 0); Blockers = @($blockers) }
+}
+
+# Orchestrates Start: computes the verdict, then only invokes the mutating
+# $ComposeInvoker when every gate is green. -SelfTest swaps $ComposeInvoker
+# for a non-mutating recorder, proving the wiring itself (not just the
+# isolated boolean aggregator) refuses to reach Docker when blocked.
+function Invoke-StartAction {
+  param(
+    [bool] $HostReady,
+    [System.Collections.Specialized.OrderedDictionary] $EnvCheck,
+    [System.Collections.Specialized.OrderedDictionary] $PrivacyCheck,
+    [string] $PortOccupancy,
+    [bool] $WebPortUrlCoherent,
+    [bool] $ConfigVerifierOk,
+    [string] $PrivacyVerifierStatus,
+    [scriptblock] $ComposeInvoker
+  )
+  $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
+    -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
+    -PrivacyVerifierStatus $PrivacyVerifierStatus
+  if (-not $verdict.Proceed) {
+    return [ordered]@{ Invoked = $false; Verdict = $verdict }
+  }
+  & $ComposeInvoker
+  return [ordered]@{ Invoked = $true; Verdict = $verdict }
+}
+
+# Orchestrates Restart in three stages so a live restart of THIS project's
+# own server is never blocked by its own listener, while a foreign occupant
+# still blocks before anything is touched: (1) gate (treating self-occupancy
+# as fine, foreign occupancy as a hard blocker) -- only a pass reaches (2)
+# $DownInvoker, scoped to this project alone, never another product; then
+# (3) re-probe the port and only call $UpInvoker if it is now actually free,
+# so a stuck port after our own `down` blocks the `up` instead of racing it.
+function Invoke-RestartAction {
+  param(
+    [bool] $HostReady,
+    [System.Collections.Specialized.OrderedDictionary] $EnvCheck,
+    [System.Collections.Specialized.OrderedDictionary] $PrivacyCheck,
+    [string] $PortOccupancy,
+    [bool] $WebPortUrlCoherent,
+    [bool] $ConfigVerifierOk,
+    [string] $PrivacyVerifierStatus,
+    [scriptblock] $DownInvoker,
+    [scriptblock] $PortFreeAfterDownProbe,
+    [scriptblock] $UpInvoker
+  )
+  $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
+    -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
+    -PrivacyVerifierStatus $PrivacyVerifierStatus
+  if (-not $verdict.Proceed) {
+    return [ordered]@{ Stage = 'blocked-before-down'; Verdict = $verdict }
+  }
+  & $DownInvoker
+  $portFreeAfterDown = & $PortFreeAfterDownProbe
+  if (-not $portFreeAfterDown) {
+    $stuckVerdict = [ordered]@{ Proceed = $false; Blockers = @("port: still occupied after stopping this project's own services") }
+    return [ordered]@{ Stage = 'blocked-after-down'; Verdict = $stuckVerdict }
+  }
+  & $UpInvoker
+  return [ordered]@{ Stage = 'started'; Verdict = $verdict }
+}
+
+# Refuses to recursively delete anything that is not, right now, a real
+# directory strictly inside $ExpectedParent with a leaf name starting with
+# $ExpectedPrefix, and refuses outright if the target itself is a reparse
+# point (symlink/junction): its target could point anywhere, so a
+# literal-path containment check on the link itself is not a safety
+# guarantee. Re-resolves immediately before deleting rather than trusting an
+# earlier snapshot, to keep the TOCTOU window as small as a single-threaded
+# script allows.
+function Remove-ContainedTempDir {
+  param([string] $Path, [string] $ExpectedParent, [string] $ExpectedPrefix)
+  if (-not (Test-Path -LiteralPath $Path)) { return }
+  $item = Get-Item -LiteralPath $Path -Force
+  if ($item.LinkType) {
+    Write-Warning "refusing to delete '$($item.FullName)': it is a reparse point ($($item.LinkType)), not a plain directory"
+    return
+  }
+  $resolved = $item.FullName.TrimEnd('\')
+  $parentResolved = (Get-Item -LiteralPath $ExpectedParent -Force).FullName.TrimEnd('\')
+  $leaf = Split-Path -Leaf $resolved
+  $parentOfResolved = Split-Path -Parent $resolved
+  $isRoot = [string]::IsNullOrEmpty($parentOfResolved)
+  $isDirectChildOfExpectedParent = ($parentOfResolved -eq $parentResolved)
+  $hasExpectedPrefix = $leaf.StartsWith($ExpectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  if ($isRoot -or -not $isDirectChildOfExpectedParent -or -not $hasExpectedPrefix) {
+    Write-Warning "refusing to delete '$resolved': not a contained temp dir directly under '$parentResolved' with prefix '$ExpectedPrefix'"
+    return
+  }
+  Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction Stop
 }
 
 # ---------------------------------------------------------------------------
 # Host-crossing I/O: every one of these is the only place that touches a
-# real file under deploy/local, wsl.exe or docker.
+# real file under deploy/local, wsl.exe, docker or another process.
 # ---------------------------------------------------------------------------
+
+# Launches a background PowerShell helper through raw ProcessStartInfo with
+# .ArgumentList (a real per-argument collection on .NET) instead of
+# Start-Process -ArgumentList, whose array form is naively string-joined on
+# Windows and does not quote elements containing spaces -- a repo path or
+# distro name with a space or Unicode character would otherwise split into
+# the wrong argv. UseShellExecute=$false + CreateNoWindow=$true is the
+# equivalent of -WindowStyle Hidden for a non-interactive helper whose
+# stdout/stderr are redirected (WindowStyle itself only applies when
+# UseShellExecute=$true, which is incompatible with redirection). No
+# -ExecutionPolicy Bypass is passed.
+function Invoke-PowerShellScript {
+  param([string] $ScriptPath, [string[]] $ScriptArgs = @())
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = 'powershell'
+  $psi.ArgumentList.Add('-NoProfile')
+  $psi.ArgumentList.Add('-File')
+  $psi.ArgumentList.Add($ScriptPath)
+  foreach ($a in $ScriptArgs) { $psi.ArgumentList.Add($a) }
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  try {
+    $proc = [System.Diagnostics.Process]::Start($psi)
+  } catch {
+    return 2
+  }
+  # Drain both streams asynchronously before waiting: this helper's exit code
+  # is all callers need, but an undrained pipe can deadlock WaitForExit() if
+  # the child writes enough output to fill its buffer.
+  $null = $proc.StandardOutput.ReadToEndAsync()
+  $null = $proc.StandardError.ReadToEndAsync()
+  $proc.WaitForExit()
+  return $proc.ExitCode
+}
 
 function Test-HostReady {
   param([string] $RepoRoot, [string] $Distro)
   $script = Join-Path $RepoRoot 'scripts/aos/preflight-host.ps1'
-  $stdout = New-TemporaryFile
-  $stderr = New-TemporaryFile
+  return (Invoke-PowerShellScript -ScriptPath $script -ScriptArgs @('-DistroName', $Distro)) -eq 0
+}
+
+# Runs a local Node verifier directly on the Windows host (no WSL hop: these
+# scripts have zero npm dependencies) and returns only its pass/fail, never
+# its stdout/stderr -- a future verifier that resolves real secrets must
+# never have them echoed by this wrapper.
+function Invoke-NodeScript {
+  param([string] $RepoRoot, [string] $ScriptPath)
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = 'node'
+  $psi.ArgumentList.Add($ScriptPath)
+  $psi.WorkingDirectory = $RepoRoot
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
   try {
-    $proc = Start-Process -FilePath 'powershell' `
-      -ArgumentList @('-NoProfile', '-File', $script, '-DistroName', $Distro) `
-      -NoNewWindow -Wait -PassThru `
-      -RedirectStandardOutput $stdout.FullName -RedirectStandardError $stderr.FullName
-    return $proc.ExitCode -eq 0
-  } finally {
-    Remove-Item -LiteralPath $stdout.FullName, $stderr.FullName -Force -ErrorAction SilentlyContinue
+    $proc = [System.Diagnostics.Process]::Start($psi)
+  } catch {
+    return $false
   }
+  $null = $proc.StandardOutput.ReadToEndAsync()
+  $null = $proc.StandardError.ReadToEndAsync()
+  $proc.WaitForExit()
+  return $proc.ExitCode -eq 0
+}
+
+# The real local-security gate (compose/dockerignore/gitignore/yarnrc/
+# Dockerfile/settings.json/merge-guard), not the whole `aos verify` (which
+# also checks provenance against GitHub) -- Start/Restart must not hit the
+# network on every call.
+function Invoke-LocalConfigVerifier {
+  param([string] $RepoRoot)
+  return Invoke-NodeScript -RepoRoot $RepoRoot -ScriptPath (Join-Path $RepoRoot 'scripts/aos/verify-local-config.mjs')
+}
+
+# CRM-003's privacy verifier may not exist yet. Its absence must block
+# Start/Restart honestly (distinct from "ran and failed"), not be silently
+# skipped.
+function Invoke-PrivacyVerifierIfPresent {
+  param([string] $RepoRoot, [string] $RelPath = 'scripts/aos/verify-privacy.mjs')
+  $scriptPath = Join-Path $RepoRoot $RelPath
+  if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { return 'Missing' }
+  if (Invoke-NodeScript -RepoRoot $RepoRoot -ScriptPath $scriptPath) { return 'Pass' }
+  return 'Fail'
+}
+
+# Asks Docker (not a bind probe) whether THIS project's `server` service is
+# the one currently bound to the configured port, so restarting our own
+# stack is never confused with a foreign listener. Requires deploy/local/.env
+# to exist for compose to interpolate at all; if it does not, our stack
+# cannot be the one running regardless, so this safely reports $false.
+function Test-OwnServerRunning {
+  param([string] $RepoRoot, [string] $Distro)
+  $linuxRootRaw = & wsl.exe -d $Distro --exec wslpath -a $RepoRoot
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linuxRootRaw)) { return $false }
+  $linuxRoot = $linuxRootRaw.Trim()
+  $composePath = "$linuxRoot/$ComposeRelPath"
+  $psOutput = & wsl.exe -d $Distro --exec docker compose -f $composePath -p $ProjectName ps --format json --status running 2>$null
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($psOutput)) { return $false }
+  foreach ($line in ($psOutput -split "`r?`n")) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try { $entry = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+    $serviceProp = $entry.PSObject.Properties | Where-Object { $_.Name -ieq 'Service' } | Select-Object -First 1
+    if ($serviceProp -and $serviceProp.Value -eq 'server') { return $true }
+  }
+  return $false
 }
 
 # Writes deploy/local/.env with fresh crypto-random secrets. Refuses to
@@ -230,6 +463,34 @@ function Invoke-Main {
   $EnvPath = Join-Path $LocalDir '.env'
   $PrivacyPath = Join-Path $LocalDir 'privacy.env'
 
+  # Shared by Status/Start/Restart: every gate signal except the one
+  # (self-vs-foreign port ownership) that is cheaper to skip when the port is
+  # already free.
+  function Get-GateSignals {
+    $hostReady = Test-HostReady -RepoRoot $RepoRoot -Distro $Distro
+    $envCheck = Test-RequiredPresentKeys -Path $EnvPath -RequiredKeys $RequiredEnvKeys -RejectedPlaceholders @('replace_me_with_a_random_hex_string', 'replace_me_with_a_random_base64_string')
+    $privacyCheck = Test-RequiredExactKeys -Path $PrivacyPath -Required $RequiredPrivacyKeys
+    $resolvedPort = Get-ConfiguredWebPort -EnvPath $EnvPath -DefaultPort $DefaultWebPort
+    $portFree = Test-PortFree -Port $resolvedPort
+    $ownRunning = if ($portFree) { $false } else { Test-OwnServerRunning -RepoRoot $RepoRoot -Distro $Distro }
+    $portOccupancy = Get-PortOccupancy -PortFree $portFree -OwnServerRunning $ownRunning
+    $envValues = Read-EnvKeys -Path $EnvPath
+    $serverUrl = if ($envValues) { $envValues['AOS_CRM_SERVER_URL'] } else { $null }
+    $urlCoherent = Test-WebPortUrlCoherent -Port $resolvedPort -ServerUrl $serverUrl
+    $configVerifierOk = Invoke-LocalConfigVerifier -RepoRoot $RepoRoot
+    $privacyVerifierStatus = Invoke-PrivacyVerifierIfPresent -RepoRoot $RepoRoot
+    return [ordered]@{
+      HostReady             = $hostReady
+      EnvCheck              = $envCheck
+      PrivacyCheck          = $privacyCheck
+      ResolvedPort          = $resolvedPort
+      PortOccupancy         = $portOccupancy
+      WebPortUrlCoherent    = $urlCoherent
+      ConfigVerifierOk      = $configVerifierOk
+      PrivacyVerifierStatus = $privacyVerifierStatus
+    }
+  }
+
   switch ($Action) {
     'Prepare' {
       Invoke-Prepare -LocalDir $LocalDir -EnvPath $EnvPath -WebPort $DefaultWebPort
@@ -237,30 +498,29 @@ function Invoke-Main {
     }
     'Status' {
       # Read-only: does not require the start gate, reports it instead.
-      $hostReady = Test-HostReady -RepoRoot $RepoRoot -Distro $Distro
-      $envCheck = Test-RequiredPresentKeys -Path $EnvPath -RequiredKeys $RequiredEnvKeys -RejectedPlaceholders @('replace_me_with_a_random_hex_string', 'replace_me_with_a_random_base64_string')
-      $privacyCheck = Test-RequiredExactKeys -Path $PrivacyPath -Required $RequiredPrivacyKeys
-      $verdict = Get-StartGateVerdict -HostReady $hostReady -EnvCheck $envCheck -PrivacyCheck $privacyCheck -PortFree (Test-PortFree -Port $DefaultWebPort)
-      Write-Output "aos-crm-local gate: $(if ($verdict.Proceed) { 'READY to start' } else { 'NOT ready' })"
+      $signals = Get-GateSignals
+      $verdict = Get-StartGateVerdict -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
+        -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus
+      Write-Output "aos-crm-local gate: $(if ($verdict.Proceed) { 'READY to start' } else { 'NOT ready' }) (configured port: $($signals.ResolvedPort), occupancy: $($signals.PortOccupancy))"
       foreach ($b in $verdict.Blockers) { Write-Output "  - $b" }
-      if ($hostReady) {
+      if ($signals.HostReady) {
         Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('ps')
         exit $script:ComposeExitCode
       }
       exit ($verdict.Proceed ? 0 : 1)
     }
     'Start' {
-      $hostReady = Test-HostReady -RepoRoot $RepoRoot -Distro $Distro
-      $envCheck = Test-RequiredPresentKeys -Path $EnvPath -RequiredKeys $RequiredEnvKeys -RejectedPlaceholders @('replace_me_with_a_random_hex_string', 'replace_me_with_a_random_base64_string')
-      $privacyCheck = Test-RequiredExactKeys -Path $PrivacyPath -Required $RequiredPrivacyKeys
-      $portFree = Test-PortFree -Port $DefaultWebPort
-      $verdict = Get-StartGateVerdict -HostReady $hostReady -EnvCheck $envCheck -PrivacyCheck $privacyCheck -PortFree $portFree
-      if (-not $verdict.Proceed) {
+      $signals = Get-GateSignals
+      $result = Invoke-StartAction -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
+        -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus `
+        -ComposeInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
+      if (-not $result.Invoked) {
         Write-Output 'aos-crm-local: BLOCKED (fail-closed), no build/up attempted:'
-        foreach ($b in $verdict.Blockers) { Write-Output "  - $b" }
+        foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit 1
       }
-      Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d')
       exit $script:ComposeExitCode
     }
     'Stop' {
@@ -268,19 +528,18 @@ function Invoke-Main {
       exit $script:ComposeExitCode
     }
     'Restart' {
-      $hostReady = Test-HostReady -RepoRoot $RepoRoot -Distro $Distro
-      $envCheck = Test-RequiredPresentKeys -Path $EnvPath -RequiredKeys $RequiredEnvKeys -RejectedPlaceholders @('replace_me_with_a_random_hex_string', 'replace_me_with_a_random_base64_string')
-      $privacyCheck = Test-RequiredExactKeys -Path $PrivacyPath -Required $RequiredPrivacyKeys
-      $portFree = Test-PortFree -Port $DefaultWebPort
-      $verdict = Get-StartGateVerdict -HostReady $hostReady -EnvCheck $envCheck -PrivacyCheck $privacyCheck -PortFree $portFree
-      if (-not $verdict.Proceed) {
-        Write-Output 'aos-crm-local: BLOCKED (fail-closed), no restart attempted:'
-        foreach ($b in $verdict.Blockers) { Write-Output "  - $b" }
+      $signals = Get-GateSignals
+      $result = Invoke-RestartAction -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
+        -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus `
+        -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
+        -PortFreeAfterDownProbe { Test-PortFree -Port $signals.ResolvedPort } `
+        -UpInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
+      if ($result.Stage -ne 'started') {
+        Write-Output 'aos-crm-local: BLOCKED (fail-closed):'
+        foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit 1
       }
-      Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down')
-      if ($script:ComposeExitCode -ne 0) { exit $script:ComposeExitCode }
-      Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d')
       exit $script:ComposeExitCode
     }
     'Logs' {
@@ -311,7 +570,9 @@ function Invoke-SelfTest {
     }
   }
 
-  $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "aos-crm-local-ps1-selftest-$([guid]::NewGuid())"
+  $tmpParent = [System.IO.Path]::GetTempPath()
+  $tmpPrefix = "aos-crm-local-ps1-selftest-$([guid]::NewGuid())"
+  $tmpRoot = Join-Path $tmpParent $tmpPrefix
   New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
   try {
     Record 'Test-PortFree: a bound loopback port reports not free' {
@@ -371,26 +632,210 @@ function Invoke-SelfTest {
       if (@($r.PlaceholderKeys).Count -ne 2) { throw "expected 2 placeholder keys flagged, got $(@($r.PlaceholderKeys).Count)" }
     }
 
+    Record 'Get-ConfiguredWebPort: reads AOS_CRM_WEB_PORT from the env file instead of the hardcoded default' {
+      $p = Join-Path $tmpRoot 'port.env'
+      Set-Content -LiteralPath $p -Value @('AOS_CRM_WEB_PORT=51234')
+      $got = Get-ConfiguredWebPort -EnvPath $p -DefaultPort 43000
+      if ($got -ne 51234) { throw "expected 51234, got $got" }
+    }
+
+    Record 'Get-ConfiguredWebPort: missing file or key falls back to the default' {
+      $missing = Get-ConfiguredWebPort -EnvPath (Join-Path $tmpRoot 'nope.env') -DefaultPort 43000
+      if ($missing -ne 43000) { throw "expected fallback 43000, got $missing" }
+      $p = Join-Path $tmpRoot 'port-novalue.env'
+      Set-Content -LiteralPath $p -Value @('AOS_CRM_PG_USER=aos_crm')
+      $noKey = Get-ConfiguredWebPort -EnvPath $p -DefaultPort 43000
+      if ($noKey -ne 43000) { throw "expected fallback 43000, got $noKey" }
+    }
+
+    Record 'Test-WebPortUrlCoherent: matching URL passes, mismatched URL fails, empty URL is not a contradiction' {
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:43000')) { throw 'expected a matching URL to be coherent' }
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:9999') { throw 'expected a mismatched URL to be incoherent' }
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '')) { throw 'expected an empty/unset URL to be treated as coherent (nothing to contradict)' }
+    }
+
+    Record 'Get-PortOccupancy: free, owned-by-self and occupied-by-other are distinguished' {
+      if ((Get-PortOccupancy -PortFree $true -OwnServerRunning $false) -ne 'Free') { throw 'expected Free' }
+      if ((Get-PortOccupancy -PortFree $false -OwnServerRunning $true) -ne 'OwnedBySelf') { throw 'expected OwnedBySelf' }
+      if ((Get-PortOccupancy -PortFree $false -OwnServerRunning $false) -ne 'OccupiedByOther') { throw 'expected OccupiedByOther' }
+    }
+
     Record 'Get-StartGateVerdict: every signal good means Proceed=true with no blockers' {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
-      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortFree $true
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass'
       if (-not $v.Proceed -or @($v.Blockers).Count -ne 0) { throw 'expected a clean proceed verdict' }
+    }
+
+    Record 'Get-StartGateVerdict: a port owned by this project itself does not block' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass'
+      if (-not $v.Proceed) { throw 'expected Proceed=true when the port is occupied by this project''s own server' }
+    }
+
+    Record 'Get-StartGateVerdict: a port occupied by a foreign process blocks without naming it a secret leak' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OccupiedByOther' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass'
+      if ($v.Proceed) { throw 'expected Proceed=false when the port is occupied by another process' }
     }
 
     Record 'Get-StartGateVerdict: missing privacy.env blocks even when everything else is ready' {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyMissing = [ordered]@{ Exists = $false; MissingKeys = @($RequiredPrivacyKeys.Keys); WrongValueKeys = @() }
-      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyMissing -PortFree $true
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyMissing -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass'
       if ($v.Proceed) { throw 'expected Proceed=false when privacy.env is missing' }
       if (-not (@($v.Blockers) -match 'privacy:')) { throw 'expected a privacy: blocker in the list' }
     }
 
-    Record 'Get-StartGateVerdict: a busy port blocks even when host/env/privacy are all ready' {
+    Record 'Get-StartGateVerdict: the real local-config verifier failing blocks even when the four-flag check passes' {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
-      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortFree $false
-      if ($v.Proceed) { throw 'expected Proceed=false when the port is busy' }
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $false -PrivacyVerifierStatus 'Pass'
+      if ($v.Proceed) { throw 'expected Proceed=false when verify-local-config.mjs fails' }
+      if (-not (@($v.Blockers) -match '^config:')) { throw 'expected a config: blocker' }
+    }
+
+    Record 'Get-StartGateVerdict: a not-yet-delivered CRM-003 privacy verifier blocks honestly, distinct from a failing one' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $vMissing = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Missing'
+      if ($vMissing.Proceed) { throw 'expected Proceed=false when the privacy verifier is not delivered yet' }
+      if (-not (@($vMissing.Blockers) -match 'not delivered yet')) { throw 'expected a not-delivered-yet blocker' }
+      $vFail = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Fail'
+      if ($vFail.Proceed) { throw 'expected Proceed=false when the privacy verifier fails' }
+      if (@($vMissing.Blockers)[0] -eq @($vFail.Blockers)[0]) { throw 'expected distinct messages for missing vs failing' }
+    }
+
+    Record 'Get-StartGateVerdict: an incoherent AOS_CRM_SERVER_URL blocks' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $false -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass'
+      if ($v.Proceed) { throw 'expected Proceed=false when the server URL does not match the configured port' }
+    }
+
+    Record 'Invoke-StartAction: a clean verdict invokes the compose up scriptblock exactly once' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $calls = @(0)
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' -ComposeInvoker { $calls[0] += 1 }
+      if (-not $result.Invoked) { throw 'expected Invoked=true' }
+      if ($calls[0] -ne 1) { throw "expected the compose invoker to run exactly once, ran $($calls[0]) time(s)" }
+    }
+
+    Record 'Invoke-StartAction: a blocked verdict never invokes the compose up scriptblock (no false PASS via an isolated aggregator)' {
+      $envMissing = [ordered]@{ Exists = $false; MissingKeys = @($RequiredEnvKeys); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $calls = @(0)
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envMissing -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' -ComposeInvoker { $calls[0] += 1 }
+      if ($result.Invoked) { throw 'expected Invoked=false' }
+      if ($calls[0] -ne 0) { throw "expected the compose invoker to never run, ran $($calls[0]) time(s)" }
+    }
+
+    Record 'Invoke-RestartAction: a clean verdict calls down then, once the port probe reports free, up' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
+      if (($order -join ',') -ne 'down,probe,up') { throw "expected down,probe,up in order, got $($order -join ',')" }
+    }
+
+    Record 'Invoke-RestartAction: a foreign occupant blocks before down or up, so another product is never touched' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OccupiedByOther' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-before-down') { throw "expected Stage=blocked-before-down, got $($result.Stage)" }
+      if ($order.Count -ne 0) { throw "expected neither down nor up to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-RestartAction: a port still stuck after down stops this project but refuses to start it back up' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $false } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-after-down') { throw "expected Stage=blocked-after-down, got $($result.Stage)" }
+      if (($order -join ',') -ne 'down,probe') { throw "expected down,probe without up, got $($order -join ',')" }
+    }
+
+    Record 'Invoke-PowerShellScript: a script path and argument containing spaces and Unicode survive intact' {
+      $spaceRoot = Join-Path $tmpRoot 'hóla müñdo path with spaces'
+      New-Item -ItemType Directory -Path $spaceRoot -Force | Out-Null
+      $scriptPath = Join-Path $spaceRoot 'próbe script.ps1'
+      $resultPath = Join-Path $spaceRoot 'resúlt.txt'
+      $distroArg = 'Distró Ñamé With Spaces'
+      $probeLines = @(
+        'param([string] $DistroName)',
+        "Set-Content -LiteralPath '$resultPath' -Value `$DistroName -Encoding utf8",
+        'exit 0'
+      )
+      # utf8BOM, not utf8: Windows PowerShell 5.1 (the 'powershell' binary
+      # Invoke-PowerShellScript launches) only auto-detects UTF-8 source
+      # files with a BOM; without one it reads this script as the system
+      # codepage and mangles the embedded accented literal below.
+      Set-Content -LiteralPath $scriptPath -Value $probeLines -Encoding utf8BOM
+      $exitCode = Invoke-PowerShellScript -ScriptPath $scriptPath -ScriptArgs @('-DistroName', $distroArg)
+      if ($exitCode -ne 0) { throw "expected exit 0, got $exitCode" }
+      if (-not (Test-Path -LiteralPath $resultPath)) { throw 'probe script did not run (result file missing); path/argument quoting likely broke' }
+      $received = (Get-Content -LiteralPath $resultPath -Raw).Trim()
+      if ($received -ne $distroArg) { throw "expected distro arg to survive as '$distroArg', got '$received'" }
+    }
+
+    Record 'Invoke-PowerShellScript: a missing script still returns a non-zero exit, never a false success' {
+      $exitCode = Invoke-PowerShellScript -ScriptPath (Join-Path $tmpRoot 'does-not-exist.ps1') -ScriptArgs @()
+      if ($exitCode -eq 0) { throw 'expected a non-zero exit code for a script that does not exist' }
+    }
+
+    Record 'Remove-ContainedTempDir: deletes a directory that is directly inside the expected parent with the expected prefix' {
+      $victim = Join-Path $tmpRoot 'contained-victim'
+      New-Item -ItemType Directory -Path $victim -Force | Out-Null
+      Set-Content -LiteralPath (Join-Path $victim 'file.txt') -Value 'x'
+      Remove-ContainedTempDir -Path $victim -ExpectedParent $tmpRoot -ExpectedPrefix 'contained-'
+      if (Test-Path -LiteralPath $victim) { throw 'expected the contained directory to be deleted' }
+    }
+
+    Record 'Remove-ContainedTempDir: refuses a directory outside the expected parent' {
+      $outside = Join-Path $tmpParent "aos-crm-local-ps1-selftest-outside-$([guid]::NewGuid())"
+      New-Item -ItemType Directory -Path $outside -Force | Out-Null
+      try {
+        Remove-ContainedTempDir -Path $outside -ExpectedParent $tmpRoot -ExpectedPrefix 'anything-' -WarningAction SilentlyContinue
+        if (-not (Test-Path -LiteralPath $outside)) { throw 'expected the out-of-parent directory to survive' }
+      } finally {
+        Remove-Item -LiteralPath $outside -Recurse -Force -ErrorAction SilentlyContinue
+      }
+    }
+
+    Record 'Remove-ContainedTempDir: refuses a directory with the wrong prefix even inside the expected parent' {
+      $wrongPrefix = Join-Path $tmpRoot 'not-the-expected-name'
+      New-Item -ItemType Directory -Path $wrongPrefix -Force | Out-Null
+      Remove-ContainedTempDir -Path $wrongPrefix -ExpectedParent $tmpRoot -ExpectedPrefix 'contained-' -WarningAction SilentlyContinue
+      if (-not (Test-Path -LiteralPath $wrongPrefix)) { throw 'expected the wrong-prefix directory to survive' }
+    }
+
+    Record 'Remove-ContainedTempDir: refuses a reparse point even when its own path looks contained' {
+      $junctionTargetOutside = Join-Path $tmpParent "aos-crm-local-ps1-selftest-junction-target-$([guid]::NewGuid())"
+      New-Item -ItemType Directory -Path $junctionTargetOutside -Force | Out-Null
+      Set-Content -LiteralPath (Join-Path $junctionTargetOutside 'canary.txt') -Value 'do-not-delete-me'
+      $junctionPath = Join-Path $tmpRoot 'contained-junction'
+      try {
+        New-Item -ItemType Junction -Path $junctionPath -Target $junctionTargetOutside -ErrorAction Stop | Out-Null
+      } catch {
+        Write-Output "[SKIP] Remove-ContainedTempDir: refuses a reparse point -- junction creation unavailable ($($_.Exception.Message))"
+        Remove-Item -LiteralPath $junctionTargetOutside -Recurse -Force -ErrorAction SilentlyContinue
+        return
+      }
+      try {
+        Remove-ContainedTempDir -Path $junctionPath -ExpectedParent $tmpRoot -ExpectedPrefix 'contained-' -WarningAction SilentlyContinue
+        if (-not (Test-Path -LiteralPath (Join-Path $junctionTargetOutside 'canary.txt'))) { throw 'the junction target''s content was deleted; a reparse point must be refused outright' }
+      } finally {
+        Remove-Item -LiteralPath $junctionPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $junctionTargetOutside -Recurse -Force -ErrorAction SilentlyContinue
+      }
     }
 
     Record 'Invoke-Prepare: refuses to overwrite an existing deploy/local/.env' {
@@ -421,7 +866,7 @@ function Invoke-SelfTest {
       }
     }
   } finally {
-    Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-ContainedTempDir -Path $tmpRoot -ExpectedParent $tmpParent -ExpectedPrefix 'aos-crm-local-ps1-selftest-'
   }
 
   Write-Output ''

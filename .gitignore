@@ -75,6 +75,3 @@ screenshots/
 /.aos/
 /.codegraph-aos/
 /dispatch-*.txt
-
-# AOS-CRM local profile: generated secrets, never committed
-/deploy/local/privacy.env

@@ -1,16 +1,25 @@
 .git
-.env
 **/node_modules
 .nx/cache
-packages/twenty-server/.env
 
 # AOS bus, agent configuration and code graph: never sent to a builder (SEC-05)
 .aos
 .codegraph-aos
 .claude
 .dispatch-bodies
+.mcp.json
 
-# AOS-CRM local profile: real secrets stay out of the build context;
-# the .env.example templates are not matched by these and remain available
-deploy/local/.env
+# Real dotenv files at any depth (.env, .env.local, .env.production, the
+# twenty-server .env.test/.env.e2e-testing-server test fixtures, deploy/local/.env,
+# etc.). Docker does not apply a simple pattern recursively
+# (https://docs.docker.com/build/concepts/context/), hence **/ on both lines.
+# Only the explicit, secret-free *.env.example templates are re-included so
+# the Dockerfile's directory COPYs still carry them.
+**/.env
+**/.env.*
+!**/.env.example
+
+# AOS-CRM local profile: deploy/local/privacy.env (CRM-003) is a non-secret,
+# versioned, reproducible profile, not credentials -- it is excluded here
+# only because the Dockerfile's build does not need it, not for secrecy.
 deploy/local/privacy.env
