@@ -43,8 +43,16 @@ function assertSafeToRemove(targetDir, allowedRoot) {
   return resolvedTarget;
 }
 
+// spawnSync's default 1 MiB buffer is smaller than real files this repo
+// tracks: `git show HEAD:yarn.lock` (about 1.9 MiB) overflowed it, and the
+// secret scanner correctly-but-wrongly reported the blob "unreadable" and
+// failed the gate. The blob was perfectly readable; our own buffer was the
+// limit. 64 MiB covers lockfile-sized text while still being bounded, so a
+// genuinely enormous blob keeps failing closed instead of being skipped.
+const GIT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+
 function git(args, { cwd, env } = {}) {
-  const res = spawnSync('git', args, { cwd, env: env ?? process.env, encoding: 'utf8' });
+  const res = spawnSync('git', args, { cwd, env: env ?? process.env, encoding: 'utf8', maxBuffer: GIT_MAX_BUFFER_BYTES });
   if (res.error) return { status: -1, stdout: '', stderr: safeMessage(res.error) };
   return { status: res.status, stdout: (res.stdout || '').trim(), stderr: (res.stderr || '').trim() };
 }
@@ -484,6 +492,39 @@ function selfTest() {
     record('negative: unicode/space filename is scanned, not skipped', () =>
       assertOk(checkNoSecretsInDiff(unicodeDir, baseSha, 'HEAD', SECRET_PATTERNS), false),
     );
+
+    // A lockfile-sized blob is readable; only our own child-process buffer
+    // made it look otherwise. Both halves matter: a large clean file must be
+    // scanned instead of reported unreadable, and a secret hiding past the
+    // old 1 MiB cut-off must still be found.
+    const largeCleanDir = join(tmpRoot, 'large-clean-blob');
+    cpSync(workDir, largeCleanDir, { recursive: true });
+    const filler = `${'lockfile-ish line with no secret in it\n'.repeat(40000)}`;
+    writeFileSync(join(largeCleanDir, 'big.lock'), filler);
+    fixtureGit(largeCleanDir, ['add', 'big.lock'], env);
+    fixtureGit(largeCleanDir, ['commit', '-q', '-m', 'add a >1MiB clean lockfile-sized blob'], env);
+    record('positive: a >1MiB clean blob is actually scanned, not reported unreadable', () => {
+      const result = checkNoSecretsInDiff(largeCleanDir, baseSha, 'HEAD', SECRET_PATTERNS);
+      if (!result.ok && result.detail.includes('unreadable')) {
+        throw new Error(`a large but perfectly readable blob was reported unreadable: ${result.detail}`);
+      }
+      assertOk(result, true);
+    });
+
+    const largeSecretDir = join(tmpRoot, 'large-secret-blob');
+    cpSync(workDir, largeSecretDir, { recursive: true });
+    writeFileSync(join(largeSecretDir, 'big-with-secret.lock'), `${filler}token=${plantedToken}\n`);
+    fixtureGit(largeSecretDir, ['add', 'big-with-secret.lock'], env);
+    fixtureGit(largeSecretDir, ['commit', '-q', '-m', 'add a >1MiB blob with a planted token at the end'], env);
+    record('negative: a token past the 1MiB mark is still detected', () => {
+      const result = checkNoSecretsInDiff(largeSecretDir, baseSha, 'HEAD', SECRET_PATTERNS);
+      assertOk(result, false);
+      // Must be rejected for the token, not for being unreadable: an
+      // unreadable verdict here would be the right answer by accident.
+      if (result.detail.includes('unreadable')) {
+        throw new Error(`rejected as unreadable instead of detecting the token: ${result.detail}`);
+      }
+    });
 
     const unreadableDir = join(tmpRoot, 'unreadable-blob');
     cpSync(workDir, unreadableDir, { recursive: true });
