@@ -1,6 +1,11 @@
 # CRM-001-HOST host-runtime installer. Idempotent, reviewable preparation for
 # WSL2 + a supported Linux distribution + Docker Engine (not Docker Desktop).
-# Run: powershell -NoProfile -File scripts/aos/install-host-wsl.ps1 [-WhatIf]
+# Run (phase 2 mutation): pwsh -NoProfile -File scripts/aos/install-host-wsl.ps1 [-WhatIf]
+# powershell.exe (Windows PowerShell 5.1) corrupts a literal double quote inside
+# a native argument (confirmed live), which the docker-apt-source step needs;
+# this script detects that engine before mutating and blocks instead of
+# corrupting /etc/apt/sources.list.d/docker.sources. powershell.exe remains
+# fine for -SelfTest/-WhatIf/read-only use.
 #
 # Scope discipline (do not relax without a new dispatch):
 #   - Never self-elevates (no Start-Process -Verb RunAs) and never reboots.
@@ -133,10 +138,13 @@ function ConvertFrom-OsRelease {
   return $map
 }
 
-# Mirrors the Ubuntu releases docs.docker.com/engine/install/ubuntu/ supports
-# as of this writing. Update this list (not the check below) when Docker
-# adds or drops a release.
-$script:SupportedUbuntuCodenames = @('focal', 'jammy', 'noble')
+# docs.docker.com/engine/install/ubuntu/ currently (as of this writing) lists
+# 22.04/24.04/26.04/26.10 as supported and no longer lists 20.04 (focal). This
+# keeps only the subset this installer has actually been exercised against
+# (22.04/jammy, 24.04/noble -- the real CRM-001-HOST target); add 26.04/26.10
+# here only once verified against docs.docker.com again, not on assumption.
+# Update this list (not the check below) when Docker adds or drops a release.
+$script:SupportedUbuntuCodenames = @('jammy', 'noble')
 
 # Refuses to run apt/repo steps against anything but a known-supported
 # Ubuntu release, checked BEFORE any mutation. Pure function.
@@ -152,6 +160,32 @@ function Test-SupportedUbuntuRelease {
     return [ordered]@{ Supported = $false; Reason = "Ubuntu codename '$codename' (VERSION_ID='$($OsRelease['VERSION_ID'])') is not in the supported list ($($script:SupportedUbuntuCodenames -join ', ')); refusing to run apt/repo steps against an unverified release" }
   }
   return [ordered]@{ Supported = $true; Reason = $null }
+}
+
+# @(<a Generic.List[object] variable>) throws "Argument types do not match" on
+# this host, reproduced live under BOTH pwsh 7 and powershell.exe 5.1 (unrelated
+# to Set-StrictMode; a List[string], or a List[object] returned from a function
+# and auto-enumerated through the pipeline, are both unaffected -- only wrapping
+# the List[object] VARIABLE itself fails). .ToArray() sidesteps it for any
+# List[T] without that crash. Pure function: no process calls, unit-testable.
+function ConvertTo-PlainArray {
+  param([Parameter(Mandatory)] [System.Collections.Generic.List[object]] $List)
+  return $List.ToArray()
+}
+
+# powershell.exe (Windows PowerShell 5.1, PSEdition 'Desktop') corrupts a
+# literal double quote embedded inside a native array argument -- reproduced
+# live with `node` as a stand-in: 'printf "Types: deb" "stable" "amd64"' arrives
+# at the child process truncated to 'printf Types:', silently dropping the rest.
+# pwsh (PSEdition 'Core') passes the same argument through byte-for-byte. The
+# docker-apt-source step below builds its apt sources file from a quoted printf
+# format string, so running phase 2's mutating steps under Desktop edition would
+# silently write a corrupt/truncated /etc/apt/sources.list.d/docker.sources
+# instead of failing loudly. Pure function: no process calls, unit-testable.
+function Test-NativeQuotingSafe {
+  param([string] $Edition, [string] $Script)
+  if (-not $Script.Contains('"')) { return $true }
+  return ($Edition -eq 'Core')
 }
 
 # Classifies the whole run from the two phases' result tokens. Never returns
@@ -190,7 +224,14 @@ function Invoke-SelfTest {
   }
 
   # ---- encoding split, proven against a real child process (node), no WSL/Linux required ----
-  $sample = 'headSha=4f9d2ab1c3e07f6a accented:cafe-nino-manana'
+  # Built from code points rather than embedded literally: a raw é/ñ in this .ps1
+  # source would depend on the file being *read* with the right encoding by
+  # whichever engine (pwsh/powershell.exe) loads it, which is exactly the kind of
+  # encoding assumption this test exists to not make. [char] construction sidesteps
+  # that entirely while still exercising genuinely non-ASCII text, not just hex.
+  $eAcute = [char]0x00E9
+  $nTilde = [char]0x00F1
+  $sample = "headSha=4f9d2ab1c3e07f6a accented:caf${eAcute}-ni${nTilde}o-ma${nTilde}ana"
   $jsUtf8 = 'process.stdout.write(Buffer.from(process.argv[1],''utf8''))'
   $jsUtf16 = 'process.stdout.write(Buffer.from(process.argv[1],''utf16le''))'
 
@@ -225,6 +266,19 @@ function Invoke-SelfTest {
   # fixed by normalizing with @() inside Resolve-MutationDistro itself.
   $noDistrosAtAll = Resolve-MutationDistro -Distributions $null -RequestedName 'Ubuntu'
   Assert-True ($null -ne $noDistrosAtAll.Error -and $null -eq $noDistrosAtAll.Distro) 'Resolve-MutationDistro fails closed (not a crash) when $Distributions is $null'
+
+  # ---- @() vs .ToArray() on a real Generic.List[object], pure, runs under whichever engine invoked -SelfTest ----
+  $syntheticSteps = New-Object System.Collections.Generic.List[object]
+  $syntheticSteps.Add([pscustomobject]@{ Name = 'apt-update'; Ok = $true }) | Out-Null
+  $syntheticSteps.Add([pscustomobject]@{ Name = 'docker-apt-source'; Ok = $false }) | Out-Null
+  $materializedSteps = ConvertTo-PlainArray -List $syntheticSteps
+  Assert-True ($materializedSteps.Count -eq 2 -and $materializedSteps[0].Name -eq 'apt-update' -and $materializedSteps[1].Name -eq 'docker-apt-source') "ConvertTo-PlainArray materializes synthetic phase2 steps under $($PSVersionTable.PSEdition) without the @(`$list) 'Argument types do not match' crash (reproduced live on this host under both pwsh and powershell.exe)"
+
+  # ---- native-arg quoting safety gate, pure ----
+  Assert-True (Test-NativeQuotingSafe -Edition 'Core' -Script 'apt-get update -y') 'Test-NativeQuotingSafe: a quote-free script is safe under pwsh'
+  Assert-True (Test-NativeQuotingSafe -Edition 'Desktop' -Script 'apt-get update -y') 'Test-NativeQuotingSafe: a quote-free script is safe under powershell.exe too (nothing to corrupt)'
+  Assert-True (Test-NativeQuotingSafe -Edition 'Core' -Script 'printf "Types: deb" "stable"') 'Test-NativeQuotingSafe: pwsh (Core) is safe even for a quoted script'
+  Assert-True (-not (Test-NativeQuotingSafe -Edition 'Desktop' -Script 'printf "Types: deb" "stable"')) 'Test-NativeQuotingSafe: powershell.exe (Desktop) is unsafe for a quoted script (reproduced live: embedded quotes get dropped/truncated)'
 
   # ---- os-release parsing + supported-release gate, pure ----
   $jammyText = "NAME=`"Ubuntu`"`nID=ubuntu`nVERSION_ID=`"22.04`"`nVERSION_CODENAME=jammy`nUBUNTU_CODENAME=jammy"
@@ -409,8 +463,6 @@ try {
                 # failure. No package removal step and no /home group membership mutation: the
                 # distro is already operated as `wsl -u root`, so no new privilege is needed, and
                 # repairing/removing anything pre-existing is out of this script's scope.
-                $steps = New-Object System.Collections.Generic.List[object]
-                $ok = $true
                 $planned = @(
                   @{ Name = 'apt-update'; Script = 'apt-get update -y' },
                   @{ Name = 'apt-install-prereqs'; Script = 'apt-get install -y ca-certificates curl' },
@@ -424,27 +476,42 @@ try {
                   @{ Name = 'verify-docker-version'; Script = 'docker --version' }
                 )
 
-                foreach ($step in $planned) {
-                  if (-not $ok) {
-                    $steps.Add([pscustomobject]@{ Name = $step.Name; Command = $step.Script; ExitCode = $null; Ok = $false; Skipped = $true; Detail = 'skipped: earlier step failed' }) | Out-Null
-                    continue
-                  }
-                  $stepResult = Invoke-WslRootStep -Distro $distro -Name $step.Name -BashScript $step.Script
-                  $steps.Add($stepResult) | Out-Null
-                  if (-not $stepResult.Skipped -and -not $stepResult.Ok) { $ok = $false }
-                }
-
-                $report.phase2.steps = @($steps)
-                $anySkipped = (@($steps | Where-Object { $_.Skipped })).Count -gt 0
-                if (-not $ok) {
-                  $report.phase2.result = 'install-failed'
-                  $report.phase2.detail = "a required step failed in '$distro'; see steps for the first failing command/exit code"
-                } elseif ($anySkipped) {
-                  $report.phase2.result = 'planned'
-                  $report.phase2.detail = "dry run (-WhatIf): no step executed against '$distro'; see steps for what would have run"
+                # Checked over every planned step (not just the one known to need quotes
+                # today) and BEFORE the loop starts a single real command, so a run under
+                # the wrong engine blocks with zero mutation rather than partially mutating
+                # (apt-update/apt-install-prereqs/etc. already run) before reaching the step
+                # that would actually corrupt. -WhatIf never executes a native command either
+                # way (Invoke-WslRootStep's ShouldProcess check short-circuits first), so it is
+                # let through here to still show the plan under either engine.
+                $unsafeSteps = @($planned | Where-Object { -not (Test-NativeQuotingSafe -Edition $PSVersionTable.PSEdition -Script $_.Script) })
+                if ($unsafeSteps.Count -gt 0 -and -not $WhatIfPreference) {
+                  $report.phase2.result = 'blocked-engine-unsafe-quoting'
+                  $report.phase2.detail = "running under PSEdition '$($PSVersionTable.PSEdition)' ($($PSVersionTable.PSVersion)); step(s) $(($unsafeSteps | ForEach-Object { $_.Name }) -join ', ') pass a native argument containing a literal double quote, which powershell.exe (Desktop edition) corrupts/truncates instead of passing through (confirmed live with a node stand-in); re-run this phase with pwsh (PowerShell 7+) instead of powershell.exe. No command was executed."
                 } else {
-                  $report.phase2.result = 'installed'
-                  $report.phase2.detail = "Docker Engine installed in '$distro'"
+                  $steps = New-Object System.Collections.Generic.List[object]
+                  $ok = $true
+                  foreach ($step in $planned) {
+                    if (-not $ok) {
+                      $steps.Add([pscustomobject]@{ Name = $step.Name; Command = $step.Script; ExitCode = $null; Ok = $false; Skipped = $true; Detail = 'skipped: earlier step failed' }) | Out-Null
+                      continue
+                    }
+                    $stepResult = Invoke-WslRootStep -Distro $distro -Name $step.Name -BashScript $step.Script
+                    $steps.Add($stepResult) | Out-Null
+                    if (-not $stepResult.Skipped -and -not $stepResult.Ok) { $ok = $false }
+                  }
+
+                  $report.phase2.steps = ConvertTo-PlainArray -List $steps
+                  $anySkipped = (@($steps | Where-Object { $_.Skipped })).Count -gt 0
+                  if (-not $ok) {
+                    $report.phase2.result = 'install-failed'
+                    $report.phase2.detail = "a required step failed in '$distro'; see steps for the first failing command/exit code"
+                  } elseif ($anySkipped) {
+                    $report.phase2.result = 'planned'
+                    $report.phase2.detail = "dry run (-WhatIf): no step executed against '$distro'; see steps for what would have run"
+                  } else {
+                    $report.phase2.result = 'installed'
+                    $report.phase2.detail = "Docker Engine installed in '$distro'"
+                  }
                 }
               }
             }

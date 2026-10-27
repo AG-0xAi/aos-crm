@@ -7,6 +7,13 @@ Fecha: 27 de octubre de 2026. **No es todavía un procedimiento de instalación 
 no propuesto— están en [HOST_RUNTIME.md](HOST_RUNTIME.md). Esta sección queda como la radiografía
 original; no se reescribe aquí.
 
+**Actualización fix2 (27 de octubre de 2026):** el founder autorizó instalar Linux; tras el
+reinicio de Windows y la instalación de Docker por el coordinador, `scripts/aos/preflight-host.ps1`
+mide `"status": "ready"` (exit 0) contra `AOS-CRM-Ubuntu-24.04` ahora mismo. El runtime de host
+(WSL2 + Docker Engine) ya no es el prerrequisito pendiente; detalle en
+[HOST_RUNTIME.md § CRM-001-HOST-fix2](HOST_RUNTIME.md#crm-001-host-fix2-cierre-con-linux-real-tras-reinicio).
+El CRM en sí (build, migraciones, servidor/worker) sigue sin arrancar.
+
 ## Comprobaciones realizadas
 
 | Elemento | Resultado |

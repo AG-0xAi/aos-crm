@@ -96,6 +96,28 @@ function Invoke-Native {
   [pscustomobject]@{ ExitCode = $code; Text = $text.Trim() }
 }
 
+# Win32_Processor's VirtualizationFirmwareEnabled/SecondLevelAddressTranslationExtensions
+# properties can read back False once Hyper-V's own hypervisor is already layered over the
+# CPU -- confirmed live on this host (hypervisorCurrentlyPresent=true while both read
+# false) -- so a BIOS/UEFI recommendation built on these two alone is only trustworthy
+# while no hypervisor is running yet; a hypervisor already running is stronger evidence
+# virtualization works than this CIM read. Pure function: no process calls, unit-testable.
+function Test-FirmwareVirtualizationTrustworthy {
+  param([bool] $HypervisorPresent)
+  return (-not $HypervisorPresent)
+}
+
+# VirtualMachinePlatform backs the modern Store-distributed WSL2 stack and is a hard
+# prerequisite; the legacy Microsoft-Windows-Subsystem-Linux feature is required only to
+# run WSL1 (`wsl --status` asks for it only in that case, confirmed live on this host:
+# Linux already runs via WSL2 while this feature reports Disabled), so a disabled state
+# there is not evidence WSL2 itself is missing. Pure function: no process calls,
+# unit-testable.
+function Test-OptionalFeatureRequiredForWsl2 {
+  param([string] $FeatureName)
+  return ($FeatureName -eq 'VirtualMachinePlatform')
+}
+
 function Get-InstallStateName([int] $State) {
   switch ($State) {
     1 { 'Enabled' }
@@ -167,7 +189,14 @@ function Invoke-SelfTest {
   }
 
   # ---- encoding split, proven against a real child process (node), no WSL/Linux required ----
-  $sample = 'headSha=4f9d2ab1c3e07f6a accented:cafe-nino-manana'
+  # Built from code points rather than embedded literally: a raw é/ñ in this .ps1 source
+  # would depend on the file being *read* with the right encoding by whichever engine
+  # (pwsh/powershell.exe) loads it, which is exactly the kind of encoding assumption this
+  # test exists to not make. [char] construction sidesteps that while still exercising
+  # genuinely non-ASCII text, not just hex.
+  $eAcute = [char]0x00E9
+  $nTilde = [char]0x00F1
+  $sample = "headSha=4f9d2ab1c3e07f6a accented:caf${eAcute}-ni${nTilde}o-ma${nTilde}ana"
   $jsUtf8 = 'process.stdout.write(Buffer.from(process.argv[1],''utf8''))'
   $jsUtf16 = 'process.stdout.write(Buffer.from(process.argv[1],''utf16le''))'
 
@@ -205,6 +234,13 @@ function Invoke-SelfTest {
   # fixed by normalizing with @() inside Resolve-TargetDistro itself.
   $noDistrosAtAll = Resolve-TargetDistro -Distributions $null -RequestedName ''
   Assert-True ($null -ne $noDistrosAtAll.Error -and $null -eq $noDistrosAtAll.Distro) 'Resolve-TargetDistro fails closed (not a crash) when $Distributions is $null'
+
+  # ---- firmware-virtualization trust gate + WSL1-vs-WSL2 feature requirement, pure ----
+  Assert-True (Test-FirmwareVirtualizationTrustworthy -HypervisorPresent $false) 'Test-FirmwareVirtualizationTrustworthy: trusts the CIM read when no hypervisor is running yet'
+  Assert-True (-not (Test-FirmwareVirtualizationTrustworthy -HypervisorPresent $true)) 'Test-FirmwareVirtualizationTrustworthy: distrusts the CIM read once a hypervisor is already active (reproduced live on this host: HypervisorPresent=true while the CIM bits read false)'
+
+  Assert-True (Test-OptionalFeatureRequiredForWsl2 -FeatureName 'VirtualMachinePlatform') 'Test-OptionalFeatureRequiredForWsl2: VirtualMachinePlatform is a hard WSL2 prerequisite'
+  Assert-True (-not (Test-OptionalFeatureRequiredForWsl2 -FeatureName 'Microsoft-Windows-Subsystem-Linux')) 'Test-OptionalFeatureRequiredForWsl2: the legacy WSL1 feature is not a WSL2 prerequisite (reproduced live on this host: Linux already runs via WSL2 while this feature reports Disabled)'
 
   Write-Output ''
   Write-Output "self-test: $(if ($failures.Count -eq 0) { 'ALL PASSED' } else { "$($failures.Count) FAILED" })"
@@ -251,37 +287,47 @@ try {
   # ---- firmware virtualization / SLAT / DEP (locale-independent CIM properties) ----
   $cpu = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
   $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem
+  $hypervisorPresent = [bool]$computerSystem.HypervisorPresent
   $result.virtualization = [ordered]@{
     firmwareVirtualizationEnabled = [bool]$cpu.VirtualizationFirmwareEnabled
     secondLevelAddressTranslation = [bool]$cpu.SecondLevelAddressTranslationExtensions
     dataExecutionPreventionAvailable = [bool]$os.DataExecutionPrevention_Available
-    hypervisorCurrentlyPresent    = [bool]$computerSystem.HypervisorPresent
+    hypervisorCurrentlyPresent    = $hypervisorPresent
   }
-  if (-not $cpu.VirtualizationFirmwareEnabled) {
-    Add-Missing 'CPU virtualization extensions are reported disabled in firmware (BIOS/UEFI); enable them before any WSL2/Hyper-V feature will work'
-  }
-  if (-not $cpu.SecondLevelAddressTranslationExtensions) {
-    Add-Missing 'SLAT (second-level address translation) is reported unavailable; WSL2 requires it'
+  if (Test-FirmwareVirtualizationTrustworthy -HypervisorPresent $hypervisorPresent) {
+    if (-not $cpu.VirtualizationFirmwareEnabled) {
+      Add-Missing 'CPU virtualization extensions are reported disabled in firmware (BIOS/UEFI); enable them before any WSL2/Hyper-V feature will work'
+    }
+    if (-not $cpu.SecondLevelAddressTranslationExtensions) {
+      Add-Missing 'SLAT (second-level address translation) is reported unavailable; WSL2 requires it'
+    }
+  } elseif (-not $cpu.VirtualizationFirmwareEnabled -or -not $cpu.SecondLevelAddressTranslationExtensions) {
+    Add-Note 'firmwareVirtualizationEnabled/secondLevelAddressTranslation report false, but a hypervisor is already running (hypervisorCurrentlyPresent=true); this is a known CIM read artifact once Hyper-V is active, not evidence of a BIOS/UEFI problem -- a running hypervisor is stronger proof virtualization already works than this CIM read'
   }
 
   # ---- Windows optional features (WMI, no elevation needed to read) ----
   $featureNames = @('VirtualMachinePlatform', 'Microsoft-Windows-Subsystem-Linux')
   $features = [ordered]@{}
   foreach ($name in $featureNames) {
+    $requiredForWsl2 = Test-OptionalFeatureRequiredForWsl2 -FeatureName $name
     $feature = Get-CimInstance -ClassName Win32_OptionalFeature -Filter "Name='$name'" -ErrorAction SilentlyContinue
     if ($null -eq $feature) {
       $features[$name] = [ordered]@{ installState = $null; installStateName = 'NotReported' }
-      Add-Missing "Windows optional feature '$name' was not reported by WMI; it is very likely not installed"
+      if ($requiredForWsl2) {
+        Add-Missing "Windows optional feature '$name' was not reported by WMI; it is very likely not installed"
+      }
     } else {
       $state = [int]$feature.InstallState
       $features[$name] = [ordered]@{ installState = $state; installStateName = (Get-InstallStateName $state) }
-      if ($state -ne 1) {
+      if ($requiredForWsl2 -and $state -ne 1) {
         Add-Missing "Windows optional feature '$name' is $(Get-InstallStateName $state) (WMI InstallState=$state), not Enabled; run scripts/aos/install-host-wsl.ps1 phase 1 from an elevated session"
+      } elseif (-not $requiredForWsl2 -and $state -ne 1) {
+        Add-Note "Windows optional feature '$name' is $(Get-InstallStateName $state) (WMI InstallState=$state); this is the legacy WSL1-only feature (wsl --status requires it only to run WSL1), not evidence that the modern Store-distributed WSL2 is missing -- not treated as a missing prerequisite"
       }
     }
   }
   $result.windowsOptionalFeatures = $features
-  Add-Note 'WMI InstallState enum: 1=Enabled, 2=Disabled, 3=Absent, 4=Unknown. A non-1 value is not evidence of WSL readiness even if wsl.exe exists.'
+  Add-Note 'WMI InstallState enum: 1=Enabled, 2=Disabled, 3=Absent, 4=Unknown. A non-1 value for VirtualMachinePlatform is not by itself evidence of WSL2 readiness even if wsl.exe exists.'
 
   # ---- wsl.exe real behavior probe (never trusts the mere existence of the binary) ----
   $wslExePath = (Get-Command wsl.exe -ErrorAction SilentlyContinue)
@@ -369,7 +415,15 @@ try {
     $smokeTest.reason = 'no WSL2 distribution available'
   } else {
     $selectedDistro = $targetDistro.name
-    $linuxPathProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'wslpath', '-a', $repoRoot)
+    # A Windows path passed as a bare argv element after `--` (no shell in between)
+    # has its backslashes silently eaten by wsl.exe's own argument forwarding --
+    # confirmed live on this host: `wsl -d <distro> -- echo 'C:\Users\x'` prints
+    # `C:Usersx`, identical corruption with no shell involved at all. Routing
+    # through `bash -lc` with the path single-quoted preserves it byte for byte
+    # (also confirmed live) because bash's own quoting, not wsl.exe's forwarding,
+    # is then what parses it.
+    $wslpathScript = "wslpath -a '$repoRoot'"
+    $linuxPathProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'bash', '-lc', $wslpathScript)
     if ($linuxPathProbe.ExitCode -ne 0) {
       $linuxAccess = [ordered]@{ attempted = $true; ok = $false; distro = $selectedDistro; detail = "wslpath translation failed (exit $($linuxPathProbe.ExitCode))" }
       Add-Missing "could not translate the checkout path for Linux via '$selectedDistro'"

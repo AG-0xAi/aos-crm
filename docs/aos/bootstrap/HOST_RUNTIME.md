@@ -13,6 +13,19 @@ Docker existente y el estado final informado. Detalle en la sección
 abajo. El bloqueo externo (WSL/elevación) sigue sin resolverse y el gate sigue fallando a propósito
 por esa razón, no por los defectos ahora corregidos.
 
+**Corrección CRM-001-HOST-fix2 (27 de octubre de 2026, rama `codex/crm001-host-runtime-fix2`):** el
+founder autorizó instalar Linux; el coordinador lo hizo y Windows reinició. El bloqueo externo de
+fix1 ya no existe: hay una distribución Linux real, con Docker instalado por el coordinador. Esta
+corrección (a) arregla un crash real de `install-host-wsl.ps1` reproducido en vivo bajo pwsh y
+powershell.exe, (b) corrige dos falsos prerrequisitos de `preflight-host.ps1` que el propio host
+exhibía, (c) añade un guardia de codificación para el paso de instalación que sí necesita comillas
+nativas, (d) corrige la lista de releases Ubuntu soportadas, y (e) encontró y corrigió, al re-medir
+el host real, un bug adicional no listado por el coordinador: `wslpath` perdía las barras invertidas
+de la ruta de Windows. Con todo corregido, `scripts/aos/preflight-host.ps1` mide **`"status":
+"ready"`, exit 0** contra este host ahora mismo — no un `-WhatIf`, no una fixture. Detalle completo
+en la sección ["CRM-001-HOST-fix2: cierre con Linux real tras reinicio"](#crm-001-host-fix2-cierre-con-linux-real-tras-reinicio)
+más abajo.
+
 ## Alcance
 
 - `scripts/aos/preflight-host.ps1` — mide el host en modo solo lectura: nunca activa una
@@ -21,10 +34,10 @@ por esa razón, no por los defectos ahora corregidos.
   distribución Linux + Docker Engine (no Docker Desktop). Nunca se autoeleva ni reinicia el equipo.
 - Ninguno de los dos instala dependencias del CRM ni construye su imagen; eso es CRM-004.
 
-## Estado medido ahora (re-ejecutado, no de memoria)
+## Estado medido en la entrega original y en fix1 (histórico, superado por fix2 abajo)
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/aos/preflight-host.ps1` sobre esta
-sesión (no administrador):
+sesión (no administrador), **antes de que existiera ninguna distribución Linux**:
 
 | Medición | Resultado real |
 | --- | --- |
@@ -151,11 +164,14 @@ control) y dos comandos `-SelfTest` (uno por script) deterministas, sin WSL/Linu
 prueban en aislado la decodificación UTF-16/UTF-8, la selección de distro y, en el instalador, el
 parseo de `/etc/os-release` y el clasificador final. El instalador real (`-WhatIf` o mutando) **no**
 está en el gate permanente: fase 2 exige `-DistroName` explícito, y fijar un nombre de distro en
-`verify.json` asumiría una topología que nadie eligió. Con el host en el estado medido arriba, el
-comando de medición real falla el gate **a propósito** (exit 1): es el comportamiento pedido por el
-contrato ("el gate debe fallar si falta WSL/Linux/runtime"), no un defecto del script. Ninguno de
-estos comandos construye, arranca servidor/worker/DB/Redis, corre typecheck/tests de la aplicación o
-instala una dependencia del CRM — ese gate completo sigue en CRM-004/CRM-005.
+`verify.json` asumiría una topología que nadie eligió. Mientras el host no tenía Linux, el comando de
+medición real fallaba el gate **a propósito** (exit 1): es el comportamiento pedido por el contrato
+("el gate debe fallar si falta WSL/Linux/runtime"), no un defecto del script. Tras fix2, con Linux y
+Docker reales, los cinco comandos pasan (ver
+["CRM-001-HOST-fix2"](#crm-001-host-fix2-cierre-con-linux-real-tras-reinicio)); el comando de
+medición real seguirá fallando cerrado otra vez si el host deja de estarlo, no por el contrario.
+Ninguno de estos comandos construye, arranca servidor/worker/DB/Redis, corre typecheck/tests de la
+aplicación o instala una dependencia del CRM — ese gate completo sigue en CRM-004/CRM-005.
 
 ## Fuentes oficiales usadas
 
@@ -200,22 +216,159 @@ capturarla (y que al recorrerla con `Where-Object` sigue invocando el bloque una
 hasta que esa fase corría — ambos confirmados en vivo contra este host con `-Phase1Only`/`-Phase2Only`
 y corregidos igual que los cinco de arriba.
 
-**No corregido aquí, fuera de alcance de este run**: `powershell.exe` clásico (no `pwsh`) recorta las
-comillas dobles incrustadas en argumentos nativos pasados por arreglo — confirmado con `node`,
-afecta en teoría a la plantilla `--format "{{.Server.Version}}"` del chequeo de Docker existente
-(inocuo para ese literal concreto porque bash no expande `{{...}}` sin coma, pero sí sería un riesgo
-real para cualquier argumento futuro que necesite comillas literales bajo `powershell.exe`). Pendiente
-de que el coordinador decida si amerita su propio encargo.
+**No corregido en fix1, cerrado en fix2 (ver abajo)**: `powershell.exe` clásico (no `pwsh`) recorta
+las comillas dobles incrustadas en argumentos nativos pasados por arreglo.
 
-## Siguiente paso (fuera del alcance de esta sesión)
+## CRM-001-HOST-fix2: cierre con Linux real tras reinicio
 
-1. El founder (o quien tenga consola de administrador) corre `wsl.exe --install` elevado y reinicia.
-2. Lanza la distribución instalada una vez para crear su usuario/contraseña de Linux.
-3. Re-corre `scripts/aos/preflight-host.ps1`; si sigue `not-ready`, re-corre
-   `scripts/aos/install-host-wsl.ps1 -DistroName <nombre-exacto>` (fase 2, Docker Engine; el nombre
-   ya no se adivina) y vuelve a comprobar.
-4. Solo cuando `preflight-host.ps1` salga `ready` (exit 0) y por tanto `aos verify` pase todos sus
-   comandos, este track puede aceptarse como terminado. Hasta entonces queda **BLOCKED/INCOMPLETE**
-   en el punto exacto descrito arriba, sin fingir aceptación. El procedimiento del instalador
-   (fix1) queda además pendiente de revisión independiente y de una ejecución real sobre un host con
-   WSL/elevación disponibles — ningún claim de "instalado"/"listo" sale de este run.
+27 de octubre de 2026, rama `codex/crm001-host-runtime-fix2`, base `2b46290b8f` (fix1).
+
+### Estado real del host (medido ahora, no de memoria, no `-WhatIf`)
+
+El founder autorizó «instala lo que necesites de linux»; el coordinador instaló WSL y Windows
+reinició (evidencia en `.aos/onboarding/bootstrap-2026-10-27/` y
+`.aos/reports/CRM-001-HOST-coordinator-review.md`). Medido de nuevo en este run, por separado de esa
+evidencia:
+
+| Medición | Resultado real |
+| --- | --- |
+| `(Get-CimInstance Win32_OperatingSystem).LastBootUpTime` | 27/10/2026 14:45:50 (coincide con lo reportado por el coordinador) |
+| `VirtualMachinePlatform` (WMI) | `InstallState=1` → **Enabled** |
+| `Microsoft-Windows-Subsystem-Linux` (WMI, legacy WSL1) | `InstallState=2` → **Disabled** (ver fix 2 abajo: ya no se reporta como prerrequisito faltante) |
+| `hypervisorCurrentlyPresent` (`Win32_ComputerSystem`) | `true` |
+| `firmwareVirtualizationEnabled`/`secondLevelAddressTranslation` (`Win32_Processor`) | ambas `false` pese al hipervisor activo (ver fix 2 abajo) |
+| `wsl --list --verbose` | `AOS-CRM-Ubuntu-24.04`, WSL2, default |
+| `/etc/os-release` dentro de la distro | `Ubuntu 24.04.5 LTS (Noble Numbat)`, `ID=ubuntu`, `UBUNTU_CODENAME=noble` |
+| `uname -r` | `6.18.54.1-microsoft-standard-WSL2` |
+| `ps -p 1 -o comm=` | `systemd` |
+| `whoami` (usuario por defecto, sin OOBE) | `root` |
+| `docker --version` / `docker compose version` | `Docker version 29.9.2, build a82e528` / `Docker Compose version v5.6.1` (instalado por el coordinador siguiendo la guía oficial, no por este run) |
+
+### Correcciones (Síntoma → Causa → Fix → Regla)
+
+1. **Crash real de `install-host-wsl.ps1` bajo `-WhatIf`.**
+   - Síntoma: `pwsh -File scripts/aos/install-host-wsl.ps1 -Phase2Only -DistroName
+     AOS-CRM-Ubuntu-24.04 -WhatIf` mostraba los diez pasos como `ShouldProcess`/skipped
+     correctamente, pero terminaba `"status": "error"`, `"error": "Argument types do not match"`.
+   - Causa: `$report.phase2.steps = @($steps)` envuelve con `@()` la variable `$steps`, que es un
+     `System.Collections.Generic.List[object]` construido con `New-Object`+`.Add()`. Esa combinación
+     concreta (lista `List[object]` referenciada directamente, no el valor que devuelve una función)
+     lanza esa excepción — reproducido en aislado con un repro mínimo de 4 líneas bajo **ambos**
+     motores, `pwsh 7.6.5` y `powershell.exe 5.1`; un `List[string]`, o un `List[object]` devuelto
+     por una función y enumerado por el pipeline, no la sufren.
+   - Fix: `ConvertTo-PlainArray` (`.ToArray()` sobre la lista) en vez de `@($steps)`.
+   - Regla: nunca envolver con `@()` una variable `Generic.List[object]` referenciada directamente;
+     usar `.ToArray()` o un `foreach` explícito. Probado con pasos sintéticos (`ConvertTo-PlainArray`
+     con una lista de dos `pscustomobject` de ejemplo) en el `-SelfTest`, sin tocar paquetes reales.
+2. **Falso prerrequisito: característica legacy WSL1.**
+   - Síntoma: `preflight-host.ps1` reportaba `Microsoft-Windows-Subsystem-Linux` deshabilitada como
+     prerrequisito faltante de WSL2, en un host donde Linux ya corre vía WSL2.
+   - Causa: el script trataba ambas características de la lista (`VirtualMachinePlatform` y la
+     legacy) como igualmente requeridas. La documentación oficial de `wsl --status` solo exige la
+     legacy para WSL1 (`--enable-wsl1`, opt-in), no para el stack moderno distribuido por la Store.
+     Confirmado en vivo en este mismo host: `InstallState=2` (Disabled) en esa característica mientras
+     `AOS-CRM-Ubuntu-24.04` corre normalmente como WSL2.
+   - Fix: `Test-OptionalFeatureRequiredForWsl2` marca solo `VirtualMachinePlatform` como duro;
+     la legacy pasa a `notes`, nunca a `missingPrerequisites`.
+   - Regla: no tratar como prerrequisito algo que la fuente oficial solo exige para una versión
+     distinta de la que se está midiendo.
+3. **Falso prerrequisito: BIOS/UEFI con hipervisor ya activo.**
+   - Síntoma: `preflight-host.ps1` recomendaba habilitar virtualización en firmware (BIOS/UEFI) en
+     un host donde WSL2/Hyper-V ya funciona.
+   - Causa: `Win32_Processor.VirtualizationFirmwareEnabled`/`SecondLevelAddressTranslationExtensions`
+     leen `false` una vez que el propio hipervisor de Hyper-V ya está activo sobre la CPU —
+     confirmado en vivo en este host: `hypervisorCurrentlyPresent=true` mientras ambas propiedades
+     CIM leen `false`. Un hipervisor corriendo es mejor prueba de que la virtualización funciona que
+     esa lectura CIM.
+   - Fix: `Test-FirmwareVirtualizationTrustworthy` solo deja recomendar BIOS/UEFI cuando no hay
+     hipervisor activo; si lo hay, la lectura `false` pasa a `notes`, no a `missingPrerequisites`.
+   - Regla: una propiedad CIM de firmware puede quedar obsoleta una vez el software que depende de
+     ella ya está corriendo; no tratarla como la fuente de verdad final si hay una señal de ejecución
+     real más fuerte disponible.
+4. **Codificación insegura en el paso mutante que sí necesita comillas.**
+   - Síntoma: ya documentado en fix1 como fuera de alcance: `powershell.exe` clásico recorta comillas
+     dobles incrustadas en un argumento nativo pasado por arreglo (confirmado con `node`:
+     `printf "Types: deb" "stable" "amd64"` llega truncado a `printf Types:`). El paso
+     `docker-apt-source` construye el archivo de fuentes `apt` exactamente con ese patrón.
+   - Causa: `pwsh` (Core) sí pasa el argumento íntegro; `powershell.exe` (Desktop) no.
+   - Fix: `Test-NativeQuotingSafe` revisa los diez pasos planeados **antes** de ejecutar el primero
+     (no solo el que tiene comillas) y bloquea con `blocked-engine-unsafe-quoting` si corre bajo
+     Desktop, sin mutar nada; `-WhatIf` igual muestra el plan bajo cualquier motor porque nunca llega
+     a ejecutar un comando nativo. No se declaran ambos motores "plenamente soportados": solo `pwsh`
+     lo está para la fase mutante; `powershell.exe` sigue sirviendo para lectura/`-SelfTest`, donde
+     ya se confirmó inocuo.
+   - Regla: antes de mutar con un argumento que necesita comillas literales, comprobar el motor de
+     PowerShell activo y fallar cerrado si no lo soporta — no asumir que pasar el self-test en un
+     motor certifica el otro.
+5. **Lista de releases Ubuntu soportadas desactualizada.**
+   - Síntoma: la lista incluía `focal` (20.04); docs.docker.com/engine/install/ubuntu ya no lo lista
+     como soportado (soporta 22.04/24.04/26.04/26.10 a la fecha de este run).
+   - Fix: lista reducida a `jammy` (22.04) y `noble` (24.04) — el subconjunto realmente probado en
+     este bootstrap, que incluye el target real `AOS-CRM-Ubuntu-24.04`. No se añaden 26.04/26.10 sin
+     verificarlas de nuevo contra la fuente oficial.
+   - Regla: una lista de "versiones soportadas" copiada de una fuente externa se desactualiza sola;
+     no ampliarla por conveniencia sin volver a confirmar la fuente.
+6. **Pruebas rotuladas "con acentos" que en realidad eran ASCII.**
+   - Síntoma: el `sample` de encoding en ambos `-SelfTest` se documentaba como texto acentuado pero
+     el literal real era `cafe-nino-manana`, sin ningún carácter fuera de ASCII.
+   - Fix: el sample ahora se construye con `[char]0x00E9`/`[char]0x00F1` (é/ñ) en vez de escribirse
+     literalmente en el `.ps1` — así la prueba no depende de que el motor que cargue el script lea su
+     propia codificación de origen correctamente, que es justo el tipo de suposición que esta prueba
+     existe para no hacer. Verificado con round-trip UTF-8/UTF-16 real bajo `pwsh` y `powershell.exe`
+     antes y después del cambio.
+   - Regla: un carácter no-ASCII embebido literalmente en un `.ps1` prueba la codificación del
+     archivo fuente, no la del proceso bajo prueba; constrúyelo desde code points si el objetivo es
+     aislar la segunda.
+7. **`wslpath` perdía las barras invertidas de la ruta de Windows (encontrado al re-medir el host
+   real, no listado por el coordinador).**
+   - Síntoma: con Linux y Docker ya sanos, `preflight-host.ps1` seguía devolviendo `not-ready` por
+     `"wslpath translation failed (exit 1)"`.
+   - Causa: `Invoke-WslLinux -NativeArgs @('-d', $distro, '--', 'wslpath', '-a', $repoRoot)` pasa la
+     ruta de Windows (con barras invertidas) como argumento suelto tras `--`, sin ninguna shell de
+     por medio. Confirmado en vivo, sin relación con comillas: `wsl -d <distro> -- echo
+     'C:\Users\x'` imprime `C:Usersx` — `wsl.exe` reenvía esa lista de argumentos al proceso Linux
+     re-interpretando barras invertidas como si fueran de escape, no como bytes literales.
+   - Fix: envolver la llamada en `bash -lc "wslpath -a '$repoRoot'"` con la ruta entre comillas
+     simples; bash sí preserva las barras invertidas dentro de comillas simples. Confirmado en vivo:
+     traduce correctamente a `/mnt/c/Users/Andrés/Documents/AOS-CRM`.
+   - Regla: un argumento de ruta de Windows pasado a `wsl.exe -- <comando>` sin una shell de por
+     medio no es seguro — pasar siempre por `bash -lc` con comillas simples para cualquier dato que
+     pueda contener barras invertidas.
+
+### Gate re-ejecutado al cerrar (los cinco comandos de `.aos/verify.json`, en este commit)
+
+```
+node scripts/aos/verify-provenance.mjs              → exit 0
+node scripts/aos/verify-provenance.mjs --self-test  → exit 0
+powershell -NoProfile -File scripts/aos/preflight-host.ps1          → exit 0, "status": "ready"
+powershell -NoProfile -File scripts/aos/preflight-host.ps1 -SelfTest → exit 0, ALL PASSED
+powershell -NoProfile -File scripts/aos/install-host-wsl.ps1 -SelfTest → exit 0, ALL PASSED
+```
+
+Evidencia completa del preflight real en `.aos/reports/host-preflight-fix2-evidence.json` (bus
+local, no versionado): `linuxCheckoutAccess.ok=true` (`headShaMatches=true`, `busReachable=true`),
+`containerRuntime.ok=true` (Docker 29.9.2, `active`), `containerSmokeTest.ok=true` (`docker run --rm
+hello-world`, sin puertos publicados), `missingPrerequisites: []`. Además, `install-host-wsl.ps1
+-Phase2Only -DistroName AOS-CRM-Ubuntu-24.04` real (sin `-WhatIf`) sobre este host devuelve
+`"result": "already-satisfied"`, `"status": "done"`, exit 0, cero pasos ejecutados — Docker ya
+estaba instalado por el coordinador, así que esta sesión no corrió `apt`/mutaciones Linux.
+
+### Límites declarados
+
+- Esta sesión no instaló WSL, Windows ni Docker: eso lo hizo el coordinador, con autorización del
+  founder, fuera de este run. Esta sesión midió, corrigió código y volvió a medir.
+- No se corrió `install-host-wsl.ps1` mutando de verdad (con pasos reales ejecutándose) porque Docker
+  ya estaba sano; la rama de código que sí ejecuta `apt`/`curl`/`systemctl` sigue sin un *end-to-end*
+  real contra este host — queda cubierta por `-SelfTest`/`-WhatIf` y por el guardia de codificación,
+  no por una ejecución mutante real.
+- No se construyó la imagen del CRM, no se arrancó servidor/worker/DB/Redis, no se corrió
+  typecheck/tests de la aplicación — eso sigue en CRM-004/CRM-005.
+- El último `aos review` sobre este track tuvo `diffTruncated: true`; no se asume cobertura completa
+  de esa revisión.
+
+## Siguiente paso
+
+Con `preflight-host.ps1` en `ready` (exit 0) y los cinco comandos de `.aos/verify.json` en verde,
+CRM-001-HOST queda listo para que el arnés publique la rama, abra el PR y el coordinador revise esta
+corrección y decida la aceptación final. El siguiente track que depende de este runtime (construir y
+arrancar el CRM, CRM-004) puede despacharse sobre `AOS-CRM-Ubuntu-24.04` sin repetir esta medición.
