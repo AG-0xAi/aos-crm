@@ -5,6 +5,13 @@
     "pr": "",
     "sessionUrl": false
   },
+  "disabledMcpjsonServers": ["context7", "playwright", "postgres"],
+  "disableClaudeAiConnectors": true,
+  "env": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DO_NOT_TRACK": "1",
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1"
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -18,11 +25,13 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/aos-merge-guard.cjs\""
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/aos-merge-guard.cjs"],
+            "onFailure": "block"
           }
         ]
       }

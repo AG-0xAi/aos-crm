@@ -1,0 +1,128 @@
+name: aos-crm-local
+
+# AOS-CRM local profile (CRM-002). Builds the pinned twenty/v2.51.0 source
+# (15e4826d3b5fc5867baeabeeb42b253892b2d4da) via the official
+# packages/twenty-docker/twenty/Dockerfile; never pulls twentycrm/twenty.
+# Run through scripts/aos/local.ps1, not directly: it generates
+# deploy/local/.env and validates deploy/local/privacy.env (CRM-003) before
+# any build/up. See docs/aos/bootstrap/LOCAL_SECURITY.md for the contract
+# and docs/aos/bootstrap/SECURITY_AUDIT.md (SEC-01..SEC-03) for why each
+# control below exists.
+
+x-aos-crm-app: &aos-crm-app
+  build:
+    context: ../..
+    dockerfile: packages/twenty-docker/twenty/Dockerfile
+    target: twenty
+    args:
+      APP_VERSION: ${AOS_CRM_APP_VERSION:-twenty-v2.51.0+15e4826d3b}
+  image: ${AOS_CRM_IMAGE_TAG:?set AOS_CRM_IMAGE_TAG in deploy/local/.env to a local, non-moving tag such as aos-crm-local/twenty:v2.51.0-15e4826d3b}
+  pull_policy: never
+  # deploy/local/privacy.env is the CRM-003 contract (telemetry/analytics/
+  # cron-sync/config-in-db opt-outs); env_file errors out if the file is
+  # missing, so a start attempt without it fails closed before any service
+  # runs (see R2.1). It is never created by this track.
+  env_file:
+    - ./privacy.env
+  networks:
+    - aos-crm-local
+  volumes:
+    - aos-crm-local-storage:/app/packages/twenty-server/.local-storage
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+x-aos-crm-env: &aos-crm-env
+  PG_DATABASE_URL: postgres://${AOS_CRM_PG_USER:-aos_crm}:${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}@db:5432/${AOS_CRM_PG_DB:-aos_crm_local}
+  REDIS_URL: redis://redis:6379
+  SERVER_URL: ${AOS_CRM_SERVER_URL:-http://127.0.0.1:43000}
+  STORAGE_TYPE: local
+  ENCRYPTION_KEY: ${AOS_CRM_ENCRYPTION_KEY:?set AOS_CRM_ENCRYPTION_KEY in deploy/local/.env}
+  # Forced regardless of privacy.env content: SEC-01 (SECURITY_AUDIT.md).
+  # NODE_ENV=production in the image already defaults both to DISABLED, but
+  # a local profile must not depend on an implicit default surviving an
+  # upstream Dockerfile change.
+  LOGIC_FUNCTION_TYPE: DISABLED
+  CODE_INTERPRETER_TYPE: DISABLED
+  # Single local workspace: no second workspace openable after the first
+  # admin signs up (LOCAL_SETUP.md).
+  IS_MULTIWORKSPACE_ENABLED: "false"
+
+services:
+  server:
+    <<: *aos-crm-app
+    environment:
+      <<: *aos-crm-env
+      NODE_PORT: "3000"
+      DISABLE_DB_MIGRATIONS: "false"
+      DISABLE_CRON_JOBS_REGISTRATION: "false"
+    ports:
+      - "127.0.0.1:${AOS_CRM_WEB_PORT:-43000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    <<: *aos-crm-app
+    environment:
+      <<: *aos-crm-env
+      # The server above already runs migrations and registers cron jobs;
+      # the worker must not race it (packages/twenty-docker/docker-compose.yml
+      # applies the same split).
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    command: ["yarn", "worker:prod"]
+    depends_on:
+      db:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${AOS_CRM_PG_DB:-aos_crm_local}
+      POSTGRES_USER: ${AOS_CRM_PG_USER:-aos_crm}
+      POSTGRES_PASSWORD: ${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}
+    volumes:
+      - aos-crm-local-db:/var/lib/postgresql/data
+    networks:
+      - aos-crm-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AOS_CRM_PG_USER:-aos_crm} -h localhost -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # No ports: published only on the aos-crm-local network (SEC-02).
+
+  redis:
+    image: redis:7
+    command: ["--maxmemory-policy", "noeviction"]
+    networks:
+      - aos-crm-local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # No ports: published only on the aos-crm-local network (SEC-02).
+
+networks:
+  aos-crm-local:
+    name: aos-crm-local
+    driver: bridge
+
+volumes:
+  aos-crm-local-db:
+    name: aos-crm-local-db
+  aos-crm-local-storage:
+    name: aos-crm-local-storage

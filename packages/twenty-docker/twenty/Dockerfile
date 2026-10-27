@@ -4,6 +4,15 @@
 
 FROM node:24.22.1-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af6176b1c70a026137dc92a2 AS node-base
 
+# Opt out of nonessential tool telemetry before any stage runs yarn/nx. Set
+# here (not per-stage) so every stage derived FROM node-base inherits it,
+# including twenty-app-dev. .yarnrc.yml also carries enableTelemetry: false;
+# this env var is Nx's own opt-out plus a build-time floor that a missing or
+# edited .yarnrc.yml cannot silently remove.
+ENV YARN_ENABLE_TELEMETRY=0 \
+    NX_NO_CLOUD=true \
+    NX_DAEMON=false
+
 # ===========================================================================
 # Dependency stages
 # ===========================================================================

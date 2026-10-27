@@ -3,3 +3,14 @@
 **/node_modules
 .nx/cache
 packages/twenty-server/.env
+
+# AOS bus, agent configuration and code graph: never sent to a builder (SEC-05)
+.aos
+.codegraph-aos
+.claude
+.dispatch-bodies
+
+# AOS-CRM local profile: real secrets stay out of the build context;
+# the .env.example templates are not matched by these and remain available
+deploy/local/.env
+deploy/local/privacy.env
