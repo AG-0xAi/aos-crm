@@ -31,23 +31,6 @@ function safeMessage(err) {
   return msg.slice(0, 200);
 }
 
-// Strips userinfo (user/password/token), query and fragment before any URL is
-// logged. Comparisons against EXPECTED still use the raw value; only the
-// printed detail goes through this.
-function redactUrl(raw) {
-  if (typeof raw !== 'string' || raw === '') return '(empty)';
-  try {
-    const u = new URL(raw);
-    u.username = '';
-    u.password = '';
-    u.search = '';
-    u.hash = '';
-    return u.toString();
-  } catch {
-    return raw.split('@').pop().split('?')[0].split('#')[0];
-  }
-}
-
 // Fail-closed guard for any recursive delete of generated fixtures: refuses
 // to remove a path that does not resolve inside the given temp root.
 function assertSafeToRemove(targetDir, allowedRoot) {
@@ -79,12 +62,13 @@ function ghApiJson(apiPath) {
 
 // ---- pure local checks (take explicit repoDir/expected so self-test can reuse them) ----
 
+// Never prints the received remote URL: a mismatch is reported as a fixed
+// diagnostic plus the known-safe expected value, nothing derived from input.
 function checkRemoteUrl(repoDir, remoteName, expectedUrl) {
   const r = git(['-C', repoDir, 'remote', 'get-url', remoteName]);
   if (r.status !== 0) return { ok: false, detail: `remote '${remoteName}' not configured` };
   const ok = r.stdout === expectedUrl;
-  const safeActual = redactUrl(r.stdout);
-  return { ok, detail: ok ? `${remoteName}=${safeActual}` : `${remoteName} expected ${expectedUrl}, got ${safeActual}` };
+  return { ok, detail: ok ? `${remoteName}=${expectedUrl}` : `${remoteName} does not match expected ${expectedUrl}` };
 }
 
 function checkTagSha(repoDir, tag, expectedSha) {
@@ -186,6 +170,8 @@ function checkLsRemoteTag(repoDir, remoteName, tag, expectedSha) {
 
 // ---- GitHub API checks: network call separated from the pure evaluator ----
 
+// Never prints the received fork/parent/clone_url: a mismatch is reported as
+// a fixed diagnostic plus the known-safe expected values, nothing from input.
 function evaluateForkApiResponse(json, expected) {
   if (!json || typeof json !== 'object') return { ok: false, detail: 'no API response' };
   const forkOk = json.fork === true;
@@ -196,8 +182,8 @@ function evaluateForkApiResponse(json, expected) {
   return {
     ok,
     detail: ok
-      ? `fork=true parent=${expected.parentFullName} clone_url matches`
-      : `fork=${json.fork} parent=${parentName ?? 'none'} clone_url=${redactUrl(json.clone_url ?? '')}`,
+      ? `fork=true parent=${expected.parentFullName} clone_url=${expected.originUrl}`
+      : `fork/parent/clone_url do not match expected fork=true parent=${expected.parentFullName} clone_url=${expected.originUrl}`,
   };
 }
 
@@ -415,25 +401,60 @@ function selfTest() {
     fixtureGit(credRemoteDir, ['remote', 'remove', 'origin'], env);
     const sentinelCredUrl = 'https://sentinel-user:sentinel-pass@example.invalid/sentinel-org/sentinel-repo.git?token=sentinel-token-xyz#sentinel-frag';
     fixtureGit(credRemoteDir, ['remote', 'add', 'origin', sentinelCredUrl], env);
-    record('redaction: mismatched remote url does not leak credentials/query/fragment', () => {
+    record('redaction: mismatched remote url does not leak credentials/host/path/query/fragment', () => {
       const result = checkRemoteUrl(credRemoteDir, 'origin', 'https://example.invalid/expected/repo.git');
       if (result.ok) throw new Error('expected mismatch, url matched unexpectedly');
-      const leaked = ['sentinel-user', 'sentinel-pass', 'sentinel-token-xyz', 'sentinel-frag'].filter((s) => result.detail.includes(s));
+      const leaked = ['sentinel-user', 'sentinel-pass', 'sentinel-org', 'sentinel-repo', 'sentinel-token-xyz', 'sentinel-frag'].filter((s) =>
+        result.detail.includes(s),
+      );
       if (leaked.length > 0) throw new Error(`redaction leaked: ${leaked.join(',')}`);
     });
 
-    record('redaction: github fork api clone_url mismatch does not leak credentials/query', () => {
+    const pathOnlyRemoteDir = join(tmpRoot, 'path-only-remote');
+    cpSync(workDir, pathOnlyRemoteDir, { recursive: true });
+    fixtureGit(pathOnlyRemoteDir, ['remote', 'remove', 'origin'], env);
+    const sentinelPathOnlyUrl = 'https://example.invalid/sentinel-pathonly-org/sentinel-pathonly-repo.git';
+    fixtureGit(pathOnlyRemoteDir, ['remote', 'add', 'origin', sentinelPathOnlyUrl], env);
+    record('redaction: mismatched remote url with no credentials still does not leak its host/path', () => {
+      const result = checkRemoteUrl(pathOnlyRemoteDir, 'origin', 'https://example.invalid/expected/repo.git');
+      if (result.ok) throw new Error('expected mismatch, url matched unexpectedly');
+      const leaked = ['sentinel-pathonly-org', 'sentinel-pathonly-repo'].filter((s) => result.detail.includes(s));
+      if (leaked.length > 0) throw new Error(`redaction leaked: ${leaked.join(',')}`);
+    });
+
+    const unparseableRemoteDir = join(tmpRoot, 'unparseable-remote');
+    cpSync(workDir, unparseableRemoteDir, { recursive: true });
+    fixtureGit(unparseableRemoteDir, ['remote', 'remove', 'origin'], env);
+    const sentinelUnparseableUrl = 'sentinel-unparseable-not-a-url';
+    fixtureGit(unparseableRemoteDir, ['remote', 'add', 'origin', sentinelUnparseableUrl], env);
+    record('redaction: mismatched remote that is not a parseable URL does not leak its raw value', () => {
+      const result = checkRemoteUrl(unparseableRemoteDir, 'origin', 'https://example.invalid/expected/repo.git');
+      if (result.ok) throw new Error('expected mismatch, url matched unexpectedly');
+      if (result.detail.includes(sentinelUnparseableUrl)) throw new Error(`redaction leaked unparseable value: ${result.detail}`);
+    });
+
+    record('redaction: github fork api clone_url mismatch does not leak credentials/host/path/query', () => {
       const result = evaluateForkApiResponse(
         {
           fork: true,
           parent: { full_name: EXPECTED.parentFullName },
-          clone_url: 'https://sentinel-user2:sentinel-pass2@example.invalid/x.git?token=sentinel-token2',
+          clone_url: 'https://sentinel-user2:sentinel-pass2@example.invalid/sentinel-path-org/x.git?token=sentinel-token2',
         },
         EXPECTED,
       );
       if (result.ok) throw new Error('expected mismatch for wrong clone_url');
-      const leaked = ['sentinel-user2', 'sentinel-pass2', 'sentinel-token2'].filter((s) => result.detail.includes(s));
+      const leaked = ['sentinel-user2', 'sentinel-pass2', 'sentinel-path-org', 'sentinel-token2'].filter((s) => result.detail.includes(s));
       if (leaked.length > 0) throw new Error(`redaction leaked: ${leaked.join(',')}`);
+    });
+
+    record('redaction: github fork api clone_url that is not a parseable URL does not leak its raw value', () => {
+      const sentinelUnparseableCloneUrl = 'sentinel-unparseable-clone-url';
+      const result = evaluateForkApiResponse(
+        { fork: true, parent: { full_name: EXPECTED.parentFullName }, clone_url: sentinelUnparseableCloneUrl },
+        EXPECTED,
+      );
+      if (result.ok) throw new Error('expected mismatch for wrong clone_url');
+      if (result.detail.includes(sentinelUnparseableCloneUrl)) throw new Error(`redaction leaked unparseable value: ${result.detail}`);
     });
 
     record('parseNameStatusZ: filename containing a newline is kept as one path', () => {
