@@ -1,7 +1,7 @@
 # AOS-CRM — bootstrap en inspección
 
 Este es el proyecto **AOS-CRM**, slug `aos-crm`, con tracks `CRM-`.
-La orden vigente es [AOS_CRM_Bootstrap.md](AOS_CRM_Bootstrap.md). El founder autorizó comenzar el 27 de octubre de 2026. La radiografía y la propuesta están en [docs/aos/bootstrap/README.md](docs/aos/bootstrap/README.md); crear specs y despachar sigue pendiente de que apruebe el mapa conforme a la sección 0.
+La orden vigente es [AOS_CRM_Bootstrap.md](AOS_CRM_Bootstrap.md). El founder autorizó comenzar el 27 de octubre de 2026. La radiografía y la propuesta están en [docs/aos/bootstrap/README.md](docs/aos/bootstrap/README.md); el founder aprobó el mapa con «go» y autorizó comenzar CRM-001. Las specs y sus contratos están registrados en el pack canónico.
 
 El registro en el panel, la membresía admin del founder y la instalación de AOS Factory ya están resueltos. Usa el bus local `.aos/` y el pack canónico `.aos/pack/aos-crm/`; no repitas el alta ni crees un segundo bus. Las evidencias y una copia del encargo están en `.aos/onboarding/`.
 

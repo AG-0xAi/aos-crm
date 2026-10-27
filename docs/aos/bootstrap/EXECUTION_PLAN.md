@@ -1,20 +1,21 @@
-# Orden propuesto de ejecución
+# Orden aprobado de ejecución
 
-Esta es una propuesta para revisión del founder tras la radiografía. **No son specs registradas ni autorizaciones de dispatch.** La épica `crm-bootstrap` sigue sin desglosar y no despachable. No se modificó `specs.json`.
+El founder aprobó la radiografía y el inicio por CRM-001 con **«go» el 27 de octubre de 2026**. La aprobación está registrada mediante `decision.recorded` en el único bus `.aos/`. No se volverá a pedir este visto bueno.
 
-El contrato `AGENTS.md`, sección 0, establece: "Specs y dispatch solo DESPUÉS de que el founder vea el mapa y apruebe por dónde empezar". La autorización inicial permite inspeccionar; esta revisión concreta fija el alcance de implementación antes de despachar.
+Se han registrado siete specs con contratos SHALL/MUST y escenarios GIVEN/WHEN/THEN en `.aos/pack/aos-crm/specs/`. CRM-001 se desglosa en procedencia y host para que un requisito de elevación no bloquee trabajo estático independiente. El alcance completo declarado es este bootstrap, no todo el futuro producto SaaS; ninguna spec se ha marcado done por desglosarla.
 
-| Orden / track propuesto | Resultado falsable | Dependencias y gate |
-| --- | --- | --- |
-| CRM-001: procedencia y preflight | Fork remoto correcto o bloqueo demostrado; referencias/SHA y orientación preservados; host Linux operativo sobre el mismo bus | Aprobación del mapa, namespace confirmado, preparación WSL/runtime por vía autorizada. Git ancestry, remotos y preflight reproducibles |
-| CRM-002: entorno local seguro | Build context excluye AOS/secretos; Compose/entorno propios con localhost, volúmenes exclusivos, credenciales seguras y drivers de código desactivados | CRM-001; triage de dependencias críticas alcanzables antes de ejecutar componentes. Validación de configuración más pruebas enfocadas |
-| CRM-003: privacidad | Ambas variables en false, Sentry y exportadores externos desactivados; política explícita de overrides DB; logs locales operativos | CRM-001; configuración disjunta del Compose de CRM-002. Tests de no envío y propagación al cliente. Parches al core solo si configuración oficial resulta insuficiente |
-| CRM-004: construcción y primer arranque | Construcción propia, migraciones de instancia limpia, servidor/worker/DB/Redis saludables y primer admin seguro | CRM-002 y CRM-003; ejecutar baseline y fijar gate real en `.aos/verify.json` con comandos comprobados. No aceptar PASS por gate vacío |
-| CRM-005: aceptación funcional y tráfico | Login; contacto/empresa/oportunidad relacionados; persistencia tras reinicio; workers; API/MCP rechazan anónimo y respetan permisos; tráfico sin tracking no autorizado en flujos cubiertos | CRM-004; navegador, HTTP, DB y captura de salida de los tres procesos. Guardar evidencia sin secretos |
-| CRM-006: documentación y revisión | Runbook reproducible, registro de licencias/integraciones, propuesta AWS, estrategia de upgrades, deuda y After-Commit Report completos | Resultados de anteriores; revisión independiente AOS de fronteras, contrato, efectos, tests, deuda, alcance y siguiente paso. Reejecutar gates antes de PR |
+| Track | Spec / capability | Resultado falsable | Dependencias |
+| --- | --- | --- | --- |
+| CRM-001 | crm-provenance / provenance | Fork AG-0xAi/aos-crm verificado; upstream/base/historia preservados; comprobador de procedencia y gate medido | Mapa aprobado |
+| CRM-001-HOST | crm-host-runtime / host-runtime | Linux y runtime operativos sobre el mismo checkout/bus; preflight reproducible y smoke aislado; si falta elevación/reinicio queda incompleto | crm-provenance |
+| CRM-002 | crm-local-security / local-security | Contexto de build sin AOS/secretos; Compose loopback, volúmenes propios, secretos seguros y drivers de código desactivados | crm-provenance; validación estática puede avanzar sin host listo |
+| CRM-003 | crm-privacy / privacy | Perfil único server/worker, ambas variables false, Sentry/exportadores apagados y política de overrides DB probada | crm-provenance; evidencia de tráfico queda para CRM-005 |
+| CRM-004 | crm-source-runtime / source-runtime | Build propio, baseline, migraciones de datos nuevos, servidor/worker/DB/Redis saludables, primer admin y gate real de aplicación | crm-host-runtime, crm-local-security, crm-privacy |
+| CRM-005 | crm-functional-acceptance / functional-acceptance | Login, CRUD relacionado, persistencia/reinicio, workers, API/MCP con permisos y captura de salida de servidor/worker/navegador | crm-source-runtime |
+| CRM-006 | crm-bootstrap-delivery / bootstrap-delivery | Runbook, licencias, integraciones, propuesta AWS, deuda, revisión independiente y reporte A-M sobre resultados reales | crm-functional-acceptance |
 
-CRM-002 y CRM-003 solo podrán ir en paralelo si sus ficheros y configuración quedan realmente disjuntos. Usar `aos dispatch`/`aos worker` y, donde el arnés lo soporte, un worktree por worker sobre **el mismo bus**. No usar subagentes externos al bus. No despachar mientras WSL/runtime y la política de primer arranque sigan sin resolver.
+Se comienza con un worker de procedencia en una rama `codex/`, sobre el checkout existente y sin publicación de su rama. No habrá workers concurrentes compartiendo árbol/índice. Si se usa paralelismo después, cada worker tendrá un worktree del mismo bus y ficheros disjuntos; el alcance del gate también se comprobará.
 
-Al aprobar el mapa, crear contratos SHALL/MUST y GIVEN/WHEN/THEN, estimar esfuerzo, declarar ficheros/gates y dependencias en el pack canónico. La aprobación no autoriza AWS, gasto, cuentas reales, activación Enterprise ni publicación pública de servicios.
+Antes de ejecutar la aplicación o construir imágenes deben estar preparados host, configuración segura y privacidad. Un gate inicial de procedencia no acredita build, E2E ni cero telemetría. No se aceptan recibos vacíos ni se escriben retornos a mano.
 
-La recomendación prioritaria es comenzar por CRM-001 y preparar WSL/runtime, conservando este checkout y el bus. En paralelo solo cabe análisis seguro que no dependa del entorno ni amplíe el producto.
+La aprobación no autoriza recursos AWS, gasto, cuentas reales, activación Enterprise, servicios públicos, merge propio ni reinicios forzados. Si Windows requiere elevación/interacción, se preparará y verificará primero el comando concreto y se continuará con tareas independientes.

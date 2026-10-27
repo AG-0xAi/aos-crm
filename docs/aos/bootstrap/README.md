@@ -24,4 +24,4 @@ Esta carpeta documenta lo observado y el trabajo propuesto. No acredita aceptaci
 
 La orden completa y las evidencias locales están en `.aos/onboarding/bootstrap-2026-10-27/`. Ese directorio permanece excluido de Git. El alta administrativa anterior se conserva en `.aos/onboarding/` y el único pack sigue siendo `.aos/pack/aos-crm/`.
 
-La entrada para continuar es [EXECUTION_PLAN.md](EXECUTION_PLAN.md). `AGENTS.md`, sección 0, exige que el founder vea este mapa y apruebe por dónde empezar antes de crear specs o despachar. Ninguna de las propuestas de tracks de este informe es todavía una spec registrada.
+El founder aprobó el mapa con «go» el 27 de octubre de 2026. La ejecución continúa por [EXECUTION_PLAN.md](EXECUTION_PLAN.md), con siete specs y contratos registrados en el pack canónico. Los informes de inspección conservan la fotografía anterior a esa aprobación.
