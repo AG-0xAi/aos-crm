@@ -1,11 +1,11 @@
-# AOS-CRM — bootstrap en inspección
+# AOS-CRM — bootstrap en ejecución
 
 Este es el proyecto **AOS-CRM**, slug `aos-crm`, con tracks `CRM-`.
 La orden vigente es [AOS_CRM_Bootstrap.md](AOS_CRM_Bootstrap.md). El founder autorizó comenzar el 27 de octubre de 2026. La radiografía y la propuesta están en [docs/aos/bootstrap/README.md](docs/aos/bootstrap/README.md); el founder aprobó el mapa con «go» y autorizó comenzar CRM-001. Las specs y sus contratos están registrados en el pack canónico.
 
 El registro en el panel, la membresía admin del founder y la instalación de AOS Factory ya están resueltos. Usa el bus local `.aos/` y el pack canónico `.aos/pack/aos-crm/`; no repitas el alta ni crees un segundo bus. Las evidencias y una copia del encargo están en `.aos/onboarding/`.
 
-Twenty está incorporado en esta carpeta sobre `twenty/v2.51.0`, SHA `15e4826d3b5fc5867baeabeeb42b253892b2d4da`, con historial no superficial y remoto `upstream`. Rama de inspección: `codex/bootstrap-inspection`. El fork remoto y `origin` siguen pendientes. No se han instalado dependencias ni arrancado servicios; el gate de aplicación todavía está vacío. Las evidencias, la orientación original de Twenty y el estado del grafo están en `.aos/onboarding/bootstrap-2026-10-27/`. Configura el gate real solo después de comprobar sus comandos. Conserva las convenciones upstream guardadas en `docs/aos/upstream/CLAUDE.md` al modificar su código.
+Twenty está incorporado en esta carpeta sobre `twenty/v2.51.0`, SHA `15e4826d3b5fc5867baeabeeb42b253892b2d4da`, con historial no superficial y remoto `upstream`. Rama de inspección: `codex/bootstrap-inspection`. El fork `AG-0xAi/aos-crm` y `origin` están verificados; CRM-001 está aceptado. WSL 3.0.3, Ubuntu 24.04.5 y Docker Engine 29.9.2 / Compose 5.6.1 están instalados en la distribución dedicada `AOS-CRM-Ubuntu-24.04`; Linux alcanza este mismo checkout y bus. No se han instalado dependencias ni arrancado servicios del CRM. El gate mide procedencia y host; el gate de aplicación/build/E2E sigue pendiente. Las evidencias, la orientación original de Twenty y el estado del grafo están en `.aos/onboarding/bootstrap-2026-10-27/`. Configura el gate real solo después de comprobar sus comandos. Conserva las convenciones upstream guardadas en `docs/aos/upstream/CLAUDE.md` al modificar su código.
 
 <!-- AOS:BEGIN v3 — bloque gestionado por `aos init` / `aos docs sync`. NO editar a mano:
      lo que escribas aquí se pierde en el próximo refresco. Tu texto propio va FUERA del bloque. -->

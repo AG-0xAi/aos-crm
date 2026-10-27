@@ -5,12 +5,12 @@ Estado al 27 de octubre de 2026. Todos abiertos salvo recuperación expresamente
 | Prioridad | Pendiente / impacto | Siguiente acción |
 | --- | --- | --- |
 | Resuelto | Aprobación del mapa | Founder respondió «go»; siete contratos registrados y ejecución autorizada desde CRM-001 |
-| P1 | WSL no instalado; Docker no disponible en PATH: no puede validarse el arranque oficial | Preparar entorno Linux y runtime con los permisos/reinicio necesarios; verificar acceso al mismo checkout |
+| Resuelto | Host Linux/contenedores | WSL3.0.3 + Ubuntu24.04.5 en AOS-CRM-Ubuntu-24.04, Docker29.9.2/Compose5.6.1, mismo checkout/bus y smoke reales; CRM-001-HOST aceptado. No equivale a app funcionando |
 | P1 | Código local `LOCAL` sin sandbox, puertos dev abiertos y script de setup invasivo | Perfil AOS explícito antes de cualquier arranque; no ejecutar scripts contra servicios de otros productos |
 | P1 | Telemetría por defecto y overrides DB pueden incumplir privacidad | Configuración oficial, tests, primer arranque bajo captura y comprobación tras reinicio |
 | P1 | 63 avisos de dependencia para 47 combinaciones del lockfile | Completar reachability y corregir componentes requeridos antes de ejecutarlos; mantener auxiliares vulnerables apagados |
 | P1 | `.dockerignore` no excluye bus y evidencias | Corregir antes de cualquier build/contexto remoto |
-| P1 | Gate solo de procedencia; ningún build/test funcional todavía | Ampliar con readiness y comandos reales de aplicación al completar los contratos correspondientes; no acreditar funcionamiento CRM con procedencia |
+| P1 | Gate de procedencia/host, sin build/test funcional del CRM todavía | Cinco comandos reales pasan; ampliar con seguridad/privacidad y después build/typecheck/E2E. No acreditar funcionamiento CRM con infraestructura |
 | P2 compartido | El monitor compartido preexistente devuelve HTTP 401; no es un bloqueo del panel de este producto | Publicación y lectura directa del proyecto comprobadas HTTP200, con las siete specs y evidencias en panel-current.json; no tocar credenciales ni repetir alta. Diagnóstico del monitor corresponde al control-plane compartido |
 | P1 condicional | Rama de invitaciones y OAuth DCR requieren pruebas de seguridad | Mantener single-workspace/local; probar antes de invitaciones y clientes externos |
 | Resuelto técnicamente | Fork AG-0xAi/aos-crm creado, upstream/origin y referencia fijada verificados | CRM-001: conservar pruebas reales, revisión y aceptación del arnés; sin publicación de ramas de trabajo |

@@ -95,3 +95,11 @@ Síntoma: se interpretó HTTP401 del monitor compartido como fallo del panel y f
 ## L-12: inventario completo de llamadas de seguridad
 
 Síntoma: la radiografía omitió el retorno DOM del saneado de asuntos de correo. Causa: describir dos funciones sin inventariar las tres llamadas a DOMPurify. Fix: revisar todo packages, corregir la fila de dependencia y contrastar condiciones acumulativas con la fuente primaria. Regla: contar callsites antes de generalizar opciones; una condición presente no confirma un exploit que exige varias, y la metadata de un aviso puede actualizarse después de su descripción inicial.
+
+## L-13: medición real de WSL y transporte de argumentos
+
+Síntoma: código0 de wsl no acreditaba Linux operativo; tras instalar y reiniciar, se informaban WSL1/BIOS como requisitos faltantes y se perdían barras/expansiones. Causa: mezclar texto UTF16 de gestión con stdoutUTF8 Linux, confiar en lecturasCIM con hipervisor activo y tratar -- como argv literal. Fix: pruebas reales contra mismo checkout/bus, diferenciar codificaciones y featuresWSL1/WSL2, usar --exec y contrastar salida/estado con códigos. Regla: verificar el dato y el efecto, no solo exit0 ni presencia del ejecutable; una rama already-satisfied no valida instalación nueva.
+
+## L-14: PowerShell y evidencia de instalación
+
+Síntoma: @() sobre Generic.List[object] fallaba al componer el informe; PowerShell5 recortaba comillas; un wrapper del coordinador acabó127 por CRLF terminal después de instalar Docker. Causa: asumir materialización, quoting y stdin equivalentes entre motores. Fix: ToArray, guard de motor para pasos mutantes y futura entrega de stdin como bytes exactos. Se conservó127 y se verificaron Engine/Compose/servicio/smoke/cleanup por separado, sin reinstalar. Regla: separar fallo de transporte, instalación y medición; probar el camino que realmente necesita comillas y no maquillar recibos.
