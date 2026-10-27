@@ -70,3 +70,8 @@ screenshots/
 /.diag*.mjs
 /.compare*.mjs
 /.narrow*.mjs
+
+# AOS Factory: local control bus and graph
+/.aos/
+/.codegraph-aos/
+/dispatch-*.txt
