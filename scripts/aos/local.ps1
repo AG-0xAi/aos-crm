@@ -138,12 +138,41 @@ function Get-ConfiguredWebPort {
   return [ordered]@{ Port = $DefaultPort; Valid = $false }
 }
 
-# AOS_CRM_SERVER_URL, when set, must agree with the resolved loopback port;
-# an unset URL is not a contradiction (compose.yaml's own default applies).
+# compose.yaml substitutes a FIXED literal for SERVER_URL when
+# AOS_CRM_SERVER_URL is unset, so "unset" is not neutral: it is that literal.
+# Read it out of compose.yaml rather than duplicating it here, so the two can
+# never drift. Returns $null when no fallback can be read (missing file, or a
+# SERVER_URL line without a `:-default`), which callers must treat as a
+# blocker, not as "nothing to contradict".
+function Get-ComposeServerUrlDefault {
+  param([string] $ComposePath)
+  if (-not (Test-Path -LiteralPath $ComposePath -PathType Leaf)) { return $null }
+  $text = Get-Content -LiteralPath $ComposePath -Raw -ErrorAction Stop
+  $match = [regex]::Match($text, '(?m)^\s*SERVER_URL:\s*\$\{\s*AOS_CRM_SERVER_URL\s*:-(?<default>[^}]*)\}\s*$')
+  if (-not $match.Success) { return $null }
+  $value = $match.Groups['default'].Value.Trim()
+  if ([string]::IsNullOrWhiteSpace($value)) { return $null }
+  return $value
+}
+
+# The URL the server actually receives: the explicit value when set, else
+# compose.yaml's own fallback. $null means it could not be determined.
+function Get-EffectiveServerUrl {
+  param([string] $ServerUrl, [string] $ComposeDefaultUrl)
+  if (-not [string]::IsNullOrWhiteSpace($ServerUrl)) { return $ServerUrl.Trim() }
+  if ([string]::IsNullOrWhiteSpace($ComposeDefaultUrl)) { return $null }
+  return $ComposeDefaultUrl.Trim()
+}
+
+# The EFFECTIVE SERVER_URL -- not just an explicitly set one -- must agree
+# with the resolved loopback port. A custom AOS_CRM_WEB_PORT with no
+# AOS_CRM_SERVER_URL is a real mismatch: the app would build links on the
+# fallback port while being published on another one.
 function Test-WebPortUrlCoherent {
-  param([int] $Port, [string] $ServerUrl)
-  if ([string]::IsNullOrWhiteSpace($ServerUrl)) { return $true }
-  return $ServerUrl -eq "http://127.0.0.1:$Port"
+  param([int] $Port, [string] $ServerUrl, [string] $ComposeDefaultUrl)
+  $effective = Get-EffectiveServerUrl -ServerUrl $ServerUrl -ComposeDefaultUrl $ComposeDefaultUrl
+  if ($null -eq $effective) { return $false }
+  return $effective -eq "http://127.0.0.1:$Port"
 }
 
 # A bind-test alone cannot tell a foreign listener from this project's own
@@ -218,7 +247,7 @@ function Get-StartGateVerdict {
     if ($PrivacyCheck.WrongValueKeys.Count -gt 0) { $blockers.Add("privacy: deploy/local/privacy.env key(s) not at the required value: $($PrivacyCheck.WrongValueKeys -join ', ')") }
   }
   if ($PortOccupancy -eq 'OccupiedByOther') { $blockers.Add('port: the configured loopback web port is occupied by a process outside this project') }
-  if (-not $WebPortUrlCoherent) { $blockers.Add('port: AOS_CRM_SERVER_URL does not match http://127.0.0.1:<AOS_CRM_WEB_PORT>') }
+  if (-not $WebPortUrlCoherent) { $blockers.Add('port: the effective SERVER_URL (AOS_CRM_SERVER_URL, or compose.yaml fallback when unset) does not match http://127.0.0.1:<AOS_CRM_WEB_PORT>') }
   if (-not $ConfigVerifierOk) { $blockers.Add('config: node scripts/aos/verify-local-config.mjs did not pass') }
   switch ($PrivacyVerifierStatus) {
     'Missing' { $blockers.Add('privacy-verifier: scripts/aos/verify-privacy.mjs (CRM-003) is not delivered yet; blocking honestly until it exists') }
@@ -530,7 +559,8 @@ function Invoke-Main {
     $portOccupancy = Get-PortOccupancy -PortFree $portFree -OwnServerRunning $ownRunning
     $envValues = Read-EnvKeys -Path $EnvPath
     $serverUrl = if ($envValues) { $envValues['AOS_CRM_SERVER_URL'] } else { $null }
-    $urlCoherent = Test-WebPortUrlCoherent -Port $resolvedPort -ServerUrl $serverUrl
+    $composeDefaultUrl = Get-ComposeServerUrlDefault -ComposePath (Join-Path $RepoRoot $ComposeRelPath)
+    $urlCoherent = Test-WebPortUrlCoherent -Port $resolvedPort -ServerUrl $serverUrl -ComposeDefaultUrl $composeDefaultUrl
     $configVerifierOk = Invoke-LocalConfigVerifier -RepoRoot $RepoRoot
     $privacyVerifierStatus = Invoke-PrivacyVerifierIfPresent -RepoRoot $RepoRoot
     return [ordered]@{
@@ -719,10 +749,26 @@ function Invoke-SelfTest {
       if ($outOfRange.Valid) { throw 'expected an out-of-range AOS_CRM_WEB_PORT (70000) to be Valid=false' }
     }
 
-    Record 'Test-WebPortUrlCoherent: matching URL passes, mismatched URL fails, empty URL is not a contradiction' {
-      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:43000')) { throw 'expected a matching URL to be coherent' }
-      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:9999') { throw 'expected a mismatched URL to be incoherent' }
-      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '')) { throw 'expected an empty/unset URL to be treated as coherent (nothing to contradict)' }
+    Record 'Test-WebPortUrlCoherent: an explicit URL must match the resolved port' {
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:43000' -ComposeDefaultUrl 'http://127.0.0.1:43000')) { throw 'expected a matching URL to be coherent' }
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:9999' -ComposeDefaultUrl 'http://127.0.0.1:43000') { throw 'expected a mismatched URL to be incoherent' }
+    }
+
+    Record "Test-WebPortUrlCoherent: an unset URL resolves to compose.yaml's fixed fallback, so a custom port without a URL is incoherent (the exact gap carried over from CRM-002)" {
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '' -ComposeDefaultUrl 'http://127.0.0.1:43000')) { throw 'expected an unset URL on the default port to be coherent' }
+      if (Test-WebPortUrlCoherent -Port 51234 -ServerUrl '' -ComposeDefaultUrl 'http://127.0.0.1:43000') { throw 'expected an unset URL on a custom port to be incoherent: compose would hand the app the 43000 fallback while publishing 51234' }
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '' -ComposeDefaultUrl '') { throw 'expected an undeterminable compose fallback to fail closed, not pass' }
+    }
+
+    Record 'Get-ComposeServerUrlDefault: reads the real fallback out of the real compose.yaml, and fails closed on a file without one' {
+      $realCompose = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path $ComposeRelPath
+      $realDefault = Get-ComposeServerUrlDefault -ComposePath $realCompose
+      if ($realDefault -notmatch '^http://127\.0\.0\.1:\d+$') { throw "expected a loopback fallback URL from the real compose.yaml, got '$realDefault'" }
+
+      $p = Join-Path $tmpRoot 'compose-no-default.yaml'
+      Set-Content -LiteralPath $p -Value @('services:', '  server:', '    environment:', '      SERVER_URL: ${AOS_CRM_SERVER_URL}')
+      if ($null -ne (Get-ComposeServerUrlDefault -ComposePath $p)) { throw 'expected $null when compose.yaml declares no fallback' }
+      if ($null -ne (Get-ComposeServerUrlDefault -ComposePath (Join-Path $tmpRoot 'compose-missing.yaml'))) { throw 'expected $null for a missing compose.yaml' }
     }
 
     Record 'Get-PortOccupancy: free, owned-by-self and occupied-by-other are distinguished' {
