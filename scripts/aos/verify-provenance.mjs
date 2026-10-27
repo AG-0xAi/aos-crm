@@ -6,7 +6,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve as resolvePath, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const EXPECTED = {
@@ -21,7 +21,7 @@ const EXPECTED = {
 // Patterns only; detail strings never include the matched substring.
 const SECRET_PATTERNS = [
   { name: 'aws-access-key-id', re: /AKIA[0-9A-Z]{16}/ },
-  { name: 'private-key-block', re: /-----BEGIN (RSA|OPENSSH|EC|DSA|PGP) PRIVATE KEY-----/ },
+  { name: 'private-key-block', re: /-----BEGIN (?:(?:RSA|OPENSSH|EC|DSA|PGP) )?PRIVATE KEY-----/ },
   { name: 'github-token', re: /gh[pousr]_[0-9A-Za-z]{36,}/ },
   { name: 'slack-token', re: /xox[baprs]-[0-9A-Za-z-]{10,}/ },
 ];
@@ -29,6 +29,35 @@ const SECRET_PATTERNS = [
 function safeMessage(err) {
   const msg = err && err.message ? String(err.message).split('\n')[0] : String(err);
   return msg.slice(0, 200);
+}
+
+// Strips userinfo (user/password/token), query and fragment before any URL is
+// logged. Comparisons against EXPECTED still use the raw value; only the
+// printed detail goes through this.
+function redactUrl(raw) {
+  if (typeof raw !== 'string' || raw === '') return '(empty)';
+  try {
+    const u = new URL(raw);
+    u.username = '';
+    u.password = '';
+    u.search = '';
+    u.hash = '';
+    return u.toString();
+  } catch {
+    return raw.split('@').pop().split('?')[0].split('#')[0];
+  }
+}
+
+// Fail-closed guard for any recursive delete of generated fixtures: refuses
+// to remove a path that does not resolve inside the given temp root.
+function assertSafeToRemove(targetDir, allowedRoot) {
+  const resolvedTarget = resolvePath(targetDir);
+  const resolvedRoot = resolvePath(allowedRoot);
+  const withinRoot = resolvedTarget === resolvedRoot || resolvedTarget.startsWith(resolvedRoot + sep);
+  if (!withinRoot) {
+    throw new Error(`refusing to remove '${resolvedTarget}': outside allowed root '${resolvedRoot}'`);
+  }
+  return resolvedTarget;
 }
 
 function git(args, { cwd, env } = {}) {
@@ -54,7 +83,8 @@ function checkRemoteUrl(repoDir, remoteName, expectedUrl) {
   const r = git(['-C', repoDir, 'remote', 'get-url', remoteName]);
   if (r.status !== 0) return { ok: false, detail: `remote '${remoteName}' not configured` };
   const ok = r.stdout === expectedUrl;
-  return { ok, detail: ok ? `${remoteName}=${r.stdout}` : `${remoteName} expected ${expectedUrl}, got ${r.stdout}` };
+  const safeActual = redactUrl(r.stdout);
+  return { ok, detail: ok ? `${remoteName}=${safeActual}` : `${remoteName} expected ${expectedUrl}, got ${safeActual}` };
 }
 
 function checkTagSha(repoDir, tag, expectedSha) {
@@ -87,25 +117,63 @@ function checkVerifyJsonIgnored(repoDir) {
   return { ok: r.status === 0, detail: r.status === 0 ? '.aos/verify.json is gitignored' : '.aos/verify.json is NOT gitignored' };
 }
 
+// Parses `git diff --name-status -z` output. NUL-delimited fields sidestep
+// the path quoting git applies by default to unicode/space/newline names.
+function parseNameStatusZ(output) {
+  const fields = output.split('\0').filter((s) => s.length > 0);
+  const entries = [];
+  let i = 0;
+  while (i < fields.length) {
+    const status = fields[i++];
+    if (status[0] === 'R' || status[0] === 'C') {
+      const oldPath = fields[i++];
+      const path = fields[i++];
+      entries.push({ status: status[0], path, oldPath });
+    } else {
+      entries.push({ status: status[0], path: fields[i++] });
+    }
+  }
+  return entries;
+}
+
 function checkNoSecretsInDiff(repoDir, baseSha, headRef, patterns) {
-  const diff = git(['-C', repoDir, 'diff', '--name-only', `${baseSha}..${headRef}`]);
+  const diff = git(['-C', repoDir, 'diff', '--name-status', '-z', `${baseSha}..${headRef}`]);
   if (diff.status !== 0) return { ok: false, detail: 'diff listing failed' };
-  const files = diff.stdout.split('\n').filter(Boolean);
+  const entries = parseNameStatusZ(diff.stdout);
   const hits = [];
-  for (const file of files) {
+  let scanned = 0;
+  let deletions = 0;
+  for (const entry of entries) {
+    if (entry.status === 'D') {
+      deletions += 1; // confirmed deletion from diff metadata, nothing to scan
+      continue;
+    }
+    const file = entry.path;
     const base = file.split('/').pop() ?? file;
-    if (/^\.env(\..+)?$/.test(base)) {
+    const isEnvExample = base === '.env.example';
+    if (/^\.env(\..+)?$/.test(base) && !isEnvExample) {
       hits.push(`${file}: dotenv-style filename`);
       continue;
     }
     const show = git(['-C', repoDir, 'show', `${headRef}:${file}`]);
-    if (show.status !== 0) continue; // deleted at headRef, nothing to scan
+    if (show.status !== 0) {
+      // Present in the diff (not a deletion) but unreadable: fail closed,
+      // never assume it was safely removed.
+      hits.push(`${file}: blob unreadable at ${headRef}, cannot be scanned`);
+      continue;
+    }
+    scanned += 1;
     for (const { name, re } of patterns) {
       if (re.test(show.stdout)) hits.push(`${file}: matched ${name}`);
     }
   }
   const ok = hits.length === 0;
-  return { ok, detail: ok ? `scanned ${files.length} changed file(s), clean` : `secret-like content: ${hits.join('; ')}` };
+  return {
+    ok,
+    detail: ok
+      ? `pattern scan clean over diff (${scanned} file(s) read, ${deletions} deletion(s) skipped)`
+      : `secret-like content: ${hits.join('; ')}`,
+  };
 }
 
 function checkLsRemoteTag(repoDir, remoteName, tag, expectedSha) {
@@ -129,7 +197,7 @@ function evaluateForkApiResponse(json, expected) {
     ok,
     detail: ok
       ? `fork=true parent=${expected.parentFullName} clone_url matches`
-      : `fork=${json.fork} parent=${parentName ?? 'none'} clone_url=${json.clone_url ?? 'missing'}`,
+      : `fork=${json.fork} parent=${parentName ?? 'none'} clone_url=${redactUrl(json.clone_url ?? '')}`,
   };
 }
 
@@ -186,6 +254,7 @@ function main() {
   }
   console.log(`\nPASS: all ${results.length} provenance checks passed.`);
   console.log('Scope: provenance only. The CRM application is not built, not running, and not covered by this gate (see CRM-004).');
+  console.log('Secret scanning is a fixed set of known patterns over the diff tip only: no entropy analysis, no full-history scan. A clean result means no known pattern matched, not that the diff is free of secrets.');
   process.exit(0);
 }
 
@@ -313,6 +382,120 @@ function selfTest() {
     fixtureGit(dotenvDir, ['commit', '-q', '-m', 'add dotenv'], env);
     record('negative: tracked dotenv file', () => assertOk(checkNoSecretsInDiff(dotenvDir, baseSha, 'HEAD', SECRET_PATTERNS), false));
 
+    const envExampleDir = join(tmpRoot, 'env-example');
+    cpSync(workDir, envExampleDir, { recursive: true });
+    writeFileSync(join(envExampleDir, '.env.example'), 'API_KEY=changeme\n');
+    fixtureGit(envExampleDir, ['add', '-f', '.env.example'], env);
+    fixtureGit(envExampleDir, ['commit', '-q', '-m', 'add env example'], env);
+    record('positive: .env.example without secret pattern is allowed', () =>
+      assertOk(checkNoSecretsInDiff(envExampleDir, baseSha, 'HEAD', SECRET_PATTERNS), true),
+    );
+
+    const envExampleSecretDir = join(tmpRoot, 'env-example-secret');
+    cpSync(workDir, envExampleSecretDir, { recursive: true });
+    writeFileSync(join(envExampleSecretDir, '.env.example'), `AWS_KEY=AKIA${'0'.repeat(16)}\n`);
+    fixtureGit(envExampleSecretDir, ['add', '-f', '.env.example'], env);
+    fixtureGit(envExampleSecretDir, ['commit', '-q', '-m', 'add env example with planted secret'], env);
+    record('negative: secret pattern inside .env.example is still rejected', () =>
+      assertOk(checkNoSecretsInDiff(envExampleSecretDir, baseSha, 'HEAD', SECRET_PATTERNS), false),
+    );
+
+    const pkcs8Dir = join(tmpRoot, 'pkcs8');
+    cpSync(workDir, pkcs8Dir, { recursive: true });
+    const pkcs8Marker = ['-----BEGIN', 'PRIVATE KEY-----'].join(' '); // PEM header only, not a real key
+    writeFileSync(join(pkcs8Dir, 'key.pem'), `${pkcs8Marker}\nFAKEFAKEFAKE\n-----END PRIVATE KEY-----\n`);
+    fixtureGit(pkcs8Dir, ['add', '-f', 'key.pem'], env);
+    fixtureGit(pkcs8Dir, ['commit', '-q', '-m', 'add pkcs8-style key marker'], env);
+    record('negative: PKCS#8 private key marker (no RSA/etc type) detected', () =>
+      assertOk(checkNoSecretsInDiff(pkcs8Dir, baseSha, 'HEAD', SECRET_PATTERNS), false),
+    );
+
+    const credRemoteDir = join(tmpRoot, 'cred-remote');
+    cpSync(workDir, credRemoteDir, { recursive: true });
+    fixtureGit(credRemoteDir, ['remote', 'remove', 'origin'], env);
+    const sentinelCredUrl = 'https://sentinel-user:sentinel-pass@example.invalid/sentinel-org/sentinel-repo.git?token=sentinel-token-xyz#sentinel-frag';
+    fixtureGit(credRemoteDir, ['remote', 'add', 'origin', sentinelCredUrl], env);
+    record('redaction: mismatched remote url does not leak credentials/query/fragment', () => {
+      const result = checkRemoteUrl(credRemoteDir, 'origin', 'https://example.invalid/expected/repo.git');
+      if (result.ok) throw new Error('expected mismatch, url matched unexpectedly');
+      const leaked = ['sentinel-user', 'sentinel-pass', 'sentinel-token-xyz', 'sentinel-frag'].filter((s) => result.detail.includes(s));
+      if (leaked.length > 0) throw new Error(`redaction leaked: ${leaked.join(',')}`);
+    });
+
+    record('redaction: github fork api clone_url mismatch does not leak credentials/query', () => {
+      const result = evaluateForkApiResponse(
+        {
+          fork: true,
+          parent: { full_name: EXPECTED.parentFullName },
+          clone_url: 'https://sentinel-user2:sentinel-pass2@example.invalid/x.git?token=sentinel-token2',
+        },
+        EXPECTED,
+      );
+      if (result.ok) throw new Error('expected mismatch for wrong clone_url');
+      const leaked = ['sentinel-user2', 'sentinel-pass2', 'sentinel-token2'].filter((s) => result.detail.includes(s));
+      if (leaked.length > 0) throw new Error(`redaction leaked: ${leaked.join(',')}`);
+    });
+
+    record('parseNameStatusZ: filename containing a newline is kept as one path', () => {
+      const weirdName = 'weird\nname.txt';
+      const entries = parseNameStatusZ(`A\0${weirdName}\0`);
+      if (entries.length !== 1) throw new Error(`expected 1 entry, got ${entries.length}`);
+      if (entries[0].path !== weirdName) throw new Error(`path mangled: ${JSON.stringify(entries[0].path)}`);
+    });
+
+    record('parseNameStatusZ: rename entry keeps old+new path distinct from a following modify', () => {
+      const entries = parseNameStatusZ('R100\0old-path.txt\0new-path.txt\0M\0other.txt\0');
+      if (entries.length !== 2) throw new Error(`expected 2 entries, got ${entries.length}`);
+      if (entries[0].status !== 'R' || entries[0].path !== 'new-path.txt' || entries[0].oldPath !== 'old-path.txt') {
+        throw new Error(`rename entry malformed: ${JSON.stringify(entries[0])}`);
+      }
+      if (entries[1].status !== 'M' || entries[1].path !== 'other.txt') {
+        throw new Error(`modify entry malformed: ${JSON.stringify(entries[1])}`);
+      }
+    });
+
+    const unicodeDir = join(tmpRoot, 'unicode-names');
+    cpSync(workDir, unicodeDir, { recursive: true });
+    const unicodeFileName = 'config caña 配置.txt';
+    writeFileSync(join(unicodeDir, unicodeFileName), `token=${plantedToken}\n`);
+    fixtureGit(unicodeDir, ['add', '-f', unicodeFileName], env);
+    fixtureGit(unicodeDir, ['commit', '-q', '-m', 'add unicode/space named file with planted token'], env);
+    record('negative: unicode/space filename is scanned, not skipped', () =>
+      assertOk(checkNoSecretsInDiff(unicodeDir, baseSha, 'HEAD', SECRET_PATTERNS), false),
+    );
+
+    const unreadableDir = join(tmpRoot, 'unreadable-blob');
+    cpSync(workDir, unreadableDir, { recursive: true });
+    writeFileSync(join(unreadableDir, 'needs-review.txt'), 'will become unreadable\n');
+    fixtureGit(unreadableDir, ['add', 'needs-review.txt'], env);
+    fixtureGit(unreadableDir, ['commit', '-q', '-m', 'add file that will become unreadable'], env);
+    const unreadableHead = fixtureGit(unreadableDir, ['rev-parse', 'HEAD'], env);
+    const unreadableBlobSha = fixtureGit(unreadableDir, ['rev-parse', `${unreadableHead}:needs-review.txt`], env);
+    rmSync(join(unreadableDir, '.git', 'objects', unreadableBlobSha.slice(0, 2), unreadableBlobSha.slice(2)), { force: true });
+    record('negative: blob present in diff but unreadable fails closed, not treated as deleted', () => {
+      const result = checkNoSecretsInDiff(unreadableDir, baseSha, unreadableHead, SECRET_PATTERNS);
+      assertOk(result, false);
+      if (!result.detail.includes('unreadable')) throw new Error(`expected 'unreadable' in detail, got: ${result.detail}`);
+    });
+
+    record('assertSafeToRemove: accepts a path nested inside the allowed root', () => {
+      const nested = join(tmpRoot, 'nested-ok');
+      mkdirSync(nested, { recursive: true });
+      const resolved = assertSafeToRemove(nested, tmpRoot);
+      if (resolved !== resolvePath(nested)) throw new Error('resolved path mismatch');
+    });
+
+    record('assertSafeToRemove: rejects a path outside the allowed root', () => {
+      const outside = resolvePath(tmpdir(), '..');
+      let threw = false;
+      try {
+        assertSafeToRemove(outside, tmpRoot);
+      } catch {
+        threw = true;
+      }
+      if (!threw) throw new Error('expected rejection for path outside allowed root');
+    });
+
     record('github api evaluator: positive', () =>
       assertOk(evaluateForkApiResponse({ fork: true, parent: { full_name: EXPECTED.parentFullName }, clone_url: EXPECTED.originUrl }, EXPECTED), true),
     );
@@ -328,7 +511,8 @@ function selfTest() {
     record('branch diversity evaluator: positive', () => assertOk(evaluateBranchDiversity([{ name: 'a' }, { name: 'b' }], 2), true));
     record('branch diversity evaluator: too few', () => assertOk(evaluateBranchDiversity([{ name: 'a' }], 2), false));
   } finally {
-    rmSync(tmpRoot, { recursive: true, force: true });
+    const safeTmpRoot = assertSafeToRemove(tmpRoot, tmpdir());
+    rmSync(safeTmpRoot, { recursive: true, force: true });
   }
 
   console.log(`\nself-test: ${failures.length === 0 ? 'ALL PASSED' : `${failures.length} FAILED`}`);
