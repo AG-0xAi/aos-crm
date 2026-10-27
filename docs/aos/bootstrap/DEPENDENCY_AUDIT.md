@@ -85,3 +85,74 @@ Los avisos del producto Twenty se evalúan por separado en `SECURITY_AUDIT.md`. 
 ## Corrección de cobertura posterior a la inspección inicial
 
 La revisión ampliada del coordinador encontró la tercera llamada `sanitizeOutboundEmailSubject` en `packages/twenty-server/src/engine/core-modules/email/utils/sanitize-outbound-email-html.util.ts`; el informe inicial había omitido su retorno DOM. No basta ese modo para confirmar el aviso de shadow roots: requiere además `SAFE_FOR_TEMPLATES`, entrada con shadow root y evaluación posterior como plantilla. La [metadata actual del mantenedor](https://github.com/cure53/DOMPurify/security/advisories/GHSA-cg2g-xh64-v4q7), consultada el 27/10/2026, indica severidad Low y versión parcheada 3.4.17, mientras el cuerpo histórico aún dice sin fix. Los conteos OSV de arriba conservan la fotografía y clasificación de aquella consulta; no sustituyen el triage actual ni acreditan un parche instalado. No se ejecutaron PoCs ni dependencias en esta comprobación.
+
+## CRM-004: del lockfile al árbol instalado
+
+Todo lo anterior es inferencia sobre `yarn.lock`. CRM-004 instaló de verdad las
+dependencias con la configuración Yarn revisada (`enableScripts: false`,
+`enableHardenedMode: true`, `enableTelemetry: false`, `npmMinimalAgeGate: 3d`) dentro de la
+etapa `server-deps` del Dockerfile oficial, y midió el árbol resultante. Los 10 paquetes
+que declaran build scripts (`bcrypt`, `cpu-features`, `esbuild`, `msgpackr-extract`,
+`msw`, `nx`, `protobufjs`, `ssh2`, `unrs-resolver`) quedaron sin ejecutar; no se habilitó
+ninguno.
+
+### body-parser: confirmado en el árbol, corregido y reverificado
+
+[GHSA-27r3-jxmh-p828](https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828)
+(High 7.5, caída por cuerpo comprimido con bytes posteriores, sin autenticación). El
+árbol instalado confirmó la ruta, no solo el lockfile:
+
+```
+/app/node_modules/express/node_modules/body-parser  2.3.0   <- express 5.2.1 <- @nestjs/platform-express 11.2.6
+/app/node_modules/body-parser                       1.20.8
+```
+
+`packages/twenty-server/src/main.ts` registra los parsers `json`/`urlencoded`/`text` sin
+`inflate: false`, así que la ruta de middleware precede a la autenticación.
+
+Se aplicó la **resolución mínima compatible**: 2.4.0 y 1.20.9 son las versiones corregidas
+y ambas caen dentro de los rangos que ya pedían los dependientes (`^2.2.1`, `~1.20.3`,
+`~1.20.5`), de modo que **no hizo falta ningún override en `package.json`**. Solo se
+re-resolvieron esos descriptores en `yarn.lock` (27 inserciones, 10 borrados: body-parser
+y tres transitivos obligados, `content-type` 2.1.0, `iconv-lite` ^0.7.3 y `qs` 6.16.1).
+No hubo refresco masivo del lockfile.
+
+Reverificado reinstalando y volviendo a leer el árbol:
+
+```
+/app/node_modules/express/node_modules/body-parser  2.4.0
+/app/node_modules/body-parser                       1.20.9
+```
+
+Límite honesto: **no se ejecutó la prueba negativa** (petición comprimida inválida contra
+el backend) porque la imagen de aplicación no llegó a construirse; ver
+`BUILD_BASELINE.md`. Esa prueba sigue siendo requisito antes de aceptar el backend.
+
+### Qué avisos alcanzan de verdad al runtime
+
+Se reprodujo el pruning de producción del Dockerfile (`yarn workspaces focus --production
+twenty-emails twenty-shared twenty-client-sdk twenty-server`), se enumeraron los **1.087
+paquetes** realmente presentes y se cruzaron con los 47 pares paquete/versión señalados
+arriba. Esto mide presencia; no es inferencia por búsqueda sin coincidencias.
+
+Presentes en el árbol de runtime con la versión exacta señalada (14): `@azure/msal-node`
+5.2.4, `@graphql-tools/utils` 9.2.1/10.3.4/12.0.0, `dompurify` 3.4.16, `follow-redirects`
+1.16.0, `ip-address` 10.7.2, `multer` 2.4.0, `nodemailer` 10.0.12, `sanitize-html`
+2.17.7, `undici` 7.30.0/8.10.2/8.11.2, `zod` 4.1.11.
+
+**Ausentes del árbol de runtime** (21), entre ellos los que concentraban los avisos
+críticos del inventario inicial: `next` 16.3.8, `storybook` 10.4.6, `@storybook/addon-vitest`
+10.4.6, `@vitest/mocker` 4.1.11, `electron` 44.1.0, `vite` 7.3.6/8.0.16, `happy-dom`,
+`@modelcontextprotocol/sdk` 1.30.0, `compression` 1.8.1, `@cyntler/react-doc-viewer`,
+`@vue/server-renderer`, `katex`, `markdown-it`, `fflate`, `fast-uri`,
+`http-cache-semantics`, `postcss-selector-parser`, `@graphql-tools/executor-legacy-ws`.
+Siguen estando en el repositorio y en el tooling de desarrollo: ausencia del artefacto de
+runtime no es ausencia del proyecto.
+
+`body-parser` aparece ahora solo como 2.4.0 en el árbol de producción: las dos versiones
+vulnerables desaparecieron y la línea 1.20.x no entra en el enfoque de producción.
+
+No se encontró ningún crítico confirmado en la ruta necesaria del runtime medido.
+Presencia no es explotabilidad, y este cruce no sustituye un SBOM ni un escaneo de la
+imagen final (que no existe todavía). El JSON del cruce está en
+`.aos/onboarding/bootstrap-2026-10-27/runtime-advisory-crosscheck.json`.

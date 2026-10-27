@@ -52,3 +52,55 @@ de host de CRM-001-HOST y los `-SelfTest` aislados de sus dos scripts (detalle e
 construye, no arranca servidor/worker/DB/Redis, no corre typecheck/tests de la app. Los comandos de
 arranque/parada/reinicio y las credenciales solo se documentarán como operativos después de
 ejecutarlos y verificar sus efectos.
+
+## Actualización CRM-004 (27 de octubre de 2026): lo medido y lo que sigue bloqueado
+
+**El CRM sigue sin arrancar, y esta vez por una causa concreta y reproducida**, no por
+falta de intento. El detalle completo, con tiempos, memoria y códigos de salida, está en
+[BUILD_BASELINE.md](BUILD_BASELINE.md).
+
+Lo que ya es real:
+
+- Las dependencias se instalan de verdad con la configuración Yarn revisada, dentro de la
+  etapa `server-deps` del Dockerfile oficial. Ningún build script se ejecutó.
+- `postgres` y `redis` están fijados a **digest inmutable** en
+  `deploy/local/compose.yaml`, descargados y con su versión comprobada dentro del
+  contenedor (PostgreSQL 16.15, Redis 7.4.12). `verify-local-config.mjs` ahora **rechaza**
+  cualquier servicio que se descargue por etiqueta sin digest, así que el pin no puede
+  perderse en silencio.
+- `deploy/local/.env` se genera con `local.ps1 -Action Prepare`, con secretos
+  cripto-aleatorios, y está ignorado por Git (comprobado con `git check-ignore`). Sus
+  valores no se leen ni se imprimen en ningún punto de este track.
+- Los dos tests de privacidad que CRM-003 dejó preparados **ya se ejecutan**, contra las
+  clases reales, y están en el gate (`scripts/aos/verify-server-specs.mjs`).
+
+Lo que **no** está hecho y no debe darse por hecho:
+
+- No hay imagen de aplicación: `twenty-server-build` falla en `lingui:extract` por un
+  timeout de 10 s de `threads@1.7.0`. Se reprodujo también sobre el árbol pinneado puro,
+  así que es un fallo de línea base. El arreglo verificado es una variable de entorno
+  (`THREADS_WORKER_INIT_TIMEOUT`) en el Dockerfile, fichero fuera del Scope de CRM-004:
+  **escalado, no modificado**.
+- Sin imagen no hay arranque, migraciones, worker, primer administrador, datos sintéticos,
+  prueba de stop/start/restart ni camino E2E. Nada de eso está medido y nada de eso se
+  declara en el gate.
+- La prueba negativa de body-parser (petición comprimida inválida que no debe derribar el
+  backend) sigue pendiente por el mismo motivo.
+
+### Puertos y URL efectiva
+
+El perfil por defecto publica `127.0.0.1:43000` y escribe un `AOS_CRM_SERVER_URL` que
+coincide. Antes, un puerto personalizado **sin** `AOS_CRM_SERVER_URL` pasaba el gate: la
+comprobación trataba una URL vacía como "nada que contradecir", mientras Compose sustituye
+un literal fijo. La aplicación habría construido sus enlaces sobre el puerto equivocado.
+Ahora `local.ps1` lee el valor por defecto directamente de `compose.yaml` y compara la
+**URL efectiva**; si ese valor por defecto no se puede leer, bloquea en vez de pasar.
+
+### Captura de destinos, lista antes del primer arranque
+
+`.aos/onboarding/bootstrap-2026-10-27/capture-crm-egress.py` registra solo **a dónde** van
+los paquetes: `tcpdump -nn -tttt -q`, nunca `-A`, `-X` ni `-w`, sin payload, sin cabeceras
+y sin fichero pcap. Filtra destinos no privados más DNS, espera el aviso explícito de
+readiness con deadline y marca las horas en UTC. Se validó ejecutándolo con el CRM
+apagado: 0 destinos remotos en 20 s, que es la línea base previa al arranque, no una
+prueba de que el CRM no hable con nadie.
