@@ -40,7 +40,8 @@ Crear el primer usuario en una instancia vacía y bajo acceso local controlado, 
 El gate deberá contener comandos reales ejecutados sobre Linux: construcción de shared/server/front, typechecks directos sin caché engañosa, tests enfocados de privacidad/configuración y smoke HTTP. Después: migraciones sobre DB exclusiva, arranque de worker, navegador, login, CRUD, relaciones y persistencia tras reinicio. Captura de tráfico desde el primer arranque en servidor/worker/browser.
 
 `.aos/verify.json` ya no está vacío: trae los dos comandos de procedencia de CRM-001 más el preflight
-de host de CRM-001-HOST (detalle en [HOST_RUNTIME.md](HOST_RUNTIME.md)). Ninguno de los tres es el
-gate de aplicación completo — no construye, no arranca servidor/worker/DB/Redis, no corre
-typecheck/tests de la app. Los comandos de arranque/parada/reinicio y las credenciales solo se
-documentarán como operativos después de ejecutarlos y verificar sus efectos.
+de host de CRM-001-HOST y los `-SelfTest` aislados de sus dos scripts (detalle en
+[HOST_RUNTIME.md](HOST_RUNTIME.md)). Ninguno de estos comandos es el gate de aplicación completo — no
+construye, no arranca servidor/worker/DB/Redis, no corre typecheck/tests de la app. Los comandos de
+arranque/parada/reinicio y las credenciales solo se documentarán como operativos después de
+ejecutarlos y verificar sus efectos.
