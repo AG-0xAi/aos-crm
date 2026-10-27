@@ -14,7 +14,7 @@ Avisos únicos por severidad de la fuente: CRITICAL: 4, HIGH: 23, LOW: 11, MODER
 | --- | --- | --- |
 | Next.js 16.3.8 | Dos avisos críticos y uno alto. Está en website/react-email UI; el frontend CRM es Vite | No arrancar el website ni el servidor auxiliar de email; comprobar que no entra en runtime CRM y actualizar si se requiere ese tooling |
 | Storybook 10.4.6 | Aviso crítico de validación de origen y otro alto | No arrancar el dev server hasta resolverlo; localhost por sí solo no elimina ataques desde un navegador |
-| DOMPurify 3.4.16 | Un crítico, un alto y un bajo | En las dos llamadas directas revisadas de Twenty no se observó `SAFE_FOR_TEMPLATES`, retorno DOM ni `IN_PLACE`. No se confirma explotación de esos avisos; completar revisión de consumidores transitivos y valorar parche mínimo |
+| DOMPurify 3.4.16 | Un crítico, un alto y un bajo | Revisión ampliada: tres llamadas en dos utilidades (archivo SVG, HTML de correo y asunto). El asunto sí usa `RETURN_DOM_FRAGMENT`, con tags/atributos vacíos y lectura de `textContent`; ninguna activa `SAFE_FOR_TEMPLATES`, `IN_PLACE` ni parser XHTML. No se confirma explotación; completar consumidores transitivos y triage de cada aviso antes del runtime |
 | MCP SDK 1.30.0 | Avisos de sesiones/tareas, memoria, OAuth y transporte | El controlador MCP de Twenty usa protocolo propio; revisar también clientes MCP e integraciones antes de atribuir todos los avisos al endpoint servidor |
 | GraphQL Tools | Versiones 9.2.1, 10.3.4, 11.1.0 y 12.0.0 | Revisar reachability de `mergeDeep`/`mergeIncrementalResult`, esquemas y dependencias transitivas |
 | body-parser, compression, multer | Avisos altos de disponibilidad | Revisar middleware real, límites de cuerpo, configuración de uploads y versiones corregidas antes de aceptar el backend |
@@ -81,3 +81,7 @@ No se detectó un exploit crítico confirmado en el camino de instalación revis
 Los scripts `static-inventory.py` y `osv-details.py`, sus respuestas JSON y las fechas están en `.aos/onboarding/bootstrap-2026-10-27/`. Las consultas solo enviaron identificadores públicos de paquetes y versiones. La revisión se realizó sin `yarn install`, `npm install` ni `npx`.
 
 Los avisos del producto Twenty se evalúan por separado en `SECURITY_AUDIT.md`. Una resolución upstream que mencione un CVE como corregido no se acepta como prueba de ausencia de otros avisos.
+
+## Corrección de cobertura posterior a la inspección inicial
+
+La revisión ampliada del coordinador encontró la tercera llamada `sanitizeOutboundEmailSubject` en `packages/twenty-server/src/engine/core-modules/email/utils/sanitize-outbound-email-html.util.ts`; el informe inicial había omitido su retorno DOM. No basta ese modo para confirmar el aviso de shadow roots: requiere además `SAFE_FOR_TEMPLATES`, entrada con shadow root y evaluación posterior como plantilla. La [metadata actual del mantenedor](https://github.com/cure53/DOMPurify/security/advisories/GHSA-cg2g-xh64-v4q7), consultada el 27/10/2026, indica severidad Low y versión parcheada 3.4.17, mientras el cuerpo histórico aún dice sin fix. Los conteos OSV de arriba conservan la fotografía y clasificación de aquella consulta; no sustituyen el triage actual ni acreditan un parche instalado. No se ejecutaron PoCs ni dependencias en esta comprobación.

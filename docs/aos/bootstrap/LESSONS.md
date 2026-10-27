@@ -91,3 +91,7 @@ Síntoma: la primera ejecución no interactiva intentó cargar MCP upstream y co
 ## L-11: alcance de informes y aceptación
 
 Síntoma: se interpretó HTTP401 del monitor compartido como fallo del panel y faltaba changes/CRM-001 para done --archive. Causa: inferir un sistema a partir de otro y registrar solo la spec sin su packet. Fix: publicar/leer directamente el producto por la vía oficial (HTTP200), corregir informes y crear change/delta con dry-run antes de aceptar. Regla: contrastar el fallo con el componente exacto y preparar registro, contrato y packet al desglosar tracks; no usar overrides para cerrar errores de coordinación.
+
+## L-12: inventario completo de llamadas de seguridad
+
+Síntoma: la radiografía omitió el retorno DOM del saneado de asuntos de correo. Causa: describir dos funciones sin inventariar las tres llamadas a DOMPurify. Fix: revisar todo packages, corregir la fila de dependencia y contrastar condiciones acumulativas con la fuente primaria. Regla: contar callsites antes de generalizar opciones; una condición presente no confirma un exploit que exige varias, y la metadata de un aviso puede actualizarse después de su descripción inicial.
