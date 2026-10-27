@@ -8,7 +8,7 @@ Se incorporó Twenty con historia en el proyecto existente, se fijó release/SHA
 
 ## B. Project registration
 
-Alta anterior reutilizada, sin segundo producto, pack ni bus. Proyecto: `C:\Users\Andrés\Documents\AOS-CRM`; pack `.aos/pack/aos-crm/`. Sin entregas pendientes ni workers activos al iniciar. El control-plane devolvió HTTP 401; no se acredita sincronización del panel. La épica sigue pending y no se movió progreso aceptado artificialmente.
+Alta anterior reutilizada, sin segundo producto, pack ni bus. Proyecto: `C:\Users\Andrés\Documents\AOS-CRM`; pack `.aos/pack/aos-crm/`. Sin entregas pendientes ni workers activos al iniciar. La consulta del monitor compartido devolvió HTTP401. Una comprobación posterior a la inspección confirmó HTTP200 en publicación y lectura directa del panel del producto; el401 preexistente no bloquea este producto. La épica sigue pending y no se movió progreso aceptado artificialmente.
 
 ## C. Repository
 
@@ -46,7 +46,7 @@ Propuesta preliminar para evaluar EC2/ECS-Fargate, RDS, Redis compatible, S3, se
 
 ## K. Deferred ledger
 
-Prioridad: aprobación del mapa, WSL/runtime, configuración segura/privacidad y triage alcanzable de dependencias antes de arrancar. También pendientes gate real, fork remoto, pruebas funcionales/red, verificación del panel, backups y revisión final. Ver `DEFERRED_LEDGER.md`.
+Estado posterior a esta fotografía: mapa aprobado con go, siete contratos registrados, fork creado y publicación/lectura del panel comprobadas. Prioridad: WSL/runtime, configuración segura/privacidad y triage alcanzable de dependencias antes de arrancar. Pendientes gate de aplicación, pruebas funcionales/red, backups y revisión final. Ver `DEFERRED_LEDGER.md`.
 
 ## L. Commits
 

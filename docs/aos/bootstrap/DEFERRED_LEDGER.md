@@ -10,10 +10,10 @@ Estado al 27 de octubre de 2026. Todos abiertos salvo recuperación expresamente
 | P1 | Telemetría por defecto y overrides DB pueden incumplir privacidad | Configuración oficial, tests, primer arranque bajo captura y comprobación tras reinicio |
 | P1 | 63 avisos de dependencia para 47 combinaciones del lockfile | Completar reachability y corregir componentes requeridos antes de ejecutarlos; mantener auxiliares vulnerables apagados |
 | P1 | `.dockerignore` no excluye bus y evidencias | Corregir antes de cualquier build/contexto remoto |
-| P1 | Gate vacío y ningún build/test funcional | Configurar solo comandos reales comprobados tras disponer de entorno; no acreditar éxito con cero comandos |
-| P1 | API del control-plane AOS devolvió HTTP 401 al iniciar | Revisar credencial/ingest por la vía de AOS, sin imprimir ni sustituir secretos. Conservar bus local y no declarar panel sincronizado |
+| P1 | Gate solo de procedencia; ningún build/test funcional todavía | Ampliar con readiness y comandos reales de aplicación al completar los contratos correspondientes; no acreditar funcionamiento CRM con procedencia |
+| P2 compartido | El monitor compartido preexistente devuelve HTTP 401; no es un bloqueo del panel de este producto | Publicación y lectura directa del proyecto comprobadas HTTP200, con las siete specs y evidencias en panel-current.json; no tocar credenciales ni repetir alta. Diagnóstico del monitor corresponde al control-plane compartido |
 | P1 condicional | Rama de invitaciones y OAuth DCR requieren pruebas de seguridad | Mantener single-workspace/local; probar antes de invitaciones y clientes externos |
-| P2 en ejecución | Fork remoto/origin aún no creado; destino aprobado AG-0xAi/aos-crm | CRM-001: crear/verificar el fork sin sobrescribir repositorios y medir procedencia |
+| Resuelto técnicamente | Fork AG-0xAi/aos-crm creado, upstream/origin y referencia fijada verificados | CRM-001: conservar pruebas reales, revisión y aceptación del arnés; sin publicación de ramas de trabajo |
 | Resuelto | Primer grafo interrumpido por cota de diez minutos | Reintento por módulo AOS con plazo de treinta minutos terminó con exit 0; status actualizado y consulta local comprobados. Evidencia en `graph-build.json` y `graph-status.txt` |
 | P2 | Patrones de secretos cubren solo árbol actual, no toda historia/entropía | Clasificar candidatos sin exponer valores y ampliar escaneo antes de publicación |
 | P2 | Cumplimiento comercial, SBOM y distribución del core modificado | Revisión jurídica y avisos de terceros antes de SaaS/redistribución |
@@ -23,4 +23,4 @@ Estado al 27 de octubre de 2026. Todos abiertos salvo recuperación expresamente
 
 El sistema de salud mostró latido reciente desde este checkout; `aos crons status` no pudo consultar la tarea SYSTEM/Admin sin elevar. Eso no acredita que falte la tarea. Si deja de crecer el registro de salud, escalar comprobación elevada al founder.
 
-El merge guard solo tiene cobertura de este repo según `aos status`; no asumir protección en sesiones abiertas fuera. No se ejecutó ningún worker ni se aceptó artificialmente la épica para mover la barra del panel.
+El merge guard solo tiene cobertura de este repo según `aos status`; no asumir protección en sesiones abiertas fuera. Los workers de procedencia se ejecutaron por este bus; sus hallazgos y correcciones están en .aos/reports/CRM-001*. No se marca la épica completa por esas entregas.
