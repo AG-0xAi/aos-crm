@@ -1,17 +1,22 @@
 # CRM-001-HOST host-runtime preflight. Read-only measurement: never enables a
 # Windows feature, never starts/stops a service, never creates another
-# checkout or .aos bus. Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/aos/preflight-host.ps1
+# checkout or .aos bus. Run: powershell -NoProfile -File scripts/aos/preflight-host.ps1
 #
 # Exit codes (unambiguous, checked by .aos/verify.json):
 #   0 = ready      (WSL2 + a registered distro + this exact checkout reachable from Linux
 #                    + a healthy container runtime + an isolated no-port smoke check all verified)
 #   1 = not-ready  (one or more prerequisites are concretely missing; see missingPrerequisites)
 #   2 = error      (a measurement itself failed unexpectedly, e.g. git/wsl.exe not found at all)
+#
+# -SelfTest runs isolated unit checks of the encoding-sensitive helpers and
+# the pure distro-selection logic below, using `node` as a stand-in process
+# instead of wsl.exe/Linux, then exits 0/1. It never touches the real host.
 [CmdletBinding()]
 param(
   [string] $DistroName,
   [string] $OutFile,
-  [switch] $SkipSmokeTest
+  [switch] $SkipSmokeTest,
+  [switch] $SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,7 +44,11 @@ function ConvertTo-PlainLine($Item) {
   return $Item.ToString()
 }
 
-function Invoke-NativeUnicode {
+# wsl.exe's own management text (--status/--help/-l -v: no Linux process
+# involved) comes back as literal UTF-16LE bytes on redirected stdout
+# regardless of console code page (confirmed against this host and by
+# Microsoft WSL issue #4607). Scoped to this call only.
+function Invoke-WslSelf {
   param([Parameter(Mandatory)] [string] $Exe, [string[]] $NativeArgs = @())
   # Native stderr lines become terminating errors under the caller's Stop
   # preference once redirected with 2>&1; scope Continue to this call only
@@ -48,6 +57,27 @@ function Invoke-NativeUnicode {
   $prevEncoding = [Console]::OutputEncoding
   try {
     [Console]::OutputEncoding = [System.Text.Encoding]::Unicode
+    $rawLines = & $Exe @NativeArgs 2>&1
+    $code = $LASTEXITCODE
+  } finally {
+    [Console]::OutputEncoding = $prevEncoding
+  }
+  $text = (@($rawLines) | ForEach-Object { ConvertTo-PlainLine $_ } | Where-Object { $_.Length -gt 0 }) -join "`n"
+  [pscustomobject]@{ ExitCode = $code; Text = $text.Trim() }
+}
+
+# A command executed INSIDE a distro (wsl.exe -d <distro> -- <linux cmd>)
+# forwards that Linux process's own stdout bytes rather than wsl.exe's own
+# console text; Linux tools (wslpath/git/docker/bash) write UTF-8, not
+# UTF-16LE. Decoding this stream with Invoke-WslSelf's UTF-16 assumption
+# corrupts it (reproduced with a `node` stand-in: ASCII+accents+a SHA-like
+# hex string come back as replacement characters, exit 0, matches=false).
+function Invoke-WslLinux {
+  param([Parameter(Mandatory)] [string] $Exe, [string[]] $NativeArgs = @())
+  $ErrorActionPreference = 'Continue'
+  $prevEncoding = [Console]::OutputEncoding
+  try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $rawLines = & $Exe @NativeArgs 2>&1
     $code = $LASTEXITCODE
   } finally {
@@ -97,6 +127,83 @@ function ConvertFrom-WslListVerbose {
     }
   }
   return $result
+}
+
+# Decides which registered distro (if any) the Linux/container checks below
+# run against. Never falls back to another distro when -DistroName was given
+# and does not match (previously it did, silently), and never selects a
+# WSL1 distro even as a default (WSL1 cannot run Docker Engine/systemd).
+# Pure function: no process calls, so it is unit-testable in -SelfTest.
+function Resolve-TargetDistro {
+  param([object[]] $Distributions, [string] $RequestedName)
+  if ($RequestedName) {
+    $matched = @($Distributions | Where-Object { $_.name -eq $RequestedName })
+    if ($matched.Count -eq 0) {
+      return [ordered]@{ Distro = $null; Error = "requested -DistroName '$RequestedName' is not a registered WSL distribution; refusing to silently probe another one" }
+    }
+    if ($matched[0].version -ne '2') {
+      return [ordered]@{ Distro = $null; Error = "requested -DistroName '$RequestedName' is registered but running WSL1, not WSL2; upgrade it (wsl --set-version $RequestedName 2) before it can be used" }
+    }
+    return [ordered]@{ Distro = $matched[0]; Error = $null }
+  }
+  $wsl2 = @($Distributions | Where-Object { $_.version -eq '2' })
+  if ($wsl2.Count -eq 0) {
+    return [ordered]@{ Distro = $null; Error = 'no WSL2 distribution is registered (only WSL1, if any); a WSL2 distro is required to measure Linux/container readiness' }
+  }
+  return [ordered]@{ Distro = $wsl2[0]; Error = $null }
+}
+
+function Invoke-SelfTest {
+  $failures = New-Object System.Collections.Generic.List[string]
+  function Assert-True([bool] $Condition, [string] $Label) {
+    if ($Condition) { Write-Output "[PASS] self-test: $Label" }
+    else { Write-Output "[FAIL] self-test: $Label"; $failures.Add($Label) | Out-Null }
+  }
+
+  # ---- encoding split, proven against a real child process (node), no WSL/Linux required ----
+  $sample = 'headSha=4f9d2ab1c3e07f6a accented:cafe-nino-manana'
+  $jsUtf8 = 'process.stdout.write(Buffer.from(process.argv[1],''utf8''))'
+  $jsUtf16 = 'process.stdout.write(Buffer.from(process.argv[1],''utf16le''))'
+
+  $linuxLike = Invoke-WslLinux -Exe 'node' -NativeArgs @('-e', $jsUtf8, $sample)
+  Assert-True ($linuxLike.ExitCode -eq 0 -and $linuxLike.Text -eq $sample) 'Invoke-WslLinux decodes UTF-8 stdout (ASCII+accents+hex) correctly'
+
+  $selfLike = Invoke-WslSelf -Exe 'node' -NativeArgs @('-e', $jsUtf16, $sample)
+  Assert-True ($selfLike.ExitCode -eq 0 -and $selfLike.Text -eq $sample) 'Invoke-WslSelf decodes UTF-16LE stdout (ASCII+accents+hex) correctly'
+
+  $wrongFn = Invoke-WslSelf -Exe 'node' -NativeArgs @('-e', $jsUtf8, $sample)
+  Assert-True ($wrongFn.Text -ne $sample) 'Invoke-WslSelf on UTF-8 bytes still corrupts (proves the split is load-bearing, guards against collapsing it back)'
+
+  # ---- Resolve-TargetDistro, pure, no process involved ----
+  $wsl2Distro = [ordered]@{ name = 'Ubuntu'; state = 'Running'; version = '2'; isDefault = $true }
+  $wsl1Distro = [ordered]@{ name = 'OldDistro'; state = 'Running'; version = '1'; isDefault = $false }
+
+  $noName = Resolve-TargetDistro -Distributions @($wsl2Distro) -RequestedName ''
+  Assert-True ($null -eq $noName.Error -and $noName.Distro.name -eq 'Ubuntu') 'Resolve-TargetDistro auto-picks the only WSL2 distro when no name requested'
+
+  $onlyWsl1 = Resolve-TargetDistro -Distributions @($wsl1Distro) -RequestedName ''
+  Assert-True ($null -ne $onlyWsl1.Error -and $null -eq $onlyWsl1.Distro) 'Resolve-TargetDistro refuses to auto-pick a WSL1-only distro'
+
+  $missingName = Resolve-TargetDistro -Distributions @($wsl2Distro) -RequestedName 'DoesNotExist'
+  Assert-True ($null -ne $missingName.Error -and $null -eq $missingName.Distro) 'Resolve-TargetDistro fails closed when the requested -DistroName is not registered (no silent fallback)'
+
+  $wrongVersion = Resolve-TargetDistro -Distributions @($wsl1Distro) -RequestedName 'OldDistro'
+  Assert-True ($null -ne $wrongVersion.Error -and $null -eq $wrongVersion.Distro) 'Resolve-TargetDistro fails closed when the requested distro is WSL1'
+
+  $exactMatch = Resolve-TargetDistro -Distributions @($wsl1Distro, $wsl2Distro) -RequestedName 'Ubuntu'
+  Assert-True ($null -eq $exactMatch.Error -and $exactMatch.Distro.name -eq 'Ubuntu') 'Resolve-TargetDistro picks the exact requested WSL2 distro among several'
+
+  Write-Output ''
+  Write-Output "self-test: $(if ($failures.Count -eq 0) { 'ALL PASSED' } else { "$($failures.Count) FAILED" })"
+  # Exits here (rather than returning a value) so the PASS/FAIL lines above
+  # stream straight to stdout: capturing this function's return value would
+  # also capture every Write-Output call made inside it, and a non-empty
+  # capture array is always truthy regardless of the last element's value.
+  if ($failures.Count -eq 0) { exit 0 } else { exit 1 }
+}
+
+if ($SelfTest) {
+  Invoke-SelfTest
 }
 
 $status = 'error'
@@ -177,13 +284,13 @@ try {
   if (-not $wslExePath) {
     Add-Missing 'wsl.exe was not found on PATH at all; this Windows build may predate WSL, see docs/aos/bootstrap/HOST_RUNTIME.md'
   } else {
-    $statusProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('--status')
+    $statusProbe = Invoke-WslSelf -Exe 'wsl.exe' -NativeArgs @('--status')
     $wsl.statusExitCode = $statusProbe.ExitCode
     $wsl.statusMessage = $statusProbe.Text
     # A working WSL install reports exit 0 from --status with configuration details.
     $wsl.installed = ($statusProbe.ExitCode -eq 0)
 
-    $helpProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('--help')
+    $helpProbe = Invoke-WslSelf -Exe 'wsl.exe' -NativeArgs @('--help')
     $knownArgs = @('--install', '--update', '--status', '--help')
     $matchedKnown = @($knownArgs | Where-Object { $helpProbe.Text -match [regex]::Escape($_) })
     # The pre-install bootstrap shim only recognizes these four arguments and
@@ -199,7 +306,7 @@ try {
     if ($wsl.bootstrapStubOnly) {
       Add-Note 'wsl.exe is still the pre-install bootstrap stub (only --install/--update/--status/--help confirmed); flags like --distribution/--no-launch/--list are NOT assumed to work yet'
     } else {
-      $listProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-l', '-v')
+      $listProbe = Invoke-WslSelf -Exe 'wsl.exe' -NativeArgs @('-l', '-v')
       if ($listProbe.ExitCode -eq 0) {
         $distros = ConvertFrom-WslListVerbose -Text $listProbe.Text
         $wsl.distributions = @($distros | ForEach-Object { [ordered]@{ name = $_.Name; state = $_.State; version = $_.Version; isDefault = $_.IsDefault } })
@@ -229,8 +336,14 @@ try {
   # ---- Linux access to this exact checkout + container runtime + isolated smoke (only if a usable distro exists) ----
   $targetDistro = $null
   if ($wsl.distributions.Count -gt 0) {
-    $preferred = if ($DistroName) { $wsl.distributions | Where-Object { $_.name -eq $DistroName } } else { $null }
-    $targetDistro = if ($preferred) { $preferred[0] } elseif ($wsl.distributions.Count -gt 0) { $wsl.distributions[0] } else { $null }
+    $resolvedDistro = Resolve-TargetDistro -Distributions $wsl.distributions -RequestedName $DistroName
+    if ($resolvedDistro.Error) {
+      Add-Missing $resolvedDistro.Error
+    } else {
+      $targetDistro = $resolvedDistro.Distro
+    }
+  } elseif ($DistroName) {
+    Add-Missing "requested -DistroName '$DistroName' cannot be used: no WSL distribution is registered at all"
   }
 
   $linuxAccess = [ordered]@{ attempted = $false }
@@ -243,14 +356,14 @@ try {
     $smokeTest.reason = 'no WSL2 distribution available'
   } else {
     $selectedDistro = $targetDistro.name
-    $linuxPathProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'wslpath', '-a', $repoRoot)
+    $linuxPathProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'wslpath', '-a', $repoRoot)
     if ($linuxPathProbe.ExitCode -ne 0) {
       $linuxAccess = [ordered]@{ attempted = $true; ok = $false; distro = $selectedDistro; detail = "wslpath translation failed (exit $($linuxPathProbe.ExitCode))" }
       Add-Missing "could not translate the checkout path for Linux via '$selectedDistro'"
     } else {
       $linuxPath = $linuxPathProbe.Text
-      $headProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD')
-      $busProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'test', '-d', "$linuxPath/.aos")
+      $headProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD')
+      $busProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'test', '-d', "$linuxPath/.aos")
       $shaMatches = ($headProbe.ExitCode -eq 0 -and $headProbe.Text -eq $windowsHeadSha)
       $busReachable = ($busProbe.ExitCode -eq 0)
       $linuxAccess = [ordered]@{
@@ -265,7 +378,7 @@ try {
       if (-not $busReachable) { Add-Missing "Linux-side '$linuxPath/.aos' is not reachable under '$selectedDistro'" }
     }
 
-    $dockerProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'bash', '-lc', 'command -v docker >/dev/null 2>&1 && docker version --format "{{.Server.Version}}" && systemctl is-active docker')
+    $dockerProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'bash', '-lc', 'command -v docker >/dev/null 2>&1 && docker version --format "{{.Server.Version}}" && systemctl is-active docker')
     $dockerOk = ($dockerProbe.ExitCode -eq 0)
     $containerRuntime = [ordered]@{
       attempted = $true
@@ -281,7 +394,7 @@ try {
       Add-Missing 'container runtime smoke test was skipped (-SkipSmokeTest); readiness requires it to actually run'
     } else {
       # Official, tiny, no-port, no-CRM-data smoke image; --rm leaves no container behind.
-      $smokeProbe = Invoke-NativeUnicode -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'docker', 'run', '--rm', 'hello-world')
+      $smokeProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'docker', 'run', '--rm', 'hello-world')
       $smokeOk = ($smokeProbe.ExitCode -eq 0 -and $smokeProbe.Text -match 'Hello from Docker!')
       $smokeTest = [ordered]@{
         attempted = $true
