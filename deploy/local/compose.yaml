@@ -86,7 +86,10 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16
+    # Immutable digest, not the moving `postgres:16` alias (CRM-004). Both
+    # `postgres:16` and `postgres:16.15` resolved to this index digest on
+    # 2026-10-27; the tag is kept beside it only so the version is readable.
+    image: postgres:16.15@sha256:9e2cf6287f25c3151f4c9421ccce2b17f3e60061c111a29165e0d2cdd9ff0a97
     environment:
       POSTGRES_DB: ${AOS_CRM_PG_DB:-aos_crm_local}
       POSTGRES_USER: ${AOS_CRM_PG_USER:-aos_crm}
@@ -104,7 +107,10 @@ services:
     # No ports: published only on the aos-crm-local network (SEC-02).
 
   redis:
-    image: redis:7
+    # Immutable digest (CRM-004), same resolution as `redis:7` on 2026-10-27.
+    # 7.4.x is RSALv2/SSPLv1, not BSD-3 like 7.2.x -- fine for this local
+    # single-tenant stack, recorded in LICENSE_COMPLIANCE.md for CRM-006.
+    image: redis:7.4.12@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039
     command: ["--maxmemory-policy", "noeviction"]
     networks:
       - aos-crm-local

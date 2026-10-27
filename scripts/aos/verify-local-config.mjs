@@ -342,15 +342,22 @@ function fetchComposeJsonViaRealDocker(repoRoot, distro) {
   }
 }
 
+// A service that is PULLED (no build section) must name an immutable digest:
+// `postgres:16` is a moving alias that can resolve to different bytes on two
+// machines or two days, which is exactly what a reproducible local profile
+// cannot afford. A service that is BUILT from this repo is excluded: its tag
+// names a locally produced artifact whose digest does not exist until the
+// build runs, so requiring one there would be unsatisfiable.
 function checkJsonNoMovingImage(model) {
   const bad = [];
   for (const [name, svc] of Object.entries(model.services || {})) {
     const image = String(svc.image || '');
-    if (/twentycrm\/twenty/.test(image) || /:latest\b/.test(image)) bad.push(name);
+    if (/twentycrm\/twenty/.test(image) || /:latest\b/.test(image)) { bad.push(`${name} (vendor/latest)`); continue; }
+    if (!svc.build && !/@sha256:[0-9a-f]{64}\b/.test(image)) bad.push(`${name} (pulled image not pinned to a digest)`);
   }
   const hasAnyImage = Object.values(model.services || {}).some((s) => s.image);
   const ok = hasAnyImage && bad.length === 0;
-  return { ok, detail: ok ? 'no service image references twentycrm/twenty or a :latest tag' : `moving/registry image reference in service(s): ${bad.join(', ')}` };
+  return { ok, detail: ok ? 'no vendor/:latest image, and every pulled image is pinned to an immutable digest' : `moving/registry image reference in service(s): ${bad.join(', ')}` };
 }
 
 function checkJsonBuildsFromSource(model) {
@@ -665,14 +672,14 @@ function cloneGoodComposeModel() {
         volumes: [{ source: 'aos-crm-local-storage', target: '/app/x', type: 'volume' }],
       },
       db: {
-        image: 'postgres:16',
+        image: 'postgres:16.15@sha256:9e2cf6287f25c3151f4c9421ccce2b17f3e60061c111a29165e0d2cdd9ff0a97',
         environment: {},
         networks: { 'aos-crm-local': null },
         healthcheck: { test: ['CMD-SHELL', 'pg_isready'] },
         volumes: [{ source: 'aos-crm-local-db', target: '/var/lib/postgresql/data', type: 'volume' }],
       },
       redis: {
-        image: 'redis:7',
+        image: 'redis:7.4.12@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039',
         networks: { 'aos-crm-local': null },
         healthcheck: { test: ['CMD', 'redis-cli', 'ping'] },
       },
@@ -842,6 +849,19 @@ function selfTest() {
     const m = cloneGoodComposeModel();
     m.services.server.image = 'twentycrm/twenty:latest';
     assertOk(checkJsonNoMovingImage(m), false);
+  });
+  record('checkJsonNoMovingImage: a pulled service on a bare tag is rejected -- a tag is mutable, a digest is not (CRM-004)', () => {
+    const m = cloneGoodComposeModel();
+    m.services.db.image = 'postgres:16';
+    assertOk(checkJsonNoMovingImage(m), false);
+    const m2 = cloneGoodComposeModel();
+    m2.services.redis.image = 'redis:7';
+    assertOk(checkJsonNoMovingImage(m2), false);
+  });
+  record('checkJsonNoMovingImage: a built service keeps using its local tag without a digest (only pulled images can be pinned)', () => {
+    const m = cloneGoodComposeModel();
+    if (m.services.server.image.includes('@sha256:')) throw new Error('fixture should keep the server on a plain local tag');
+    assertOk(checkJsonNoMovingImage(m), true);
   });
   record('checkJsonBuildsFromSource: positive', () => assertOk(checkJsonBuildsFromSource(cloneGoodComposeModel()), true));
   record('checkJsonBuildsFromSource: a worker pointed at a different target is rejected', () => {
