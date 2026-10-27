@@ -7,17 +7,21 @@
 // against synthetic fixtures) over a raw-text regex, because a regex can
 // match a comment or a YAML merge anchor and produce a false PASS that
 // misses a per-service override -- see docs/aos/bootstrap/LOCAL_SECURITY.md.
-// When Docker/WSL is unreachable those specific checks are reported
-// `[INFO] ... not measured`, never faked as a PASS.
+// When Docker/WSL is unreachable, those specific checks FAIL CLOSED by
+// default (an unmeasured control is not a passed one). Pass --static to
+// explicitly accept a reduced, Docker-less check set instead (reported
+// `[INFO] ... not measured`) -- scripts/aos/local.ps1's Start/Restart never
+// pass this flag, so they always see the fail-closed default.
 // Run: node scripts/aos/verify-local-config.mjs
+// Run (reduced, Docker-less, explicit): node scripts/aos/verify-local-config.mjs --static
 // Self-test (isolated fixtures/subprocess only, never Docker, never network;
 // it does read this repo's real .claude/settings.json and
 // .claude/hooks/aos-merge-guard.cjs to exercise the merge-guard wiring
 // itself, same as the existing hook-coverage self-test already did):
 //   node scripts/aos/verify-local-config.mjs --self-test
 import { spawnSync } from 'node:child_process';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
-import { join, dirname, resolve as resolvePath } from 'node:path';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, lstatSync } from 'node:fs';
+import { join, dirname, basename, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
@@ -34,23 +38,66 @@ function readRepoFile(relPath) {
   return readFileSync(join(REPO_ROOT, relPath), 'utf8');
 }
 
+// Refuses to recursively delete anything that is not, right now, a real
+// directory strictly inside expectedParentDir with a leaf name starting
+// with expectedPrefix, and refuses outright if the target is a symlink:
+// its target could point anywhere, so ancestor-path containment alone
+// (verify-provenance.mjs's assertSafeToRemove) is not a full guarantee
+// here. Re-resolves immediately before deleting rather than trusting an
+// earlier snapshot. Mirrors scripts/aos/local.ps1's Remove-ContainedTempDir
+// for the same fail-closed contract on the Node side.
+function assertContainedTempDirSafeToRemove(targetDir, expectedParentDir, expectedPrefix) {
+  let stat;
+  try {
+    stat = lstatSync(targetDir);
+  } catch {
+    return null; // already gone; nothing to remove
+  }
+  if (stat.isSymbolicLink()) {
+    throw new Error(`refusing to remove '${targetDir}': it is a symlink, not a plain directory`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`refusing to remove '${targetDir}': not a directory`);
+  }
+  const resolvedTarget = resolvePath(targetDir);
+  const resolvedParent = resolvePath(expectedParentDir);
+  const leaf = basename(resolvedTarget);
+  const parentOfResolved = dirname(resolvedTarget);
+  const isRoot = parentOfResolved === resolvedTarget;
+  const isDirectChild = parentOfResolved === resolvedParent;
+  const hasPrefix = leaf.startsWith(expectedPrefix);
+  if (isRoot || !isDirectChild || !hasPrefix) {
+    throw new Error(`refusing to remove '${resolvedTarget}': not a contained temp dir directly under '${resolvedParent}' with prefix '${expectedPrefix}'`);
+  }
+  return resolvedTarget;
+}
+
+function removeContainedTempDir(targetDir, expectedParentDir, expectedPrefix) {
+  const safePath = assertContainedTempDirSafeToRemove(targetDir, expectedParentDir, expectedPrefix);
+  if (safePath) rmSync(safePath, { recursive: true, force: true });
+}
+
 // ---- .dockerignore / .gitignore / .yarnrc.yml / Dockerfile: flat,
 // non-anchored text, so a literal-line regex is not exposed to the
 // comment/anchor ambiguity that the compose checks below are built to avoid
 // ----
 
+// Requires the **/ (any-depth) form of each pattern, not a root-only
+// literal: a root-only `.mcp.json` passed this check while leaving
+// packages/twenty-agent-skills/.mcp.json uncovered -- confirmed via the real
+// Docker build-context export in checkDockerignoreViaRealDocker below.
 function checkDockerignoreExcludesAosState(text) {
   const required = ['.aos', '.codegraph-aos', '.claude', '.git', '.mcp.json'];
-  const missingLiteral = required.filter((p) => !new RegExp(`^${p.replace(/\./g, '\\.')}\\s*$`, 'm').test(text));
+  const missingAnyDepth = required.filter((p) => !new RegExp(`^\\*\\*/${p.replace(/\./g, '\\.')}\\s*$`, 'm').test(text));
   const hasEnvAnyDepth = /^\*\*\/\.env\s*$/m.test(text);
   const hasEnvSuffixAnyDepth = /^\*\*\/\.env\.\*\s*$/m.test(text);
   const hasExampleReincluded = /^!\*\*\/\.env\.example\s*$/m.test(text);
-  const ok = missingLiteral.length === 0 && hasEnvAnyDepth && hasEnvSuffixAnyDepth && hasExampleReincluded;
+  const ok = missingAnyDepth.length === 0 && hasEnvAnyDepth && hasEnvSuffixAnyDepth && hasExampleReincluded;
   return {
     ok,
     detail: ok
-      ? 'excludes .aos/.codegraph-aos/.claude/.git/.mcp.json plus **/.env and **/.env.* at any depth, with *.env.example re-included'
-      : `missing literal exclude(s): ${missingLiteral.join(', ')}; **/.env=${hasEnvAnyDepth}, **/.env.*=${hasEnvSuffixAnyDepth}, !**/.env.example=${hasExampleReincluded}`,
+      ? 'excludes .aos/.codegraph-aos/.claude/.git/.mcp.json at any depth (**/) plus **/.env and **/.env.* at any depth, with *.env.example re-included'
+      : `missing any-depth (**/) exclude(s): ${missingAnyDepth.join(', ')}; **/.env=${hasEnvAnyDepth}, **/.env.*=${hasEnvSuffixAnyDepth}, !**/.env.example=${hasExampleReincluded}`,
   };
 }
 
@@ -426,13 +473,22 @@ function checkDockerignoreViaRealDocker(repoRoot, distro) {
     return { measured: false, ok: null, detail: 'not measured: wsl.exe/distro unavailable on this runtime (see HOST_RUNTIME.md)' };
   }
   const linuxRoot = pathProbe.stdout.trim();
-  const winCtx = mkdtempSync(join(tmpdir(), 'aos-crm-dockerignore-probe-'));
+  // Context AND exported output live under the SAME mkdtemp-owned scratch
+  // root, so one contained cleanup removes both -- plus any partial output
+  // left behind by a failed build -- without ever needing a separate
+  // Linux-rooted `rm -rf` to reach back across the WSL boundary.
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'aos-crm-dockerignore-probe-'));
+  const winCtx = join(scratchRoot, 'ctx');
+  const winOut = join(scratchRoot, 'out');
   try {
+    mkdirSync(winCtx, { recursive: true });
+    mkdirSync(winOut, { recursive: true });
     const fixtures = {
       '.env': 'FIXTURE_SECRET=root-env',
       '.git': 'not-a-real-git-dir-just-a-fixture',
       '.mcp.json': '{}',
       'package.json': '{"name":"fixture"}',
+      LICENSE: 'MIT License fixture, keep-me',
       'deploy/local/.env': 'FIXTURE_SECRET=local-env',
       'deploy/local/.env.local': 'FIXTURE_SECRET=local-env-local',
       'deploy/local/.env.production': 'FIXTURE_SECRET=local-env-prod',
@@ -441,6 +497,16 @@ function checkDockerignoreViaRealDocker(repoRoot, distro) {
       'packages/twenty-server/.env.test': 'FIXTURE_SECRET=server-env-test',
       'packages/twenty-server/.env.example': 'EXAMPLE=keep-me-too',
       'nested/deeper/dir/.env': 'FIXTURE_SECRET=deep-env',
+      'nested/deeper/dir/asset.txt': 'keep-me-asset',
+      // Real, confirmed nested miss a root-only .mcp.json pattern left
+      // uncovered (packages/twenty-agent-skills/.mcp.json), plus nested
+      // agent/bus/graph/Git fixtures proving the **/ fix in .dockerignore.
+      'packages/twenty-agent-skills/.mcp.json': '{"servers":{}}',
+      'packages/twenty-agent-skills/skill.json': 'keep-me-skill-asset',
+      'nested/sub/.claude/settings.json': '{"fixture":true}',
+      'nested/sub/.aos/state.json': '{"fixture":true}',
+      'nested/sub/.codegraph-aos/index.sqlite': 'fixture',
+      'vendor/thirdparty/.git/HEAD': 'ref: refs/heads/main',
     };
     for (const [rel, content] of Object.entries(fixtures)) {
       const dest = join(winCtx, rel);
@@ -450,29 +516,41 @@ function checkDockerignoreViaRealDocker(repoRoot, distro) {
     copyFileSync(join(repoRoot, '.dockerignore'), join(winCtx, '.dockerignore'));
     writeFileSync(join(winCtx, 'Dockerfile'), 'FROM scratch\nCOPY . /\n', 'utf8');
 
-    const expectKept = ['deploy/local/.env.example', 'packages/twenty-server/.env.example', 'package.json'];
+    const expectKept = [
+      'deploy/local/.env.example',
+      'packages/twenty-server/.env.example',
+      'package.json',
+      'LICENSE',
+      'nested/deeper/dir/asset.txt',
+      'packages/twenty-agent-skills/skill.json',
+    ];
     const expectExcluded = [
       '.env', '.git', '.mcp.json',
       'deploy/local/.env', 'deploy/local/.env.local', 'deploy/local/.env.production', 'deploy/local/privacy.env',
       'packages/twenty-server/.env.test', 'nested/deeper/dir/.env',
+      'packages/twenty-agent-skills/.mcp.json',
+      'nested/sub/.claude/settings.json',
+      'nested/sub/.aos/state.json',
+      'nested/sub/.codegraph-aos/index.sqlite',
+      'vendor/thirdparty/.git/HEAD',
     ];
 
     const ctxProbe = spawnSync('wsl.exe', ['-d', distro, '--exec', 'wslpath', '-a', winCtx], { encoding: 'utf8' });
-    if (ctxProbe.error || ctxProbe.status !== 0) {
-      return { measured: false, ok: null, detail: 'not measured: wslpath translation of the synthetic probe context failed' };
+    const outProbe = spawnSync('wsl.exe', ['-d', distro, '--exec', 'wslpath', '-a', winOut], { encoding: 'utf8' });
+    if (ctxProbe.error || ctxProbe.status !== 0 || outProbe.error || outProbe.status !== 0) {
+      return { measured: false, ok: null, detail: 'not measured: wslpath translation of the synthetic probe context/output failed' };
     }
     const linuxCtx = ctxProbe.stdout.trim();
-    const outDir = `${linuxCtx}-out`;
-    const build = spawnSync('wsl.exe', ['-d', distro, '--exec', 'docker', 'build', '-f', `${linuxCtx}/Dockerfile`, '-o', outDir, linuxCtx], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    const linuxOut = outProbe.stdout.trim();
+    const build = spawnSync('wsl.exe', ['-d', distro, '--exec', 'docker', 'build', '-f', `${linuxCtx}/Dockerfile`, '-o', linuxOut, linuxCtx], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
     if (build.error || build.status !== 0) {
       return { measured: false, ok: null, detail: `not measured: synthetic scratch-image build/export failed (status=${build.status}${build.error ? `, ${safeMessage(build.error)}` : ''})` };
     }
-    const find = spawnSync('wsl.exe', ['-d', distro, '--exec', 'find', outDir, '-type', 'f'], { encoding: 'utf8' });
-    spawnSync('wsl.exe', ['-d', distro, '--exec', 'rm', '-rf', outDir]);
+    const find = spawnSync('wsl.exe', ['-d', distro, '--exec', 'find', linuxOut, '-type', 'f'], { encoding: 'utf8' });
     if (find.error || find.status !== 0) {
       return { measured: false, ok: null, detail: 'not measured: could not list the exported probe output' };
     }
-    const exported = new Set(find.stdout.split('\n').filter(Boolean).map((p) => p.slice(outDir.length + 1)));
+    const exported = new Set(find.stdout.split('\n').filter(Boolean).map((p) => p.slice(linuxOut.length + 1)));
     const wronglyKept = expectExcluded.filter((p) => exported.has(p));
     const wronglyExcluded = expectKept.filter((p) => !exported.has(p));
     const ok = wronglyKept.length === 0 && wronglyExcluded.length === 0;
@@ -480,17 +558,24 @@ function checkDockerignoreViaRealDocker(repoRoot, distro) {
       measured: true,
       ok,
       detail: ok
-        ? `real Docker build-context export: ${expectExcluded.length} dotenv/agent-config fixture(s) excluded at various depths, ${expectKept.length} example(s)/non-secret file(s) kept`
+        ? `real Docker build-context export: ${expectExcluded.length} dotenv/agent-bus-git-graph fixture(s) excluded at various depths (including nested, e.g. packages/twenty-agent-skills/.mcp.json), ${expectKept.length} example(s)/license/asset file(s) kept`
         : `wronglyKept=${JSON.stringify(wronglyKept)}, wronglyExcluded=${JSON.stringify(wronglyExcluded)}`,
     };
   } finally {
-    rmSync(winCtx, { recursive: true, force: true });
+    removeContainedTempDir(scratchRoot, tmpdir(), 'aos-crm-dockerignore-probe-');
   }
 }
 
 // ---------------------------------------------------------------------------
 // main: real repo files/Docker only
 // ---------------------------------------------------------------------------
+
+// Only main() (never --self-test) reads this: an explicit, visible opt-out
+// for a reduced Docker-less check set. scripts/aos/local.ps1's
+// Invoke-LocalConfigVerifier never passes it -- Start/Restart always run
+// the fail-closed default, so an unreachable Docker/WSL on that path blocks
+// instead of quietly running with fewer controls.
+const STATIC_ONLY = process.argv.includes('--static');
 
 function main() {
   const results = [];
@@ -502,8 +587,10 @@ function main() {
     }
   } else if (composeJson.measured) {
     results.push({ name: 'compose-json:parseable', ok: false, detail: composeJson.detail });
+  } else if (STATIC_ONLY) {
+    console.log(`[INFO] compose-json: ${composeJson.detail} (effective Compose structure not measured by this run; --static mode, local.ps1 Start/Restart never pass this flag)`);
   } else {
-    console.log(`[INFO] compose-json: ${composeJson.detail} (effective Compose structure not measured by this run)`);
+    results.push({ name: 'compose-json:measured', ok: false, detail: `${composeJson.detail}; fails closed by default -- pass --static to explicitly accept a reduced, Docker-less check set (Start/Restart never do)` });
   }
 
   results.push({ name: 'dockerignore:excludes-aos-state', ...checkDockerignoreExcludesAosState(readRepoFile('.dockerignore')) });
@@ -526,8 +613,10 @@ function main() {
   if (dockerignoreCheck.measured) {
     console.log(`[${dockerignoreCheck.ok ? 'PASS' : 'FAIL'}] dockerignore:real-docker-build-context: ${dockerignoreCheck.detail}`);
     results.push({ name: 'dockerignore:real-docker-build-context', ok: dockerignoreCheck.ok, detail: dockerignoreCheck.detail });
+  } else if (STATIC_ONLY) {
+    console.log(`[INFO] dockerignore:real-docker-build-context: ${dockerignoreCheck.detail} (--static mode, local.ps1 Start/Restart never pass this flag)`);
   } else {
-    console.log(`[INFO] dockerignore:real-docker-build-context: ${dockerignoreCheck.detail}`);
+    results.push({ name: 'dockerignore:real-docker-build-context:measured', ok: false, detail: `${dockerignoreCheck.detail}; fails closed by default -- pass --static to explicitly accept a reduced, Docker-less check set (Start/Restart never do)` });
   }
 
   const failed = results.filter((r) => !r.ok);
@@ -536,7 +625,7 @@ function main() {
     process.exit(1);
   }
   console.log(`\nPASS: all ${results.length} local-security checks passed.`);
-  console.log('Scope: static configuration contract only. No image was built, no container/network/volume was created, and no service was started by this script (the .dockerignore check builds a throwaway `FROM scratch` image from synthetic fixtures in an isolated temp dir, never the CRM Dockerfile/image/context).');
+  console.log('Scope: static configuration contract only. No CRM image was built, no CRM container/network/volume was created, and no CRM service was started by this script -- the .dockerignore check DOES build and export a throwaway `FROM scratch` image, but only from synthetic fixtures in an isolated temp dir, never the CRM Dockerfile/image/context.');
   console.log('deploy/local/privacy.env is a separate CRM-003 deliverable: its absence is expected right now and is exactly what makes docker compose refuse to start (see R2.1); this gate does not create or require it.');
   process.exit(0);
 }
@@ -615,17 +704,60 @@ function selfTest() {
     }
   }
 
-  record('checkDockerignoreExcludesAosState: positive', () => assertOk(checkDockerignoreExcludesAosState('.git\n.aos\n.codegraph-aos\n.claude\n.mcp.json\n**/.env\n**/.env.*\n!**/.env.example\n'), true));
-  record('checkDockerignoreExcludesAosState: missing .aos is rejected', () => assertOk(checkDockerignoreExcludesAosState('.git\n.claude\n.mcp.json\n**/.env\n**/.env.*\n!**/.env.example\n'), false));
-  record('checkDockerignoreExcludesAosState: missing .mcp.json is rejected', () => assertOk(checkDockerignoreExcludesAosState('.git\n.aos\n.codegraph-aos\n.claude\n**/.env\n**/.env.*\n!**/.env.example\n'), false));
-  record('checkDockerignoreExcludesAosState: missing the any-depth dotenv patterns is rejected', () => assertOk(checkDockerignoreExcludesAosState('.git\n.aos\n.codegraph-aos\n.claude\n.mcp.json\n.env\n'), false));
+  record('checkDockerignoreExcludesAosState: positive', () => assertOk(checkDockerignoreExcludesAosState('**/.git\n**/.aos\n**/.codegraph-aos\n**/.claude\n**/.mcp.json\n**/.env\n**/.env.*\n!**/.env.example\n'), true));
+  record('checkDockerignoreExcludesAosState: missing .aos is rejected', () => assertOk(checkDockerignoreExcludesAosState('**/.git\n**/.claude\n**/.mcp.json\n**/.env\n**/.env.*\n!**/.env.example\n'), false));
+  record('checkDockerignoreExcludesAosState: missing .mcp.json is rejected', () => assertOk(checkDockerignoreExcludesAosState('**/.git\n**/.aos\n**/.codegraph-aos\n**/.claude\n**/.env\n**/.env.*\n!**/.env.example\n'), false));
+  record('checkDockerignoreExcludesAosState: missing the any-depth dotenv patterns is rejected', () => assertOk(checkDockerignoreExcludesAosState('**/.git\n**/.aos\n**/.codegraph-aos\n**/.claude\n**/.mcp.json\n.env\n'), false));
+  record('checkDockerignoreExcludesAosState: a root-only .mcp.json (no **/) is rejected (the exact gap packages/twenty-agent-skills/.mcp.json exposed)', () => assertOk(checkDockerignoreExcludesAosState('**/.git\n**/.aos\n**/.codegraph-aos\n**/.claude\n.mcp.json\n**/.env\n**/.env.*\n!**/.env.example\n'), false));
+
+  record('removeContainedTempDir: deletes a directory that is directly inside the expected parent with the expected prefix', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'aos-crm-contained-selftest-'));
+    try {
+      const victim = join(parent, 'contained-victim');
+      mkdirSync(victim, { recursive: true });
+      writeFileSync(join(victim, 'file.txt'), 'x', 'utf8');
+      removeContainedTempDir(victim, parent, 'contained-');
+      let stillExists = true;
+      try { lstatSync(victim); } catch { stillExists = false; }
+      if (stillExists) throw new Error('expected the contained directory to be deleted');
+    } finally {
+      removeContainedTempDir(parent, tmpdir(), 'aos-crm-contained-selftest-');
+    }
+  });
+  record('removeContainedTempDir: refuses a directory outside the expected parent', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'aos-crm-contained-selftest-'));
+    const outside = mkdtempSync(join(tmpdir(), 'aos-crm-contained-selftest-outside-'));
+    try {
+      let threw = false;
+      try { removeContainedTempDir(outside, parent, 'anything-'); } catch { threw = true; }
+      if (!threw) throw new Error('expected removeContainedTempDir to refuse a path outside the expected parent');
+    } finally {
+      removeContainedTempDir(outside, tmpdir(), 'aos-crm-contained-selftest-outside-');
+      removeContainedTempDir(parent, tmpdir(), 'aos-crm-contained-selftest-');
+    }
+  });
+  record('removeContainedTempDir: refuses a directory with the wrong prefix even inside the expected parent', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'aos-crm-contained-selftest-'));
+    try {
+      const wrongPrefix = join(parent, 'not-the-expected-name');
+      mkdirSync(wrongPrefix, { recursive: true });
+      let threw = false;
+      try { removeContainedTempDir(wrongPrefix, parent, 'contained-'); } catch { threw = true; }
+      if (!threw) throw new Error('expected removeContainedTempDir to refuse a directory with the wrong prefix');
+      let stillExists = false;
+      try { lstatSync(wrongPrefix); stillExists = true; } catch { /* unexpected */ }
+      if (!stillExists) throw new Error('expected the wrong-prefix directory to survive');
+    } finally {
+      removeContainedTempDir(parent, tmpdir(), 'aos-crm-contained-selftest-');
+    }
+  });
 
   record('checkGitIgnoresRealEnvNotPrivacyProfile: deploy/local/.env ignored, privacy.env not -> pass', () => {
     const dir = makeTmpGitRepo('**/**/.env\n');
     try {
       assertOk(checkGitIgnoresRealEnvNotPrivacyProfile(dir), true);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      removeContainedTempDir(dir, tmpdir(), 'aos-crm-gitignore-selftest-');
     }
   });
   record('checkGitIgnoresRealEnvNotPrivacyProfile: privacy.env wrongly gitignored is rejected (the bug this track fixed)', () => {
@@ -633,7 +765,7 @@ function selfTest() {
     try {
       assertOk(checkGitIgnoresRealEnvNotPrivacyProfile(dir), false);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      removeContainedTempDir(dir, tmpdir(), 'aos-crm-gitignore-selftest-');
     }
   });
   record('checkGitIgnoresRealEnvNotPrivacyProfile: deploy/local/.env NOT ignored is rejected', () => {
@@ -641,7 +773,7 @@ function selfTest() {
     try {
       assertOk(checkGitIgnoresRealEnvNotPrivacyProfile(dir), false);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      removeContainedTempDir(dir, tmpdir(), 'aos-crm-gitignore-selftest-');
     }
   });
 

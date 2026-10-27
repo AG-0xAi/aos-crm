@@ -120,18 +120,22 @@ function Test-RequiredPresentKeys {
 
 # Resolves the loopback port to gate/use: whatever deploy/local/.env sets for
 # AOS_CRM_WEB_PORT, falling back to $DefaultPort only when the file is absent
-# or the key is missing/unparseable. Never hardcodes 43000 over a real value.
+# or the key is missing. Never hardcodes 43000 over a real value. An explicit
+# but invalid value (unparseable or outside 1-65535) is NOT silently treated
+# as "absent" -- it is reported via Valid=$false so the gate fails closed
+# instead of quietly running on the wrong port; Port still carries the
+# fallback so a caller always has a concrete int to probe/display.
 function Get-ConfiguredWebPort {
   param([string] $EnvPath, [int] $DefaultPort)
   $found = Read-EnvKeys -Path $EnvPath
   if ($null -eq $found -or -not $found.ContainsKey('AOS_CRM_WEB_PORT') -or [string]::IsNullOrWhiteSpace($found['AOS_CRM_WEB_PORT'])) {
-    return $DefaultPort
+    return [ordered]@{ Port = $DefaultPort; Valid = $true }
   }
   $parsed = 0
   if ([int]::TryParse($found['AOS_CRM_WEB_PORT'], [ref] $parsed) -and $parsed -gt 0 -and $parsed -le 65535) {
-    return $parsed
+    return [ordered]@{ Port = $parsed; Valid = $true }
   }
-  return $DefaultPort
+  return [ordered]@{ Port = $DefaultPort; Valid = $false }
 }
 
 # AOS_CRM_SERVER_URL, when set, must agree with the resolved loopback port;
@@ -154,6 +158,35 @@ function Get-PortOccupancy {
   return 'OccupiedByOther'
 }
 
+# Decides -- from the parsed `docker compose ps --format json` output alone
+# -- whether THIS project's own `server` service is the one actually bound,
+# on loopback, to $ConfiguredPort. A Service=='server' match by itself is not
+# enough: if AOS_CRM_WEB_PORT changes to a port some OTHER process already
+# occupies, the still-running `server` container from the OLD port is still
+# named 'server' but does not own the new port -- only its own Publishers
+# entry (URL + PublishedPort) proves ownership of a specific port.
+function Test-ServerOwnsPublishedPort {
+  param([string] $PsJsonOutput, [int] $ConfiguredPort, [string] $ServiceName = 'server', [string] $BindAddress = '127.0.0.1')
+  if ([string]::IsNullOrWhiteSpace($PsJsonOutput)) { return $false }
+  foreach ($line in ($PsJsonOutput -split "`r?`n")) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try { $entry = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+    $serviceProp = $entry.PSObject.Properties | Where-Object { $_.Name -ieq 'Service' } | Select-Object -First 1
+    if (-not $serviceProp -or $serviceProp.Value -ne $ServiceName) { continue }
+    $publishersProp = $entry.PSObject.Properties | Where-Object { $_.Name -ieq 'Publishers' } | Select-Object -First 1
+    if (-not $publishersProp -or -not $publishersProp.Value) { continue }
+    foreach ($publisher in @($publishersProp.Value)) {
+      $urlProp = $publisher.PSObject.Properties | Where-Object { $_.Name -ieq 'URL' } | Select-Object -First 1
+      $portProp = $publisher.PSObject.Properties | Where-Object { $_.Name -ieq 'PublishedPort' } | Select-Object -First 1
+      if (-not $urlProp -or -not $portProp) { continue }
+      $parsedPublished = 0
+      if (-not [int]::TryParse([string] $portProp.Value, [ref] $parsedPublished)) { continue }
+      if ($urlProp.Value -eq $BindAddress -and $parsedPublished -eq $ConfiguredPort) { return $true }
+    }
+  }
+  return $false
+}
+
 # Aggregates every gate signal into one fail-closed verdict. Pure: no I/O,
 # so -SelfTest can cover every combination without touching the host.
 function Get-StartGateVerdict {
@@ -166,10 +199,12 @@ function Get-StartGateVerdict {
     [bool] $WebPortUrlCoherent,
     [bool] $ConfigVerifierOk,
     [ValidateSet('Pass', 'Fail', 'Missing')]
-    [string] $PrivacyVerifierStatus
+    [string] $PrivacyVerifierStatus,
+    [bool] $PortConfigValid = $true
   )
   $blockers = [System.Collections.Generic.List[string]]::new()
   if (-not $HostReady) { $blockers.Add('host: preflight-host.ps1 did not report ready') }
+  if (-not $PortConfigValid) { $blockers.Add('port: AOS_CRM_WEB_PORT is set but is not a valid port number (1-65535)') }
   if (-not $EnvCheck.Exists) {
     $blockers.Add('secrets: deploy/local/.env is missing (run -Action Prepare)')
   } else {
@@ -205,11 +240,12 @@ function Invoke-StartAction {
     [bool] $WebPortUrlCoherent,
     [bool] $ConfigVerifierOk,
     [string] $PrivacyVerifierStatus,
-    [scriptblock] $ComposeInvoker
+    [scriptblock] $ComposeInvoker,
+    [bool] $PortConfigValid = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
     -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
-    -PrivacyVerifierStatus $PrivacyVerifierStatus
+    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid
   if (-not $verdict.Proceed) {
     return [ordered]@{ Invoked = $false; Verdict = $verdict }
   }
@@ -235,19 +271,32 @@ function Invoke-RestartAction {
     [string] $PrivacyVerifierStatus,
     [scriptblock] $DownInvoker,
     [scriptblock] $PortFreeAfterDownProbe,
-    [scriptblock] $UpInvoker
+    [scriptblock] $UpInvoker,
+    [bool] $PortConfigValid = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
     -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
-    -PrivacyVerifierStatus $PrivacyVerifierStatus
+    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid
   if (-not $verdict.Proceed) {
-    return [ordered]@{ Stage = 'blocked-before-down'; Verdict = $verdict }
+    return [ordered]@{ Stage = 'blocked-before-down'; Verdict = $verdict; ExitCode = 1 }
   }
+  # $DownInvoker's real exit code travels via $script:ComposeExitCode (same
+  # convention as Invoke-ComposeOnLinux/Invoke-Main below), not a captured
+  # return value: capturing `& $DownInvoker`'s output would swallow
+  # `docker compose down`'s own live-streamed stdout (see
+  # Invoke-ComposeOnLinux's comment). A failed `down` must block before `up`
+  # and preserve its real exit code, not be silently outrun by a port that
+  # happens to already be free.
   & $DownInvoker
+  if ($script:ComposeExitCode -ne 0) {
+    $downExitCode = $script:ComposeExitCode
+    $stuckVerdict = [ordered]@{ Proceed = $false; Blockers = @("down: compose down exited $downExitCode; refusing to start back up") }
+    return [ordered]@{ Stage = 'blocked-down-failed'; Verdict = $stuckVerdict; ExitCode = $downExitCode }
+  }
   $portFreeAfterDown = & $PortFreeAfterDownProbe
   if (-not $portFreeAfterDown) {
     $stuckVerdict = [ordered]@{ Proceed = $false; Blockers = @("port: still occupied after stopping this project's own services") }
-    return [ordered]@{ Stage = 'blocked-after-down'; Verdict = $stuckVerdict }
+    return [ordered]@{ Stage = 'blocked-after-down'; Verdict = $stuckVerdict; ExitCode = 1 }
   }
   & $UpInvoker
   return [ordered]@{ Stage = 'started'; Verdict = $verdict }
@@ -376,25 +425,20 @@ function Invoke-PrivacyVerifierIfPresent {
 }
 
 # Asks Docker (not a bind probe) whether THIS project's `server` service is
-# the one currently bound to the configured port, so restarting our own
-# stack is never confused with a foreign listener. Requires deploy/local/.env
-# to exist for compose to interpolate at all; if it does not, our stack
-# cannot be the one running regardless, so this safely reports $false.
+# the one actually bound, on loopback, to $ConfiguredPort -- a Service match
+# alone does not prove port ownership (see Test-ServerOwnsPublishedPort).
+# Requires deploy/local/.env to exist for compose to interpolate at all; if
+# it does not, our stack cannot be the one running regardless, so this
+# safely reports $false.
 function Test-OwnServerRunning {
-  param([string] $RepoRoot, [string] $Distro)
+  param([string] $RepoRoot, [string] $Distro, [int] $ConfiguredPort)
   $linuxRootRaw = & wsl.exe -d $Distro --exec wslpath -a $RepoRoot
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linuxRootRaw)) { return $false }
   $linuxRoot = $linuxRootRaw.Trim()
   $composePath = "$linuxRoot/$ComposeRelPath"
   $psOutput = & wsl.exe -d $Distro --exec docker compose -f $composePath -p $ProjectName ps --format json --status running 2>$null
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($psOutput)) { return $false }
-  foreach ($line in ($psOutput -split "`r?`n")) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    try { $entry = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
-    $serviceProp = $entry.PSObject.Properties | Where-Object { $_.Name -ieq 'Service' } | Select-Object -First 1
-    if ($serviceProp -and $serviceProp.Value -eq 'server') { return $true }
-  }
-  return $false
+  return Test-ServerOwnsPublishedPort -PsJsonOutput $psOutput -ConfiguredPort $ConfiguredPort
 }
 
 # Writes deploy/local/.env with fresh crypto-random secrets. Refuses to
@@ -470,9 +514,10 @@ function Invoke-Main {
     $hostReady = Test-HostReady -RepoRoot $RepoRoot -Distro $Distro
     $envCheck = Test-RequiredPresentKeys -Path $EnvPath -RequiredKeys $RequiredEnvKeys -RejectedPlaceholders @('replace_me_with_a_random_hex_string', 'replace_me_with_a_random_base64_string')
     $privacyCheck = Test-RequiredExactKeys -Path $PrivacyPath -Required $RequiredPrivacyKeys
-    $resolvedPort = Get-ConfiguredWebPort -EnvPath $EnvPath -DefaultPort $DefaultWebPort
+    $portCheck = Get-ConfiguredWebPort -EnvPath $EnvPath -DefaultPort $DefaultWebPort
+    $resolvedPort = $portCheck.Port
     $portFree = Test-PortFree -Port $resolvedPort
-    $ownRunning = if ($portFree) { $false } else { Test-OwnServerRunning -RepoRoot $RepoRoot -Distro $Distro }
+    $ownRunning = if ($portFree) { $false } else { Test-OwnServerRunning -RepoRoot $RepoRoot -Distro $Distro -ConfiguredPort $resolvedPort }
     $portOccupancy = Get-PortOccupancy -PortFree $portFree -OwnServerRunning $ownRunning
     $envValues = Read-EnvKeys -Path $EnvPath
     $serverUrl = if ($envValues) { $envValues['AOS_CRM_SERVER_URL'] } else { $null }
@@ -484,6 +529,7 @@ function Invoke-Main {
       EnvCheck              = $envCheck
       PrivacyCheck          = $privacyCheck
       ResolvedPort          = $resolvedPort
+      PortConfigValid       = $portCheck.Valid
       PortOccupancy         = $portOccupancy
       WebPortUrlCoherent    = $urlCoherent
       ConfigVerifierOk      = $configVerifierOk
@@ -501,7 +547,7 @@ function Invoke-Main {
       $signals = Get-GateSignals
       $verdict = Get-StartGateVerdict -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
         -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
-        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid
       Write-Output "aos-crm-local gate: $(if ($verdict.Proceed) { 'READY to start' } else { 'NOT ready' }) (configured port: $($signals.ResolvedPort), occupancy: $($signals.PortOccupancy))"
       foreach ($b in $verdict.Blockers) { Write-Output "  - $b" }
       if ($signals.HostReady) {
@@ -514,7 +560,7 @@ function Invoke-Main {
       $signals = Get-GateSignals
       $result = Invoke-StartAction -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
         -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
-        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus `
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid `
         -ComposeInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
       if (-not $result.Invoked) {
         Write-Output 'aos-crm-local: BLOCKED (fail-closed), no build/up attempted:'
@@ -531,14 +577,14 @@ function Invoke-Main {
       $signals = Get-GateSignals
       $result = Invoke-RestartAction -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
         -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
-        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus `
+        -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid `
         -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
         -PortFreeAfterDownProbe { Test-PortFree -Port $signals.ResolvedPort } `
         -UpInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
       if ($result.Stage -ne 'started') {
         Write-Output 'aos-crm-local: BLOCKED (fail-closed):'
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
-        exit 1
+        exit $result.ExitCode
       }
       exit $script:ComposeExitCode
     }
@@ -636,16 +682,32 @@ function Invoke-SelfTest {
       $p = Join-Path $tmpRoot 'port.env'
       Set-Content -LiteralPath $p -Value @('AOS_CRM_WEB_PORT=51234')
       $got = Get-ConfiguredWebPort -EnvPath $p -DefaultPort 43000
-      if ($got -ne 51234) { throw "expected 51234, got $got" }
+      if ($got.Port -ne 51234) { throw "expected 51234, got $($got.Port)" }
+      if (-not $got.Valid) { throw 'expected a well-formed explicit port to be Valid' }
     }
 
-    Record 'Get-ConfiguredWebPort: missing file or key falls back to the default' {
+    Record 'Get-ConfiguredWebPort: missing file or key falls back to the default and is still Valid' {
       $missing = Get-ConfiguredWebPort -EnvPath (Join-Path $tmpRoot 'nope.env') -DefaultPort 43000
-      if ($missing -ne 43000) { throw "expected fallback 43000, got $missing" }
+      if ($missing.Port -ne 43000) { throw "expected fallback 43000, got $($missing.Port)" }
+      if (-not $missing.Valid) { throw 'expected a missing file to be Valid (nothing explicit to reject)' }
       $p = Join-Path $tmpRoot 'port-novalue.env'
       Set-Content -LiteralPath $p -Value @('AOS_CRM_PG_USER=aos_crm')
       $noKey = Get-ConfiguredWebPort -EnvPath $p -DefaultPort 43000
-      if ($noKey -ne 43000) { throw "expected fallback 43000, got $noKey" }
+      if ($noKey.Port -ne 43000) { throw "expected fallback 43000, got $($noKey.Port)" }
+      if (-not $noKey.Valid) { throw 'expected a missing key to be Valid' }
+    }
+
+    Record 'Get-ConfiguredWebPort: an explicit invalid value fails instead of silently falling back to the default (the exact defect this track fixed)' {
+      $p = Join-Path $tmpRoot 'port-invalid.env'
+      Set-Content -LiteralPath $p -Value @('AOS_CRM_WEB_PORT=not-a-port')
+      $invalid = Get-ConfiguredWebPort -EnvPath $p -DefaultPort 43000
+      if ($invalid.Valid) { throw 'expected an unparseable AOS_CRM_WEB_PORT to be Valid=false, not silently accepted' }
+      if ($invalid.Port -ne 43000) { throw 'expected the fallback port to still be populated for downstream probing even when invalid' }
+
+      $pOutOfRange = Join-Path $tmpRoot 'port-out-of-range.env'
+      Set-Content -LiteralPath $pOutOfRange -Value @('AOS_CRM_WEB_PORT=70000')
+      $outOfRange = Get-ConfiguredWebPort -EnvPath $pOutOfRange -DefaultPort 43000
+      if ($outOfRange.Valid) { throw 'expected an out-of-range AOS_CRM_WEB_PORT (70000) to be Valid=false' }
     }
 
     Record 'Test-WebPortUrlCoherent: matching URL passes, mismatched URL fails, empty URL is not a contradiction' {
@@ -658,6 +720,31 @@ function Invoke-SelfTest {
       if ((Get-PortOccupancy -PortFree $true -OwnServerRunning $false) -ne 'Free') { throw 'expected Free' }
       if ((Get-PortOccupancy -PortFree $false -OwnServerRunning $true) -ne 'OwnedBySelf') { throw 'expected OwnedBySelf' }
       if ((Get-PortOccupancy -PortFree $false -OwnServerRunning $false) -ne 'OccupiedByOther') { throw 'expected OccupiedByOther' }
+    }
+
+    Record 'Test-ServerOwnsPublishedPort: a Publishers entry matching the configured port on loopback is owned' {
+      $json = '{"Service":"server","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      if (-not (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43000)) { throw 'expected ownership to be confirmed for a matching Publishers entry' }
+    }
+
+    Record 'Test-ServerOwnsPublishedPort: a server published on a different port is not confused with the newly configured one (the exact 43000-vs-43001 defect this track fixed)' {
+      $json = '{"Service":"server","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      if (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43001) { throw 'expected no ownership when the configured port does not match the published one' }
+    }
+
+    Record 'Test-ServerOwnsPublishedPort: a server entry with no Publishers is not treated as owning the port' {
+      $json = '{"Service":"server","Publishers":[]}'
+      if (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43000) { throw 'expected no ownership with an empty Publishers list' }
+    }
+
+    Record 'Test-ServerOwnsPublishedPort: a non-loopback bind is not treated as owning the loopback-configured port' {
+      $json = '{"Service":"server","Publishers":[{"URL":"0.0.0.0","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      if (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43000) { throw 'expected no ownership for a non-loopback bind address' }
+    }
+
+    Record 'Test-ServerOwnsPublishedPort: a matching Publishers entry on a different service is not attributed to server' {
+      $json = '{"Service":"worker","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      if (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43000) { throw 'expected no ownership when the matching Publishers entry belongs to a different service' }
     }
 
     Record 'Get-StartGateVerdict: every signal good means Proceed=true with no blockers' {
@@ -715,6 +802,14 @@ function Invoke-SelfTest {
       if ($v.Proceed) { throw 'expected Proceed=false when the server URL does not match the configured port' }
     }
 
+    Record 'Get-StartGateVerdict: an explicitly invalid AOS_CRM_WEB_PORT blocks even when everything else passes' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $v = Get-StartGateVerdict -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' -PortConfigValid $false
+      if ($v.Proceed) { throw 'expected Proceed=false when AOS_CRM_WEB_PORT is explicitly invalid' }
+      if (-not (@($v.Blockers) -match '^port:.*valid port number')) { throw 'expected a port: ... valid port number blocker' }
+    }
+
     Record 'Invoke-StartAction: a clean verdict invokes the compose up scriptblock exactly once' {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
@@ -738,7 +833,7 @@ function Invoke-SelfTest {
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe,up') { throw "expected down,probe,up in order, got $($order -join ',')" }
     }
@@ -748,9 +843,20 @@ function Invoke-SelfTest {
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OccupiedByOther' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'blocked-before-down') { throw "expected Stage=blocked-before-down, got $($result.Stage)" }
       if ($order.Count -ne 0) { throw "expected neither down nor up to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-RestartAction: a down failure blocks before up and preserves the original exit code (the hidden-failure defect this track fixed)' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $script:ComposeExitCode = 7; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-down-failed') { throw "expected Stage=blocked-down-failed, got $($result.Stage)" }
+      if ($result.ExitCode -ne 7) { throw "expected the original down exit code 7 to be preserved, got $($result.ExitCode)" }
+      if (($order -join ',') -ne 'down') { throw "expected only down to run, neither probe nor up, got $($order -join ',')" }
     }
 
     Record 'Invoke-RestartAction: a port still stuck after down stops this project but refuses to start it back up' {
@@ -758,7 +864,7 @@ function Invoke-SelfTest {
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -DownInvoker { $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $false } -UpInvoker { $order.Add('up') }
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $false } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'blocked-after-down') { throw "expected Stage=blocked-after-down, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe') { throw "expected down,probe without up, got $($order -join ',')" }
     }
@@ -806,7 +912,7 @@ function Invoke-SelfTest {
         Remove-ContainedTempDir -Path $outside -ExpectedParent $tmpRoot -ExpectedPrefix 'anything-' -WarningAction SilentlyContinue
         if (-not (Test-Path -LiteralPath $outside)) { throw 'expected the out-of-parent directory to survive' }
       } finally {
-        Remove-Item -LiteralPath $outside -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-ContainedTempDir -Path $outside -ExpectedParent $tmpParent -ExpectedPrefix 'aos-crm-local-ps1-selftest-outside-'
       }
     }
 
@@ -826,7 +932,7 @@ function Invoke-SelfTest {
         New-Item -ItemType Junction -Path $junctionPath -Target $junctionTargetOutside -ErrorAction Stop | Out-Null
       } catch {
         Write-Output "[SKIP] Remove-ContainedTempDir: refuses a reparse point -- junction creation unavailable ($($_.Exception.Message))"
-        Remove-Item -LiteralPath $junctionTargetOutside -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-ContainedTempDir -Path $junctionTargetOutside -ExpectedParent $tmpParent -ExpectedPrefix 'aos-crm-local-ps1-selftest-junction-target-'
         return
       }
       try {
@@ -834,7 +940,7 @@ function Invoke-SelfTest {
         if (-not (Test-Path -LiteralPath (Join-Path $junctionTargetOutside 'canary.txt'))) { throw 'the junction target''s content was deleted; a reparse point must be refused outright' }
       } finally {
         Remove-Item -LiteralPath $junctionPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $junctionTargetOutside -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-ContainedTempDir -Path $junctionTargetOutside -ExpectedParent $tmpParent -ExpectedPrefix 'aos-crm-local-ps1-selftest-junction-target-'
       }
     }
 

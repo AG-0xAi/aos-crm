@@ -1,6 +1,6 @@
 # Perfil local seguro (CRM-002)
 
-Fecha: 27 de octubre de 2026, actualizado en CRM-002-fix1 (misma fecha).
+Fecha: 27 de octubre de 2026, actualizado en CRM-002-fix1 y CRM-002-fix2 (misma fecha).
 Alcance: configuración estática de `deploy/local/`, `.claude/`,
 `.dockerignore`, `.gitignore`, `.yarnrc.yml` y
 `packages/twenty-docker/twenty/Dockerfile`. **No se instalaron dependencias
@@ -12,8 +12,9 @@ validador estático (`scripts/aos/verify-local-config.mjs`), el self-test de
 campos efectivos por servicio, sin build/up), y un build `FROM scratch`
 descartable sobre un contexto sintético para verificar `.dockerignore`
 contra Docker real (nunca el contexto/imagen del CRM). Ver
-`.aos/reports/CRM-002-fix1.md` (y `.aos/reports/CRM-002.md` para la entrega
-original) para comandos y códigos de salida exactos.
+`.aos/reports/CRM-002-fix2.md` (y `.aos/reports/CRM-002-fix1.md`/
+`.aos/reports/CRM-002.md` para las entregas previas) para comandos y
+códigos de salida exactos.
 
 ## Perfil
 
@@ -122,11 +123,25 @@ tras uno loopback correcto en `server` — la regex de puertos solo miraba la
 primera línea `-` tras `ports:`. Los checks cubren todos los puertos de
 todos los servicios, drivers efectivos de `server` Y `worker`, red/volumen/
 proyecto dedicados, y ausencia de `privileged`/socket de Docker, todo desde
-el JSON ya resuelto. Sin WSL/Docker alcanzable, estos checks se reportan
-`[INFO] ... not measured` (igual que el chequeo de `.dockerignore` contra
-Docker real) — nunca un PASS falso por volver a una regex más débil.
+el JSON ya resuelto.
 
-### Puerto propio vs. ajeno (R4)
+**Corrección CRM-002-fix2 (fail-closed por defecto):** antes de esta
+corrección, si WSL/Docker no estaba alcanzable, `main()` omitía en
+silencio los checks de `compose.yaml` y de `.dockerignore` contra Docker
+real, y seguía reportando `PASS` sobre el resto de checks estáticos — una
+ausencia total de medición Docker no fallaba el gate. Ahora el
+**comportamiento por defecto (sin flags; el que usan este gate y
+`local.ps1` Start/Restart) falla cerrado**: si `docker compose config`/el
+build de contexto sintético no se pudieron medir, el gate termina en `FAIL`
+en vez de omitir esos controles. Un modo reducido y explícito,
+`node scripts/aos/verify-local-config.mjs --static`, sigue existiendo para
+cuando de verdad solo se necesita el subconjunto estático (reporta
+`[INFO] ... not measured`, sin contarlo como fallo) — pero **ni este
+comando del gate (`.aos/verify.json`) ni `local.ps1` Start/Restart pasan
+nunca `--static`**, así que un Docker/WSL caído bloquea esos dos caminos en
+vez de dejarlos pasar con menos controles de los que creen tener.
+
+### Puerto propio vs. ajeno (R4, corrección CRM-002-fix2)
 
 `local.ps1` ya no fija `43000` a ciegas: lee `AOS_CRM_WEB_PORT` de
 `deploy/local/.env` (con `43000` solo como *fallback* si el archivo o la
@@ -135,13 +150,37 @@ puerto. Un *bind* TCP por sí solo no distingue "mi propio servidor ya
 corriendo" de "otro proceso ocupa el puerto" (WSL2 reenvía ambos al mismo
 loopback de Windows), así que `Test-OwnServerRunning` pregunta a `docker
 compose -p aos-crm-local ps` si el servicio `server` de ESTE proyecto es el
-que está arriba. `Start` ya no reporta `NOT ready` por su propio listener;
-`Restart` valida seguridad, detiene **solo** su propio proyecto (nunca otro
-producto, porque `down` ya estaba acotado por `-p aos-crm-local`), y
-**vuelve a comprobar el puerto después del `down` y antes del `up`** — si
-sigue ocupado (por un tercero que lo tomó mientras tanto), bloquea sin
-levantar nada. Un listener verdaderamente ajeno bloquea Start/Restart desde
-el principio, sin tocar `docker compose down`.
+que está arriba. **Corrección fix2:** comprobar solo `Service == 'server'`
+no demuestra que ese servidor posea el puerto configurado — si
+`AOS_CRM_WEB_PORT` cambia (ej. de `43000` a `43001`) mientras el contenedor
+`server` viejo sigue arriba en `43000`, el chequeo anterior lo clasificaba
+como `OwnedBySelf` y dejaba que `Start`/`Restart` siguieran de largo sin ver
+que el `43001` real lo ocupa un proceso ajeno. `Test-ServerOwnsPublishedPort`
+(función pura, con fixtures de JSON) ahora lee el array `Publishers` de la
+entrada `server` en `docker compose ps --format json` y exige que
+`URL == 127.0.0.1` **y** `PublishedPort == <puerto configurado>` — no solo
+el nombre del servicio. Un puerto `AOS_CRM_WEB_PORT` explícito pero
+inválido (no numérico o fuera de 1-65535) también deja de caer en silencio
+al *fallback* `43000`: `Get-ConfiguredWebPort` ahora devuelve
+`{Port, Valid}` y el gate bloquea con `Valid=false` en vez de arrancar
+sobre el puerto equivocado sin avisar.
+
+`Start` ya no reporta `NOT ready` por su propio listener; `Restart` valida
+seguridad, detiene **solo** su propio proyecto (nunca otro producto, porque
+`down` ya estaba acotado por `-p aos-crm-local`), y **vuelve a comprobar el
+puerto después del `down` y antes del `up`** — si sigue ocupado (por un
+tercero que lo tomó mientras tanto), bloquea sin levantar nada. Un listener
+verdaderamente ajeno bloquea Start/Restart desde el principio, sin tocar
+`docker compose down`. **Corrección fix2:** `Invoke-RestartAction` no
+observaba el código de salida real de `down` — con `down` fallando (ej.
+exit 7) y el puerto ya libre por otra razón, el flujo anterior igual
+llegaba a `up` y devolvía éxito (`exit 0`), ocultando el fallo real
+(reproducido de forma independiente por el coordinador en
+`restart-down-failure-observation.json`: `down` exit 7 + puerto libre →
+`upCalls=1`, `finalExitCode=0`). Ahora `Invoke-RestartAction` lee el código
+real de `down` antes de probar el puerto: si no es `0`, bloquea con
+`Stage=blocked-down-failed` y **preserva ese código de salida original**
+sin llegar nunca a `up`.
 
 ## Driver de correo local
 
@@ -214,18 +253,34 @@ con `1`, "Cannot find module") es visible y distinto de ambos códigos
 esperados — `onFailure: "block"` en `settings.json` es lo que hace que
 *Claude Code* trate ese fallo de arranque como bloqueo; esta prueba no
 puede observar esa reacción del arnés, solo que el fallo es visible desde
-fuera. **Evidencia adicional de carga real por ESTE CLI nativo:** cada
-invocación Bash/PowerShell de este mismo worker durante CRM-002/CRM-002-fix1
-pasó por este hook como `PreToolUse` real (está wireado en
-`.claude/settings.json`, que aplica a todo el checkout) y ninguna fue
-bloqueada — evidencia en vivo de que el hook carga y permite comandos
-inocuos bajo el dispatcher nativo, no solo bajo subprocess de prueba.
-**Límite declarado:** no se lanzó ningún `gh pr merge`/`git push origin
-main` real para observar el bloqueo bajo el dispatcher nativo (prohibido
-por el dispatch); no hay, por tanto, evidencia end-to-end del lado
-"bloquea" dentro de Claude Code mismo — solo de los dos scripts
-(`merge-guard-script-direct`/`merge-guard-wiring`) y del lado "permite" en
-vivo.
+fuera. **Evidencia de carga real por ESTE CLI nativo, lado "permite" (CRM-002/fix1)
+y lado "bloquea" (CRM-002-fix2):** cada invocación Bash/PowerShell de este
+worker durante CRM-002/CRM-002-fix1 pasó por este hook como `PreToolUse`
+real (wireado en `.claude/settings.json`, que aplica a todo el checkout) y
+ninguna fue bloqueada. **Corrección fix2 sobre esa afirmación:** el éxito de
+herramientas inocuas, por sí solo, NO demuestra que el dispatcher real
+invocara el hook — una llamada que nunca pasa por `PreToolUse` también
+"tendría éxito" sin bloquear nada, así que esa evidencia anterior probaba
+como máximo que el hook no bloqueaba de más, no que estuviera cargado. La
+prueba real que faltaba (lado "bloquea", bajo el dispatcher nativo, sin
+ejecutar ningún `gh`/`git` real) se hizo en CRM-002-fix2: una llamada Bash
+de este worker con el comando `echo "gh pr merge 999
+literal-test-only-not-executed"` y una llamada PowerShell con
+`Write-Output "git push origin main literal-test-only-not-executed"` — en
+ambos casos el ÚNICO efecto posible, si el hook no cargara, sería imprimir
+ese texto literal (nunca invocar `gh`/`git` de verdad). El dispatcher nativo
+devolvió, para ambas, un error de hook antes de ejecutar nada:
+`PreToolUse:Bash hook error: […aos-merge-guard.cjs]: [AOS-MERGE-GUARD]
+BLOQUEADO: …` y el equivalente para `PreToolUse:PowerShell` — ningún texto
+llegó a imprimirse. Esto es evidencia end-to-end real, bajo el dispatcher de
+Claude Code (no un subprocess de prueba), de que `PreToolUse` carga el hook
+y bloquea antes de ejecutar, para ambas shells que cubre el `matcher`.
+**Límite que sigue en pie:** esta prueba usó una cadena que calza el patrón
+del guard (`gh pr merge`, `git push … main`) dentro de un `echo`/
+`Write-Output` inocuo — no se lanzó ningún `gh pr merge`/`git push origin
+main` real (seguiría prohibido por el dispatch), y el guard sigue sin
+cubrir una tercera vía de merge (otra shell, `curl` directo a la API de
+GitHub, un comando construido para evadir el patrón).
 
 También se corrigió el mensaje del guard: decía "deja que el S-00 lo
 revise y fusione", contradiciendo AGENTS.md §3 ("Fusionar su propio
@@ -275,6 +330,39 @@ CRM-002-fix1:
   de distro sintéticos, ambos con espacios y caracteres acentuados, sin
   duplicar el bus/checkout real.
 
+### Borrados recursivos contenidos, cierre de huecos restantes (CRM-002-fix2)
+
+El fix de `Remove-ContainedTempDir` de arriba cerró el borrado final de
+`-SelfTest`, pero dejó sin contención el cleanup de SUS PROPIAS pruebas:
+`$outside` y `$junctionTargetOutside` (los directorios creados fuera de
+`$tmpRoot` a propósito, para probar que la función los rechaza) se borraban
+con `Remove-Item -Recurse -Force` crudo en el `finally`/`catch` de esas
+mismas pruebas. Ahora usan el mismo `Remove-ContainedTempDir`, con
+`-ExpectedParent $tmpParent` y el prefijo real de cada directorio — sin
+excepción para código de test.
+
+Del lado Node, `scripts/aos/verify-local-config.mjs` tenía el mismo patrón
+sin contención: `rmSync(winCtx, { recursive: true, force: true })` en
+`checkDockerignoreViaRealDocker`, y `rmSync(dir, …)` sobre los repos git
+temporales de `checkGitIgnoresRealEnvNotPrivacyProfile` en el self-test.
+Además, la salida exportada del build `FROM scratch` (`outDir`) vivía en
+una ruta puramente Linux (`${linuxCtx}-out`) y se borraba con
+`wsl.exe … rm -rf outDir` — un borrado que cruza de Windows a Linux para
+borrar, fuera del alcance de cualquier guarda de Node. Fix: un nuevo
+`assertContainedTempDirSafeToRemove`/`removeContainedTempDir` (mismo
+contrato que `Remove-ContainedTempDir` de `local.ps1`: re-resuelve la ruta
+inmediatamente antes de borrar, exige directorio real, hijo directo del
+padre esperado, con el prefijo esperado, y rechaza un symlink en la propia
+ruta objetivo) — inspirado en, pero no copiado de, el
+`assertSafeToRemove` de `verify-provenance.mjs` (ese es solo un guard de
+contención por ancestro, sin exigir hijo-directo/prefijo/symlink; no se
+tocó ese archivo). El contexto de build (`ctx`) y su salida exportada
+(`out`) pasan a vivir como hijos del MISMO directorio temporal propio de
+Node (`mkdtempSync`), así que un solo `removeContainedTempDir` al final
+limpia ambos — incluida cualquier salida parcial de un build fallido,
+porque sigue dentro del mismo temporal — sin ningún `rm -rf` de WSL
+cruzando de vuelta a Windows.
+
 ## Telemetría de build (R1)
 
 `.yarnrc.yml` ahora declara `enableTelemetry: false` (clave oficial,
@@ -290,17 +378,36 @@ https://yarnpkg.com/advanced/telemetry, https://nx.dev/docs/reference/environmen
 
 ## `.dockerignore` (SEC-05)
 
-Excluye `.aos`, `.codegraph-aos`, `.claude`, `.dispatch-bodies`, `.mcp.json`
-(configuración de agentes existente en la raíz) y, a **cualquier
-profundidad**, todo dotenv real: `**/.env` y `**/.env.*` (cubre
+Excluye, a **cualquier profundidad** (`**/`), `.aos`, `.codegraph-aos`,
+`.claude`, `.dispatch-bodies`, `.git` y `.mcp.json` (bus/configuración de
+agentes/Git/grafo) y todo dotenv real: `**/.env` y `**/.env.*` (cubre
 `.env.local`, `.env.production`, los fixtures de test
 `packages/twenty-server/.env.test`/`.env.e2e-testing-server`, etc.), con
 `!**/.env.example` re-incluyendo explícitamente solo los `*.env.example`
 versionados y libres de secretos (los cinco que existen en el repo). Docker
 no aplica un patrón simple de forma recursiva
-(https://docs.docker.com/build/concepts/context/), de ahí el `**/` en ambas
-líneas — la corrección R1 original solo cubría `.env` en la raíz y en dos
-rutas fijas, dejando fuera cualquier `.env.*` anidado.
+(https://docs.docker.com/build/concepts/context/), de ahí el `**/` en cada
+línea.
+
+**Corrección CRM-002-fix2:** hasta esta corrección, `.git`, `.aos`,
+`.codegraph-aos`, `.claude`, `.dispatch-bodies` y `.mcp.json` estaban
+escritos SIN `**/` (solo raíz). El review independiente final de fix1
+confirmó el hueco real: `packages/twenty-agent-skills/.mcp.json` (existente
+en el repo) no quedaba excluido porque el patrón raíz-only `.mcp.json` no
+cubre esa ruta anidada. Las seis líneas pasan ahora a `**/`, y
+`checkDockerignoreExcludesAosState` en `verify-local-config.mjs` exige esa
+forma `**/` literal (un patrón raíz-only vuelve a fallar el check, con un
+negativo exacto para ese caso). El build de contexto sintético
+(`checkDockerignoreViaRealDocker`) añade fixtures anidadas reales —
+`packages/twenty-agent-skills/.mcp.json`, `nested/sub/.claude/…`,
+`nested/sub/.aos/…`, `nested/sub/.codegraph-aos/…`,
+`vendor/thirdparty/.git/HEAD` — y preserva fixtures de ejemplo/licencia/
+assets (`LICENSE`, `packages/twenty-agent-skills/skill.json`,
+`nested/deeper/dir/asset.txt`) para confirmar que las nuevas exclusiones
+`**/` no se llevan contenido legítimo por delante. Medido en vivo contra
+Docker/BuildKit real sobre `AOS-CRM-Ubuntu-24.04`: 14 fixtures excluidas
+(incluida la anidada `packages/twenty-agent-skills/.mcp.json`), 6
+ejemplos/licencia/assets conservados, `wronglyKept=[]`/`wronglyExcluded=[]`.
 `deploy/local/privacy.env` sigue excluido del contexto Docker (no lo
 necesita el build), pero ya no se describe como secreto: ver "Contrato de
 privacidad" más abajo.
@@ -308,11 +415,16 @@ privacidad" más abajo.
 Verificado contra Docker/BuildKit real, no contra una reimplementación de
 las reglas de dockerignore: `scripts/aos/verify-local-config.mjs` construye
 una imagen `FROM scratch` descartable sobre un contexto sintético aislado
-(fixtures dotenv en varias profundidades, nunca el repo real ni la imagen
-CRM) y exporta el contexto resultante con `docker build -o <dir>` para
-comprobar qué quedó realmente dentro. `.gitignore` NO lista
-`deploy/local/privacy.env` (ver abajo); `deploy/local/.env` sigue cubierto
-por el patrón existente `**/**/.env`, comprobado con `git check-ignore`.
+(fixtures dotenv/agente/bus/Git/grafo en varias profundidades, nunca el
+repo real ni la imagen CRM) y exporta el contexto resultante con
+`docker build -o <dir>` para comprobar qué quedó realmente dentro —
+contexto y salida exportada viven bajo un único directorio temporal propio
+de Node (`mkdtempSync`), limpiado por Node tras validar destino/padre/
+prefijo (ver "Borrados recursivos contenidos" más abajo), nunca con un `rm
+-rf` de WSL cruzando de vuelta a borrar algo en el lado Windows. `.gitignore`
+NO lista `deploy/local/privacy.env` (ver abajo); `deploy/local/.env` sigue
+cubierto por el patrón existente `**/**/.env`, comprobado con
+`git check-ignore`.
 
 ## Triage de dependencias (R3) — acotado, no exhaustivo
 

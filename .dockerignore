@@ -1,13 +1,16 @@
-.git
+**/.git
 **/node_modules
 .nx/cache
 
-# AOS bus, agent configuration and code graph: never sent to a builder (SEC-05)
-.aos
-.codegraph-aos
-.claude
-.dispatch-bodies
-.mcp.json
+# AOS bus, agent configuration and code graph: never sent to a builder
+# (SEC-05). **/ on every line: a pattern without it only matches at the
+# context root (packages/twenty-agent-skills/.mcp.json was the real,
+# confirmed miss that a root-only `.mcp.json` left uncovered).
+**/.aos
+**/.codegraph-aos
+**/.claude
+**/.dispatch-bodies
+**/.mcp.json
 
 # Real dotenv files at any depth (.env, .env.local, .env.production, the
 # twenty-server .env.test/.env.e2e-testing-server test fixtures, deploy/local/.env,
