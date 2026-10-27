@@ -415,22 +415,20 @@ try {
     $smokeTest.reason = 'no WSL2 distribution available'
   } else {
     $selectedDistro = $targetDistro.name
-    # A Windows path passed as a bare argv element after `--` (no shell in between)
-    # has its backslashes silently eaten by wsl.exe's own argument forwarding --
-    # confirmed live on this host: `wsl -d <distro> -- echo 'C:\Users\x'` prints
-    # `C:Usersx`, identical corruption with no shell involved at all. Routing
-    # through `bash -lc` with the path single-quoted preserves it byte for byte
-    # (also confirmed live) because bash's own quoting, not wsl.exe's forwarding,
-    # is then what parses it.
-    $wslpathScript = "wslpath -a '$repoRoot'"
-    $linuxPathProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'bash', '-lc', $wslpathScript)
+    # `--` runs the trailing command through the distro's default-shell hop,
+    # which re-parses it a second time; `--exec` execs the named program
+    # directly with its argv, so a Windows path survives as a literal argv
+    # element with no bash -lc / quoting hack needed at all (confirmed live
+    # on this host: `wsl -d <distro> --exec wslpath -a 'C:\Users\x'` round-trips
+    # the path byte for byte, backslashes and accents included).
+    $linuxPathProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'wslpath', '-a', $repoRoot)
     if ($linuxPathProbe.ExitCode -ne 0) {
       $linuxAccess = [ordered]@{ attempted = $true; ok = $false; distro = $selectedDistro; detail = "wslpath translation failed (exit $($linuxPathProbe.ExitCode))" }
       Add-Missing "could not translate the checkout path for Linux via '$selectedDistro'"
     } else {
       $linuxPath = $linuxPathProbe.Text
-      $headProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD')
-      $busProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--', 'test', '-d', "$linuxPath/.aos")
+      $headProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD')
+      $busProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'test', '-d', "$linuxPath/.aos")
       $shaMatches = ($headProbe.ExitCode -eq 0 -and $headProbe.Text -eq $windowsHeadSha)
       $busReachable = ($busProbe.ExitCode -eq 0)
       $linuxAccess = [ordered]@{
@@ -445,7 +443,7 @@ try {
       if (-not $busReachable) { Add-Missing "Linux-side '$linuxPath/.aos' is not reachable under '$selectedDistro'" }
     }
 
-    $dockerProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'bash', '-lc', 'command -v docker >/dev/null 2>&1 && docker version --format "{{.Server.Version}}" && systemctl is-active docker')
+    $dockerProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--exec', 'bash', '-lc', 'command -v docker >/dev/null 2>&1 && docker version --format "{{.Server.Version}}" && systemctl is-active docker')
     $dockerOk = ($dockerProbe.ExitCode -eq 0)
     $containerRuntime = [ordered]@{
       attempted = $true
@@ -461,7 +459,7 @@ try {
       Add-Missing 'container runtime smoke test was skipped (-SkipSmokeTest); readiness requires it to actually run'
     } else {
       # Official, tiny, no-port, no-CRM-data smoke image; --rm leaves no container behind.
-      $smokeProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--', 'docker', 'run', '--rm', 'hello-world')
+      $smokeProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--exec', 'docker', 'run', '--rm', 'hello-world')
       $smokeOk = ($smokeProbe.ExitCode -eq 0 -and $smokeProbe.Text -match 'Hello from Docker!')
       $smokeTest = [ordered]@{
         attempted = $true

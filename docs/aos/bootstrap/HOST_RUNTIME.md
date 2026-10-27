@@ -26,6 +26,19 @@ de la ruta de Windows. Con todo corregido, `scripts/aos/preflight-host.ps1` mide
 en la sección ["CRM-001-HOST-fix2: cierre con Linux real tras reinicio"](#crm-001-host-fix2-cierre-con-linux-real-tras-reinicio)
 más abajo.
 
+**Corrección CRM-001-HOST-fix3 (27 de octubre de 2026, rama `codex/crm001-host-runtime-fix3`):** el
+fix de fix2 para `wslpath` (envolverlo en `bash -lc` con comillas simples) tapaba el síntoma pero no
+la causa: `wsl.exe -d <distro> [-u root] -- <comando>` enruta el comando a través del shell por
+defecto de la distro antes de ejecutarlo, un salto de shell adicional e implícito que puede volver a
+parsear/perder expansiones incluso cuando el comando explícito ya es `bash -lc '...'` — confirmado en
+vivo por el coordinador y reproducido de nuevo en este run con una sonda de solo lectura
+(`. /etc/os-release; printf ...`): con `--` devuelve cadena vacía, exit 0; con `--exec` (que ejecuta
+el programa indicado directamente, sin ese salto) devuelve `noble`, exit 0. Este fix sustituye `--`
+por `--exec` en las diez invocaciones de comandos Linux de ambos scripts (sin tocar
+`--status`/`--help`/`-l -v`/`--install`, que son gestión propia de `wsl.exe`) y quita el hack de
+`bash -lc` para `wslpath`, pasando la ruta de Windows como argumento `--exec` literal. Detalle en la
+lección 8 de la sección de fix2 más abajo.
+
 ## Alcance
 
 - `scripts/aos/preflight-host.ps1` — mide el host en modo solo lectura: nunca activa una
@@ -334,6 +347,36 @@ evidencia:
    - Regla: un argumento de ruta de Windows pasado a `wsl.exe -- <comando>` sin una shell de por
      medio no es seguro — pasar siempre por `bash -lc` con comillas simples para cualquier dato que
      pueda contener barras invertidas.
+   - **Superado por la lección 8 (fix3) de abajo**: el hack de `bash -lc` resultó ser un parche sobre
+     el síntoma correcto pero el diagnóstico de causa (ausencia de shell) era incompleto — `wsl.exe
+     --` sí mete una shell por defecto de por medio, solo que una distinta e implícita.
+
+8. **`--` enruta por una shell implícita adicional de la distro; `--exec` no (encontrado al revisar
+   fix2, confirmado por el coordinador y reproducido de nuevo en este run, rama fix3).**
+   - Síntoma: una sonda de solo lectura equivalente al paso `docker-apt-source`
+     (`. /etc/os-release; printf "%s" "${UBUNTU_CODENAME:-$VERSION_CODENAME}"`) ejecutada como
+     `wsl.exe -d AOS-CRM-Ubuntu-24.04 -u root -- bash -lc $script` bajo `pwsh` devolvía **cadena
+     vacía**, exit 0 — no un error, un éxito silencioso con el dato perdido. La rama
+     `already-satisfied` de `install-host-wsl.ps1` (Docker ya sano) ocultaba el bug porque nunca
+     llega a ejecutar `docker-apt-source`.
+   - Causa: `wsl.exe -d <distro> [-u <user>] -- <comando>` no ejecuta `<comando>` directamente; lo
+     reenvía al shell por defecto de la distro, que lo vuelve a parsear antes de que el `bash -lc`
+     explícito reciba su argumento. Ese salto de shell implícito y adicional es el mismo mecanismo
+     que en la lección 7 se diagnosticó solo como "backslashes perdidos" — es más general: también
+     pierde expansión de variables (`. /etc/os-release; ...`) aunque el comando explícito ya sea
+     `bash -lc '...'`. Confirmado en vivo en este host (repro exacto arriba) y también para
+     `wslpath`: `wsl -d <distro> --exec wslpath -a 'C:\Users\x'` conserva la ruta byte a byte,
+     backslashes y acentos incluidos, sin ningún `bash -lc` de por medio.
+   - Fix: `--exec` en vez de `--` en las diez invocaciones de comandos Linux de ambos scripts
+     (`Invoke-WslLinux`); `bash -lc '<script>'` se conserva como proceso explícito únicamente donde
+     el script necesita expresiones de shell (`&&`, `|`, `.`/`source`, sustitución de variables) —
+     ahora es el *único* shell en la ruta, no uno de dos. Para `wslpath` se quitó el hack de `bash
+     -lc` por completo: `--exec wslpath -a $repoRoot` pasa la ruta como argumento literal, sin
+     ninguna shell. No se tocaron `--status`/`--help`/`-l -v`/`--install` (gestión propia de
+     `wsl.exe`, sin proceso Linux involucrado, fuera del alcance de este bug).
+   - Regla: `wsl.exe -- <comando>` no es "ejecutar `<comando>` sin shell" — mete el shell por defecto
+     de la distro de por medio igual que si no hubiera `--` en absoluto. Para argv Linux literal o
+     para un `bash -lc` explícito sin un segundo salto de shell escondido, usar `--exec`.
 
 ### Gate re-ejecutado al cerrar (los cinco comandos de `.aos/verify.json`, en este commit)
 
@@ -365,6 +408,27 @@ estaba instalado por el coordinador, así que esta sesión no corrió `apt`/muta
   typecheck/tests de la aplicación — eso sigue en CRM-004/CRM-005.
 - El último `aos review` sobre este track tuvo `diffTruncated: true`; no se asume cobertura completa
   de esa revisión.
+
+### Fix3: re-medición real tras sustituir `--` por `--exec`
+
+`scripts/aos/preflight-host.ps1 -DistroName AOS-CRM-Ubuntu-24.04` real contra este host, en este
+commit: `"status": "ready"`, exit 0. `linuxCheckoutAccess.linuxPath` ahora viene directo de `--exec
+wslpath -a $repoRoot` (sin `bash -lc`): `/mnt/c/Users/Andrés/Documents/AOS-CRM`, con la tilde y las
+barras intactas; `headShaMatches=true`, `busReachable=true`. `containerRuntime.ok=true` (`29.9.2`,
+`active`); `containerSmokeTest.ok=true`. `missingPrerequisites: []`. `-SelfTest` de ambos scripts:
+`ALL PASSED`, exit 0.
+
+Nota de transparencia (no se oculta, no se atribuye a WSL/elevación faltante): los logs crudos de la
+instalación de Docker que hizo el coordinador (`.aos/reports/CRM-001-HOST-coordinator-review.md`)
+registran que el wrapper de PowerShell que envolvió esa instalación terminó en **exit 127 por un
+retorno de carro (CR) que su propio pipeline añadió al final**, después de que todos los pasos reales
+(Engine + Compose + `active`) ya habían corrido correctamente — un artefacto de captura de esa
+sesión, no un fallo de paquete ni evidencia de que falte WSL/administrador. El coordinador no
+repitió esa instalación; verificó Docker de forma independiente aparte (ver
+`CRM-001-HOST-coordinator-review.md` y `docker-runtime-observation.json` en
+`.aos/onboarding/bootstrap-2026-10-27/`), y esa observación independiente — igual que el
+`containerRuntime.ok=true`/`containerSmokeTest.ok=true` medidos arriba, en este run — pasó
+limpiamente.
 
 ## Siguiente paso
 

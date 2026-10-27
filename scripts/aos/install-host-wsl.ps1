@@ -343,7 +343,7 @@ function Invoke-WslRootStep {
   if (-not $PSCmdlet.ShouldProcess("wsl:$Distro", "root# $Name")) {
     return [pscustomobject]@{ Name = $Name; Command = $BashScript; ExitCode = $null; Ok = $true; Skipped = $true; Detail = 'skipped (-WhatIf)' }
   }
-  $probe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $Distro, '-u', 'root', '--', 'bash', '-lc', $BashScript)
+  $probe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $Distro, '-u', 'root', '--exec', 'bash', '-lc', $BashScript)
   [pscustomobject]@{ Name = $Name; Command = $BashScript; ExitCode = $probe.ExitCode; Ok = ($probe.ExitCode -eq 0); Skipped = $false; Detail = $probe.Text }
 }
 
@@ -424,13 +424,13 @@ try {
         $distro = $resolvedDistro.Distro.Name
         $report.phase2.distro = $distro
 
-        $present = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--', 'bash', '-lc', 'command -v docker')
+        $present = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--exec', 'bash', '-lc', 'command -v docker')
         if ($present.ExitCode -eq 0) {
           # "command -v docker" only proves the binary exists, not that the
           # daemon/service/Compose are healthy; check all three before
           # calling it satisfied, and never attempt to repair an unhealthy
           # existing install here (that needs a separate dispatch).
-          $health = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--', 'bash', '-lc', 'docker info >/dev/null 2>&1 && systemctl is-active --quiet docker && docker compose version >/dev/null 2>&1 && echo HEALTHY')
+          $health = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--exec', 'bash', '-lc', 'docker info >/dev/null 2>&1 && systemctl is-active --quiet docker && docker compose version >/dev/null 2>&1 && echo HEALTHY')
           if ($health.ExitCode -eq 0) {
             $report.phase2.result = 'already-satisfied'
             $report.phase2.detail = "docker already present and healthy in '$distro' (binary at $($present.Text))"
@@ -441,7 +441,7 @@ try {
         } else {
           # Not present yet: validate the distro's OS release and check for
           # conflicting packages BEFORE any apt/repo mutation runs.
-          $osReleaseProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--', 'bash', '-lc', 'cat /etc/os-release')
+          $osReleaseProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--exec', 'bash', '-lc', 'cat /etc/os-release')
           if ($osReleaseProbe.ExitCode -ne 0) {
             $report.phase2.result = 'blocked-os-release-unreadable'
             $report.phase2.detail = "could not read /etc/os-release inside '$distro' (exit $($osReleaseProbe.ExitCode))"
@@ -452,7 +452,7 @@ try {
               $report.phase2.result = 'blocked-unsupported-os'
               $report.phase2.detail = $supportCheck.Reason
             } else {
-              $conflictProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--', 'bash', '-lc', 'dpkg --get-selections docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc 2>/dev/null | cut -f1')
+              $conflictProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $distro, '-u', 'root', '--exec', 'bash', '-lc', 'dpkg --get-selections docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc 2>/dev/null | cut -f1')
               $conflicts = @(($conflictProbe.Text -split "`n") | Where-Object { $_.Trim().Length -gt 0 })
               if ($conflicts.Count -gt 0) {
                 $report.phase2.result = 'blocked-conflicting-packages'
