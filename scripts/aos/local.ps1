@@ -436,8 +436,17 @@ function Test-OwnServerRunning {
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linuxRootRaw)) { return $false }
   $linuxRoot = $linuxRootRaw.Trim()
   $composePath = "$linuxRoot/$ComposeRelPath"
-  $psOutput = & wsl.exe -d $Distro --exec docker compose -f $composePath -p $ProjectName ps --format json --status running 2>$null
-  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($psOutput)) { return $false }
+  $psOutputRaw = & wsl.exe -d $Distro --exec docker compose -f $composePath -p $ProjectName ps --format json --status running 2>$null
+  if ($LASTEXITCODE -ne 0) { return $false }
+  # `docker compose ps --format json` is JSON Lines (one object per line). A
+  # multi-record native stdout capture lands here as string[]; joining with a
+  # real newline at this boundary -- where the array shape is produced --
+  # keeps the per-line structure Test-ServerOwnsPublishedPort splits on.
+  # Without it, PowerShell's default array-to-string coercion at the
+  # [string]-typed parameter joins elements with spaces instead, collapsing
+  # every record onto one line the JSON Lines parser cannot decode.
+  $psOutput = ($psOutputRaw -join "`n")
+  if ([string]::IsNullOrWhiteSpace($psOutput)) { return $false }
   return Test-ServerOwnsPublishedPort -PsJsonOutput $psOutput -ConfiguredPort $ConfiguredPort
 }
 
@@ -745,6 +754,44 @@ function Invoke-SelfTest {
     Record 'Test-ServerOwnsPublishedPort: a matching Publishers entry on a different service is not attributed to server' {
       $json = '{"Service":"worker","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
       if (Test-ServerOwnsPublishedPort -PsJsonOutput $json -ConfiguredPort 43000) { throw 'expected no ownership when the matching Publishers entry belongs to a different service' }
+    }
+
+    Record 'Test-OwnServerRunning: a multi-record `docker compose ps` stdout captured as a native string[] (not a pre-joined string) is still parsed as JSON Lines (the array-to-space-joined-string defect this track fixed)' {
+      $script:selfTestPsRecords = @(
+        '{"Service":"db","Publishers":[]}',
+        '{"Service":"server","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      )
+      function wsl.exe {
+        $global:LASTEXITCODE = 0
+        if ($args -contains 'wslpath') { return '/synthetic/repo' }
+        return $script:selfTestPsRecords
+      }
+      if (-not (Test-OwnServerRunning -RepoRoot 'C:\synthetic' -Distro 'synthetic-distro' -ConfiguredPort 43000)) {
+        throw 'expected the real Test-OwnServerRunning wrapper to confirm ownership from multi-record native stdout'
+      }
+    }
+
+    Record 'Invoke-RestartAction wired to the real Test-OwnServerRunning: a server published on 43000 while 43001 is configured is a foreign occupant, so down/up are never called' {
+      $script:selfTestPsRecords = @(
+        '{"Service":"db","Publishers":[]}',
+        '{"Service":"server","Publishers":[{"URL":"127.0.0.1","TargetPort":3000,"PublishedPort":43000,"Protocol":"tcp"}]}'
+      )
+      function wsl.exe {
+        $global:LASTEXITCODE = 0
+        if ($args -contains 'wslpath') { return '/synthetic/repo' }
+        return $script:selfTestPsRecords
+      }
+      $ownServerRunning = Test-OwnServerRunning -RepoRoot 'C:\synthetic' -Distro 'synthetic-distro' -ConfiguredPort 43001
+      if ($ownServerRunning) { throw 'expected no ownership when configured port 43001 does not match the published port 43000' }
+      $portOccupancy = Get-PortOccupancy -PortFree $false -OwnServerRunning $ownServerRunning
+      if ($portOccupancy -ne 'OccupiedByOther') { throw "expected OccupiedByOther, got $portOccupancy" }
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy $portOccupancy -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-before-down') { throw "expected Stage=blocked-before-down, got $($result.Stage)" }
+      if ($order.Count -ne 0) { throw "expected neither down nor up to run, ran: $($order -join ',')" }
     }
 
     Record 'Get-StartGateVerdict: every signal good means Proceed=true with no blockers' {

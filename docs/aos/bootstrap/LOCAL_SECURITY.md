@@ -165,6 +165,19 @@ al *fallback* `43000`: `Get-ConfiguredWebPort` ahora devuelve
 `{Port, Valid}` y el gate bloquea con `Valid=false` en vez de arrancar
 sobre el puerto equivocado sin avisar.
 
+**Corrección fix3:** `docker compose ps --format json` devuelve JSON Lines
+(un objeto por línea; [confirmado por la documentación oficial](https://docs.docker.com/reference/cli/docker/compose/ps/)).
+Cuando hay varios servicios arriba, `wsl.exe` entrega varias líneas y
+PowerShell captura ese stdout nativo como `string[]`, no como un string ya
+unido. `Test-OwnServerRunning` pasaba ese array directo al parámetro
+`[string]` de `Test-ServerOwnsPublishedPort`: PowerShell lo convertía uniendo
+los elementos con **espacios** (no con salto de línea), así que el parser
+JSON Lines ya no podía partir los registros y `Test-ServerOwnsPublishedPort`
+devolvía siempre `false` — bloqueando `Restart` justo cuando el propio
+servidor sí era el dueño del puerto, con dos o más servicios corriendo.
+`Test-OwnServerRunning` ahora une explícitamente las líneas con `` `n `` en
+la frontera donde se producen, antes de que ocurra esa conversión implícita.
+
 `Start` ya no reporta `NOT ready` por su propio listener; `Restart` valida
 seguridad, detiene **solo** su propio proyecto (nunca otro producto, porque
 `down` ya estaba acotado por `-p aos-crm-local`), y **vuelve a comprobar el
