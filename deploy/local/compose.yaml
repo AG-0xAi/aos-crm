@@ -16,6 +16,12 @@ x-aos-crm-app: &aos-crm-app
     target: twenty
     args:
       APP_VERSION: ${AOS_CRM_APP_VERSION:-twenty-v2.51.0+15e4826d3b}
+    # Make the artifact self-describing: the image carries the upstream
+    # commit it was built from, so `docker inspect` answers "which source is
+    # this?" without trusting the mutable tag it happens to be named with.
+    labels:
+      org.opencontainers.image.revision: "15e4826d3b5fc5867baeabeeb42b253892b2d4da"
+      org.opencontainers.image.version: "twenty-v2.51.0"
   image: ${AOS_CRM_IMAGE_TAG:?set AOS_CRM_IMAGE_TAG in deploy/local/.env to a local, non-moving tag such as aos-crm-local/twenty:v2.51.0-15e4826d3b}
   pull_policy: never
   # deploy/local/privacy.env is the CRM-003 contract (telemetry/analytics/
