@@ -39,14 +39,34 @@ function readEnvKeys(path) {
   return found;
 }
 
+// The services that must be running the verified image. A tag that describes
+// the right bytes while the containers run older ones is not provenance.
+export const APP_SERVICES = ['server', 'worker'];
+
+// The AOS half of the image reference. scripts/aos/local.ps1's
+// Get-SourcePinnedImageTag builds the name; this is the part of it that pins
+// the name to one AOS commit, and the self-test checks the two agree.
+export function aosTagSuffix(head) {
+  return `aos${head.slice(0, 12)}`;
+}
+
 // Pure: the whole verdict, so every rule is covered by the self-test without
-// Docker. Takes the labels Docker reported and the stamp Git reports now.
-export function judgeImage({ tag, labels, imageId, expectedUpstreamSha, head, tree, dirty, servesFrontend }) {
+// Docker. Takes the labels Docker reported, the stamp Git reports now, and the
+// image every running app service actually resolved to.
+export function judgeImage({ tag, labels, imageId, expectedUpstreamSha, head, tree, dirty, servesFrontend, runningServices }) {
   const problems = [];
   const shortPin = expectedUpstreamSha.slice(0, 10);
   if (!tag) problems.push('AOS_CRM_IMAGE_TAG is not set in deploy/local/.env');
   else if (/:latest$/.test(tag) || !tag.includes(':')) problems.push(`the image tag '${tag}' is a moving tag`);
   else if (!tag.includes(shortPin)) problems.push(`the image tag '${tag}' does not name the pinned upstream source ${shortPin}`);
+  // CRM-004-fix1 named every build after the upstream pin alone, so each AOS
+  // commit silently overwrote the previous image behind the same reference
+  // (observed twice on 2026-10-28: ImageID 86a21ef0, then 353a1cf2). The pin
+  // is necessary but not sufficient: the reference has to name this tree too,
+  // or it is a base reference that any commit can claim.
+  else if (!tag.includes(aosTagSuffix(head))) {
+    problems.push(`the image reference '${tag}' names the upstream pin but not this AOS commit (expected it to carry ${aosTagSuffix(head)}): a reference every AOS tree overwrites cannot identify these bytes`);
+  }
   if (!imageId || !/^sha256:[0-9a-f]{64}$/.test(imageId)) problems.push(`the image has no usable config digest (got '${imageId}')`);
   const revision = labels['org.opencontainers.image.revision'];
   if (revision !== expectedUpstreamSha) problems.push(`org.opencontainers.image.revision is '${revision}', expected the pinned ${expectedUpstreamSha}`);
@@ -56,6 +76,25 @@ export function judgeImage({ tag, labels, imageId, expectedUpstreamSha, head, tr
   if (labels['ai.aos.crm.source.dirty'] !== 'false') problems.push(`ai.aos.crm.source.dirty is '${labels['ai.aos.crm.source.dirty']}': an image built from uncommitted changes cannot be traced to a source`);
   if (dirty) problems.push('this checkout has uncommitted changes, so no image built from it can be traced to a commit');
   if (!servesFrontend) problems.push(`the image does not carry ${FRONT_INDEX}: it is not the full application target, so a dependency image may be wearing the application tag`);
+  // Measured off the containers, not inferred from the tag: inspecting a
+  // freshly built image while the stack still serves the previous one is
+  // exactly what fix1's provenance check could not tell apart.
+  if (!Array.isArray(runningServices)) {
+    problems.push('the running services could not be read, so there is no evidence the verified image is the one being served');
+  } else {
+    for (const service of APP_SERVICES) {
+      const found = runningServices.filter((s) => s.service === service);
+      if (found.length === 0) {
+        problems.push(`the '${service}' service is not running, so this image is not the one serving anything`);
+        continue;
+      }
+      for (const instance of found) {
+        if (instance.imageId !== imageId) {
+          problems.push(`the running '${service}' container uses image ${instance.imageId || 'unknown'}, not the verified ${imageId}: the tag was rebuilt under a service that is still on older bytes`);
+        }
+      }
+    }
+  }
   return { ok: problems.length === 0, problems };
 }
 
@@ -77,6 +116,24 @@ function git(args) {
 function fail(message) {
   console.error(`[FAIL] ${message}`);
   process.exit(1);
+}
+
+// What the containers of THIS compose project actually resolved their image to,
+// by container id. Returns null when it cannot be read, which judgeImage treats
+// as a failure rather than as "nothing to check".
+function readRunningServices() {
+  const compose = wsl(['docker', 'ps', '--filter', 'label=com.docker.compose.project=aos-crm-local',
+    '--format', '{{.ID}}']);
+  if (compose.status !== 0) return null;
+  const ids = compose.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (ids.length === 0) return [];
+  const inspect = wsl(['docker', 'inspect',
+    '--format', '{{index .Config.Labels "com.docker.compose.service"}}|{{.Image}}', ...ids]);
+  if (inspect.status !== 0) return null;
+  return inspect.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((line) => {
+    const [service, imageId] = line.split('|');
+    return { service, imageId };
+  });
 }
 
 function run() {
@@ -106,6 +163,7 @@ function run() {
     tree: git(['rev-parse', 'HEAD^{tree}']).trim(),
     dirty: git(['status', '--porcelain']).split('\n').some((l) => l.trim() !== ''),
     servesFrontend: frontProbe.status === 0,
+    runningServices: readRunningServices(),
   });
 
   if (!verdict.ok) {
@@ -130,20 +188,22 @@ function selfTest() {
   const pin = 'a'.repeat(40);
   const head = 'b'.repeat(40);
   const tree = 'c'.repeat(40);
+  const imageId = `sha256:${'d'.repeat(64)}`;
   const good = {
-    tag: `aos-crm-local/twenty:v2.51.0-${pin.slice(0, 10)}`,
+    tag: `aos-crm-local/twenty:v2.51.0-${pin.slice(0, 10)}-${aosTagSuffix(head)}`,
     labels: {
       'org.opencontainers.image.revision': pin,
       'ai.aos.crm.source.commit': head,
       'ai.aos.crm.source.tree': tree,
       'ai.aos.crm.source.dirty': 'false',
     },
-    imageId: `sha256:${'d'.repeat(64)}`,
+    imageId,
     expectedUpstreamSha: pin,
     head,
     tree,
     dirty: false,
     servesFrontend: true,
+    runningServices: APP_SERVICES.map((service) => ({ service, imageId })),
   };
 
   record('judgeImage: a complete, clean, pinned image passes', () => {
@@ -172,6 +232,44 @@ function selfTest() {
   record('judgeImage: a moving tag is rejected', () => {
     assert(!judgeImage({ ...good, tag: 'aos-crm-local/twenty:latest' }).ok, 'expected :latest to fail');
     assert(!judgeImage({ ...good, tag: 'aos-crm-local/twenty:v2.51.0' }).ok, 'expected a tag without the pin to fail');
+  });
+  record('judgeImage: the base reference alone -- upstream pin, no AOS commit -- is rejected (the fix1 overwrite)', () => {
+    const r = judgeImage({ ...good, tag: `aos-crm-local/twenty:v2.51.0-${pin.slice(0, 10)}` });
+    assert(!r.ok, 'expected a reference without the AOS commit to fail');
+    assert(r.problems.some((p) => p.includes(aosTagSuffix(head))), `expected the problem to name the missing AOS commit: ${r.problems.join('; ')}`);
+    // And a reference naming a DIFFERENT AOS commit must not pass either.
+    const other = judgeImage({ ...good, tag: `aos-crm-local/twenty:v2.51.0-${pin.slice(0, 10)}-${aosTagSuffix('e'.repeat(40))}` });
+    assert(!other.ok, 'expected a reference naming another AOS commit to fail');
+  });
+  record('judgeImage: a service still running OTHER bytes is rejected, however correct the inspected tag is', () => {
+    const stale = `sha256:${'9'.repeat(64)}`;
+    for (const service of APP_SERVICES) {
+      const runningServices = good.runningServices.map((s) => (s.service === service ? { ...s, imageId: stale } : s));
+      const r = judgeImage({ ...good, runningServices });
+      assert(!r.ok, `expected a stale '${service}' container to fail`);
+      assert(r.problems.some((p) => p.includes(service) && p.includes(stale)),
+        `expected the problem to name the stale service and image: ${r.problems.join('; ')}`);
+    }
+  });
+  record('judgeImage: an app service that is not running at all is rejected, not treated as nothing to check', () => {
+    for (const service of APP_SERVICES) {
+      const runningServices = good.runningServices.filter((s) => s.service !== service);
+      const r = judgeImage({ ...good, runningServices });
+      assert(!r.ok, `expected a missing '${service}' service to fail`);
+    }
+    assert(!judgeImage({ ...good, runningServices: [] }).ok, 'expected an empty stack to fail');
+    assert(!judgeImage({ ...good, runningServices: null }).ok, 'expected unreadable services to fail closed');
+    assert(!judgeImage({ ...good, runningServices: undefined }).ok, 'expected unreadable services to fail closed');
+  });
+  record('the image reference this gate demands is the one local.ps1 builds', () => {
+    const local = readFileSync(resolve(REPO_ROOT, 'scripts/aos/local.ps1'), 'utf8');
+    assert(/function Get-SourcePinnedImageTag/.test(local), 'local.ps1 no longer derives the image reference');
+    // Both sides must take the first 12 hex of the AOS commit, prefixed 'aos'.
+    assert(/-aos\$\(\$AosCommit\.Substring\(0, 12\)\)/.test(local),
+      'local.ps1 builds the AOS half of the reference differently than this gate expects');
+    assert(/Substring\(0, 10\)/.test(local), 'local.ps1 no longer embeds the 10-char upstream pin this gate looks for');
+    assert(/Update-SourceStamp[\s\S]{0,800}AOS_CRM_IMAGE_TAG/.test(local),
+      'local.ps1 no longer rewrites AOS_CRM_IMAGE_TAG when it stamps the source');
   });
   record('judgeImage: the wrong upstream revision is rejected', () => {
     const r = judgeImage({ ...good, labels: { ...good.labels, 'org.opencontainers.image.revision': 'f'.repeat(40) } });

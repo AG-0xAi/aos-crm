@@ -225,6 +225,41 @@ function Set-EnvKeyLines {
   return @($out)
 }
 
+# The local image reference. CRM-004-fix1 named every build
+# `aos-crm-local/twenty:v2.51.0-15e4826d3b` -- the upstream pin and nothing
+# else -- so each AOS commit overwrote the previous image's tag with different
+# bytes, and `docker image inspect <tag>` could describe an artifact no service
+# was running (observed twice on 2026-10-28: ImageID 86a21ef0 then 353a1cf2
+# behind the same name). The reference now carries the AOS commit as well, so
+# two different trees cannot share one name. Pure: takes the pin and the commit
+# instead of reading either, so -SelfTest covers the format.
+$ImageRepository = 'aos-crm-local/twenty'
+
+function Get-SourcePinnedImageTag {
+  param([string] $UpstreamTag, [string] $UpstreamSha, [string] $AosCommit)
+  if ([string]::IsNullOrWhiteSpace($UpstreamTag) -or [string]::IsNullOrWhiteSpace($UpstreamSha) -or [string]::IsNullOrWhiteSpace($AosCommit)) { return $null }
+  if ($UpstreamSha -notmatch '^[0-9a-f]{40}$' -or $AosCommit -notmatch '^[0-9a-f]{40}$') { return $null }
+  # 'twenty/v2.51.0' -> 'v2.51.0'
+  $version = ($UpstreamTag -split '/')[-1]
+  if ([string]::IsNullOrWhiteSpace($version)) { return $null }
+  return "${ImageRepository}:$version-$($UpstreamSha.Substring(0, 10))-aos$($AosCommit.Substring(0, 12))"
+}
+
+# Reads the upstream pin from the same docs/aos/bootstrap/provenance.json that
+# CRM-001's gate and scripts/aos/verify-image-provenance.mjs read, so the name
+# of the artifact cannot drift from the source it claims to come from. Returns
+# $null if either input cannot be read: an image nobody can name correctly must
+# not be built.
+function Resolve-ImageTag {
+  param([string] $RepoRoot, [string] $AosCommit)
+  $provenancePath = Join-Path $RepoRoot 'docs/aos/bootstrap/provenance.json'
+  if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) { return $null }
+  try {
+    $provenance = Get-Content -LiteralPath $provenancePath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+  } catch { return $null }
+  return Get-SourcePinnedImageTag -UpstreamTag $provenance.upstream.tag -UpstreamSha $provenance.upstream.sha -AosCommit $AosCommit
+}
+
 # The identity of the source these bytes were built from: the AOS commit, its
 # tree, and whether the working tree had uncommitted changes at build time. A
 # dirty build must never be able to present itself as a clean commit, so the
@@ -245,13 +280,18 @@ function Get-GitSourceStamp {
 }
 
 # Stamps the source identity into deploy/local/.env so compose can label the
-# image it is about to build with it. Returns $true only if the stamp was
-# written: a build whose provenance could not be recorded must not proceed.
+# image it is about to build with it, AND renames the image after that same
+# commit so a different tree cannot reuse the name. Returns $true only if the
+# whole stamp was written: a build whose provenance could not be recorded must
+# not proceed.
 function Update-SourceStamp {
   param([string] $RepoRoot, [string] $EnvPath)
   $stamp = Get-GitSourceStamp -RepoRoot $RepoRoot
   if ($null -eq $stamp) { return $false }
   if (-not (Test-Path -LiteralPath $EnvPath -PathType Leaf)) { return $false }
+  $tag = Resolve-ImageTag -RepoRoot $RepoRoot -AosCommit $stamp.AOS_CRM_SOURCE_COMMIT
+  if ([string]::IsNullOrWhiteSpace($tag)) { return $false }
+  $stamp.AOS_CRM_IMAGE_TAG = $tag
   $lines = @(Get-Content -LiteralPath $EnvPath -ErrorAction Stop)
   [System.IO.File]::WriteAllLines($EnvPath, (Set-EnvKeyLines -Lines $lines -Values $stamp))
   return $true
@@ -670,7 +710,7 @@ function Test-OwnServerRunning {
 # invalidate a running deployment's credentials). Never prints a value.
 function Invoke-Prepare {
   [CmdletBinding()]
-  param([string] $LocalDir, [string] $EnvPath, [int] $WebPort)
+  param([string] $LocalDir, [string] $EnvPath, [int] $WebPort, [string] $RepoRoot)
   if (Test-Path -LiteralPath $EnvPath -PathType Leaf) {
     Write-Output "deploy/local/.env already exists; leaving it untouched. Delete it yourself first if you want new secrets."
     $script:PrepareOk = $true
@@ -681,12 +721,23 @@ function Invoke-Prepare {
     $script:PrepareOk = $false
     return
   }
+  # The image name carries the AOS commit, so it is derived rather than
+  # hardcoded. Start/Restart re-derive it (Update-SourceStamp) immediately
+  # before every build; this only has to be a usable value for `compose config`
+  # in between.
+  $stamp = Get-GitSourceStamp -RepoRoot $RepoRoot
+  $imageTag = if ($null -ne $stamp) { Resolve-ImageTag -RepoRoot $RepoRoot -AosCommit $stamp.AOS_CRM_SOURCE_COMMIT } else { $null }
+  if ([string]::IsNullOrWhiteSpace($imageTag)) {
+    Write-Error 'could not derive the local image name from git HEAD and docs/aos/bootstrap/provenance.json; refusing to write a profile that would build an image nobody can trace.'
+    $script:PrepareOk = $false
+    return
+  }
   New-Item -ItemType Directory -Path $LocalDir -Force | Out-Null
   $pgPassword = New-CryptoToken -Encoding Hex -Bytes 32
   $encryptionKey = New-CryptoToken -Encoding Base64 -Bytes 32
   $lines = @(
     '# Generated by scripts/aos/local.ps1 -Action Prepare. Never commit this file.',
-    'AOS_CRM_IMAGE_TAG=aos-crm-local/twenty:v2.51.0-15e4826d3b',
+    "AOS_CRM_IMAGE_TAG=$imageTag",
     # Semver, not the upstream tag: the server validates APP_VERSION with
     # semver.parse() at boot and rejects anything else (see compose.yaml).
     'AOS_CRM_APP_VERSION=2.51.0+15e4826d3b',
@@ -827,7 +878,7 @@ function Invoke-Main {
 
   switch ($Action) {
     'Prepare' {
-      Invoke-Prepare -LocalDir $LocalDir -EnvPath $EnvPath -WebPort $DefaultWebPort
+      Invoke-Prepare -LocalDir $LocalDir -EnvPath $EnvPath -WebPort $DefaultWebPort -RepoRoot $RepoRoot
       exit ($script:PrepareOk ? 0 : 1)
     }
     'Status' {
@@ -932,6 +983,10 @@ function Invoke-SelfTest {
   $tmpPrefix = "aos-crm-local-ps1-selftest-$([guid]::NewGuid())"
   $tmpRoot = Join-Path $tmpParent $tmpPrefix
   New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
+  # Read-only here: the image-name cases below need this repo's HEAD and its
+  # docs/aos/bootstrap/provenance.json. Nothing under it is written -- every
+  # fixture lives in $tmpRoot.
+  $RepoRootForSelfTest = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
   try {
     Record 'Test-PortFree: a bound loopback port reports not free' {
       $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse('127.0.0.1'), 0)
@@ -1513,9 +1568,59 @@ function Invoke-SelfTest {
       $before = Get-Content -LiteralPath $envPath -Raw
       $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse('127.0.0.1'), 0)
       $listener.Start(); $freePort = $listener.LocalEndpoint.Port; $listener.Stop()
-      Invoke-Prepare -LocalDir $localDir -EnvPath $envPath -WebPort $freePort *> $null
+      Invoke-Prepare -LocalDir $localDir -EnvPath $envPath -WebPort $freePort -RepoRoot $RepoRootForSelfTest *> $null
       $after = Get-Content -LiteralPath $envPath -Raw
       if ($before -ne $after) { throw 'Prepare must not modify an existing .env' }
+    }
+
+    Record 'Invoke-Prepare: the profile it writes names the image after BOTH the upstream pin and this AOS commit' {
+      $localDir = Join-Path $tmpRoot 'prepare-fresh'
+      $envPath = Join-Path $localDir '.env'
+      $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse('127.0.0.1'), 0)
+      $listener.Start(); $freePort = $listener.LocalEndpoint.Port; $listener.Stop()
+      Invoke-Prepare -LocalDir $localDir -EnvPath $envPath -WebPort $freePort -RepoRoot $RepoRootForSelfTest *> $null
+      if (-not $script:PrepareOk) { throw 'expected Prepare to succeed on a free port' }
+      $written = (Read-EnvKeys -Path $envPath)['AOS_CRM_IMAGE_TAG']
+      $head = (& git -C $RepoRootForSelfTest rev-parse HEAD).Trim()
+      if ($written -notmatch '15e4826d3b') { throw "the written tag does not name the upstream pin: $written" }
+      if ($written -notlike "*aos$($head.Substring(0,12))") { throw "the written tag does not name this AOS commit: $written" }
+      if ($written -eq "${ImageRepository}:v2.51.0-15e4826d3b") { throw 'the written tag is the base reference alone, which every AOS commit would overwrite' }
+    }
+
+    Record 'Get-SourcePinnedImageTag: a missing or malformed input yields no name at all, so nothing gets built' {
+      $pin = '15e4826d3b5fc5867baeabeeb42b253892b2d4da'
+      $commit = 'a' * 40
+      $good = Get-SourcePinnedImageTag -UpstreamTag 'twenty/v2.51.0' -UpstreamSha $pin -AosCommit $commit
+      if ($good -ne "${ImageRepository}:v2.51.0-15e4826d3b-aos$('a' * 12)") { throw "unexpected tag: $good" }
+      if ($null -ne (Get-SourcePinnedImageTag -UpstreamTag 'twenty/v2.51.0' -UpstreamSha $pin -AosCommit '')) { throw 'expected no tag without an AOS commit' }
+      if ($null -ne (Get-SourcePinnedImageTag -UpstreamTag 'twenty/v2.51.0' -UpstreamSha 'not-a-sha' -AosCommit $commit)) { throw 'expected no tag from a malformed pin' }
+      if ($null -ne (Get-SourcePinnedImageTag -UpstreamTag '' -UpstreamSha $pin -AosCommit $commit)) { throw 'expected no tag without an upstream tag' }
+      if ($null -ne (Get-SourcePinnedImageTag -UpstreamTag 'twenty/v2.51.0' -UpstreamSha $pin -AosCommit ('b' * 39))) { throw 'expected no tag from a short commit' }
+    }
+
+    Record 'Resolve-ImageTag: reads the pin from the same provenance.json the provenance gate reads' {
+      $head = (& git -C $RepoRootForSelfTest rev-parse HEAD).Trim()
+      $resolved = Resolve-ImageTag -RepoRoot $RepoRootForSelfTest -AosCommit $head
+      $pin = (Get-Content -LiteralPath (Join-Path $RepoRootForSelfTest 'docs/aos/bootstrap/provenance.json') -Raw | ConvertFrom-Json).upstream.sha
+      if ($resolved -notmatch $pin.Substring(0, 10)) { throw "the resolved tag ignores provenance.json's pin: $resolved" }
+      if ($null -ne (Resolve-ImageTag -RepoRoot $tmpRoot -AosCommit $head)) { throw 'expected no tag when provenance.json cannot be read' }
+    }
+
+    Record 'Update-SourceStamp: rewrites the image name to this commit and never touches a secret line' {
+      $localDir = Join-Path $tmpRoot 'stamp'
+      New-Item -ItemType Directory -Path $localDir -Force | Out-Null
+      $envPath = Join-Path $localDir '.env'
+      Set-Content -LiteralPath $envPath -Value @(
+        '# generated',
+        "AOS_CRM_IMAGE_TAG=${ImageRepository}:v2.51.0-15e4826d3b",
+        'AOS_CRM_PG_PASSWORD=do-not-touch'
+      )
+      if (-not (Update-SourceStamp -RepoRoot $RepoRootForSelfTest -EnvPath $envPath)) { throw 'expected the stamp to be written' }
+      $keys = Read-EnvKeys -Path $envPath
+      $head = (& git -C $RepoRootForSelfTest rev-parse HEAD).Trim()
+      if ($keys['AOS_CRM_IMAGE_TAG'] -notlike "*aos$($head.Substring(0,12))") { throw "the stamp left a commit-agnostic image name: $($keys['AOS_CRM_IMAGE_TAG'])" }
+      if ($keys['AOS_CRM_SOURCE_COMMIT'] -ne $head) { throw 'the source commit was not stamped' }
+      if ($keys['AOS_CRM_PG_PASSWORD'] -ne 'do-not-touch') { throw 'the stamp rewrote an unrelated secret line' }
     }
 
     Record 'Invoke-Prepare: a busy port is refused before any file is written' {

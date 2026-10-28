@@ -1,8 +1,8 @@
 // CRM-004: the end-to-end path of the local AOS-CRM stack, run against the
 // real containers over the real published loopback port.
 //
-// @e2e: HTTP /healthz on the published loopback port -> the frontend bundle the image was built with -> GraphQL login as the first administrator -> a record written through the API -> the same row read back with psql inside this project's own PostgreSQL container -> the db container restarted -> the row still there -> an invalid gzip body rejected without killing the server -> a second public signup refused -> the worker alive with its own Redis queue
-// @e2e-falla-si: stop the `server` container, or point PG_DATABASE_URL at another database. Every assertion below reads the published port with fetch(), psql inside the db container and redis-cli inside the redis container; there is no double to pass instead.
+// @e2e: HTTP /healthz on the published loopback port -> the frontend bundle the image was built with -> GraphQL login as the first administrator -> a record written through the API -> the same row read back with psql inside this project's own PostgreSQL container -> the db container restarted -> the row still there -> an invalid gzip body rejected without killing the server -> a VALID gzip frame with trailing bytes (GHSA-27r3-jxmh-p828) answered with the same container, pid and RestartCount afterwards -> a second public signup refused -> the worker alive with its own Redis queue
+// @e2e-falla-si: stop the `server` container, or point PG_DATABASE_URL at another database. Every assertion below reads the published loopback port over a real HTTP connection, psql inside the db container, redis-cli inside the redis container and `docker inspect` for the serving process's own identity; there is no double to pass instead.
 //
 // Requires the stack to be up (scripts/aos/local.ps1 -Action Start, which also
 // builds the image and holds the WSL session open). It does not build the
@@ -17,6 +17,9 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
+import { connect } from 'node:net';
+import { request } from 'node:http';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -79,8 +82,65 @@ function redis(args) {
   return res.stdout.trim();
 }
 
+// The identity of the process currently serving, not just "a container called
+// server". Compose declares `restart: unless-stopped`, so a server that dies is
+// brought straight back and a later /healthz 200 would read as survival. The
+// container id, its RestartCount and the pid of its main process are what tell
+// a surviving process from a replaced one.
+function serverProcessIdentity() {
+  const id = compose(['ps', '-q', 'server']).stdout.trim().split(/\r?\n/)[0];
+  assert.ok(id, 'docker compose ps -q server named no container');
+  const res = wsl(['docker', 'inspect', '--format', '{{.Id}}|{{.RestartCount}}|{{.State.Pid}}|{{.State.StartedAt}}', id]);
+  assert.equal(res.status, 0, `docker inspect exited ${res.status}: ${(res.stderr || '').slice(-200)}`);
+  const [containerId, restartCount, pid, startedAt] = res.stdout.trim().split('|');
+  return { containerId, restartCount: Number(restartCount), pid: Number(pid), startedAt };
+}
+
+// node:http with `agent: false`, not fetch(): one fresh connection per request
+// and no keep-alive pool.
+//
+// Measured on 2026-10-28: a fetch()-based suite failed three different
+// assertions with ECONNABORTED-on-write and ECONNRESET-on-read, at 6 ms and
+// 55 ms -- the shape of undici reusing a pooled socket that the Windows/WSL2
+// loopback relay had already torn down (and the same keep-alive class of
+// problem as nodejs/node#64004, noted in the official Dockerfile). Retrying
+// would hide it and would risk replaying a mutation; measuring the application
+// over a connection it actually has is the fix. The responses this suite reads
+// are small, so per-request connections cost nothing here.
+function httpRequest(path, { method = 'GET', headers = {}, body = null, timeoutMs = 60_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request({
+      host: '127.0.0.1',
+      port: WEB_PORT,
+      path,
+      method,
+      headers: { ...headers, ...(body ? { 'content-length': Buffer.byteLength(body) } : {}) },
+      agent: false,
+      timeout: timeoutMs,
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        resolve({
+          status: res.statusCode,
+          headers: res.headers,
+          text: async () => buffer.toString('utf8'),
+          json: async () => JSON.parse(buffer.toString('utf8')),
+          arrayBuffer: async () => buffer,
+        });
+      });
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(Object.assign(new Error(`request to ${path} timed out`), { code: 'ETIMEDOUT' })));
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 async function httpGet(path, init = {}) {
-  return fetch(`${BASE_URL}${path}`, { signal: AbortSignal.timeout(30_000), ...init });
+  return httpRequest(path, { method: 'GET', timeoutMs: 30_000, ...init });
 }
 
 // Twenty serves two GraphQL schemas: the workspace records live at /graphql
@@ -92,7 +152,7 @@ const CORE = '/graphql';
 const METADATA = '/metadata';
 
 async function gql(query, { variables, token, path = CORE } = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await httpRequest(path, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -100,7 +160,6 @@ async function gql(query, { variables, token, path = CORE } = {}) {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(60_000),
   });
   const body = await res.json();
   return { status: res.status, body };
@@ -119,7 +178,7 @@ async function waitForHealthy(timeoutMs) {
       if (res.status === 200) return true;
       last = `status ${res.status}`;
     } catch (e) {
-      last = e.name === 'TimeoutError' ? 'request timed out' : e.code || e.name;
+      last = e.code || e.name;
     }
     await new Promise((r) => setTimeout(r, 2000));
   }
@@ -350,11 +409,11 @@ test('the row survives restarting the database container (the volume is the stat
 });
 
 test('an invalid compressed request body is rejected without taking the server down (GHSA-27r3-jxmh-p828)', async () => {
-  const res = await fetch(`${BASE_URL}/graphql`, {
+  const res = await httpRequest('/graphql', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'content-encoding': 'gzip', origin: ORIGIN },
     body: Buffer.from('this is not gzip at all, not even close'),
-    signal: AbortSignal.timeout(30_000),
+    timeoutMs: 30_000,
   });
   // The contract (spec R1) is that the request is refused and the server
   // survives, not a particular status: Twenty's exception layer turns the
@@ -367,6 +426,91 @@ test('an invalid compressed request body is rejected without taking the server d
     `the server stopped answering after an invalid compressed body (rejection status was ${res.status})`);
   const second = await httpGet('/client-config');
   assert.equal(second.status, 200, 'the server answers /healthz but no longer serves requests');
+});
+
+test('a VALID compressed frame followed by trailing bytes does not kill the server process (GHSA-27r3-jxmh-p828)', async () => {
+  // The test above sends bytes that are not gzip at all, which body-parser
+  // refuses up front. That is a useful generic control but it is NOT this
+  // advisory. CVE-2026-111181 is an UNCAUGHT EXCEPTION (CWE-248): body-parser
+  // left the decompression stream piped with no error listener, so a request
+  // made of one VALID frame plus extra bytes was parsed and answered, and only
+  // then did the trailing bytes reach the already-finished decoder, whose error
+  // nobody handled and which took the process down. No auth and no matching
+  // route are needed, because body parsing runs before routing.
+  //   advisory: https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828
+  //   fix + its own regression: https://github.com/expressjs/body-parser/commit/1260c38
+  // The bytes below are that regression's shape -- valid frame, one zero byte,
+  // then a large trailing block -- and they are byte-identical to the input
+  // that was measured killing body-parser 2.3.0 and being answered 200 by
+  // 2.4.0 in an isolated throwaway container
+  // (.aos/onboarding/crm004-fix2/bodyparser-affected-vs-patched.txt). That
+  // comparison is what makes this the advisory's condition rather than "a gzip
+  // body"; on the patched version the delayed error cannot occur at all, so
+  // what this asserts here is SURVIVAL of the real process.
+  //
+  // Sent over a raw socket rather than fetch(): measured on this stack, the
+  // server answers this request differently depending on framing (200 with the
+  // decoded body under chunked encoding, and no response at all under
+  // Content-Length, where Nest logs the 400-class decoder error and closes).
+  // Asserting a status would be asserting that incidental behaviour; a
+  // fetch() client is also reset mid-upload by it. Only our own synthetic local
+  // instance is addressed.
+  assert.ok(adminToken, 'no administrator token: the sign-in step did not complete');
+  const before = serverProcessIdentity();
+
+  const frame = gzipSync(Buffer.from(JSON.stringify({ query: '{ __typename }' })));
+  const body = Buffer.concat([frame, Buffer.from([0x00]), Buffer.alloc(100 * 1024, 0x58)]);
+  const request = Buffer.concat([
+    Buffer.from([
+      'POST /graphql HTTP/1.1',
+      `Host: 127.0.0.1:${WEB_PORT}`,
+      `Origin: ${ORIGIN}`,
+      'Content-Type: application/json',
+      'Content-Encoding: gzip',
+      `Content-Length: ${body.length}`,
+      'Connection: close',
+      '', '',
+    ].join('\r\n')),
+    body,
+  ]);
+
+  const exchange = await new Promise((done) => {
+    const socket = connect(WEB_PORT, '127.0.0.1');
+    let statusLine = null;
+    let bytes = 0;
+    let socketError = null;
+    socket.setTimeout(30_000, () => { socketError ??= 'ETIMEDOUT'; socket.destroy(); });
+    socket.on('connect', () => { socket.write(request); socket.end(); });
+    socket.on('data', (chunk) => { bytes += chunk.length; statusLine ??= chunk.toString('latin1').split('\r\n')[0]; });
+    // A reset or a close with no response is not a pass or a failure on its
+    // own: whether the process is still the same one is.
+    socket.on('error', (e) => { socketError ??= e.code || e.message; });
+    socket.on('close', () => done({ statusLine, bytes, socketError }));
+  });
+
+  // The advisory's failure is delayed by construction, so everything below has
+  // to happen after the exchange is over and the trailing bytes drained.
+  await new Promise((r) => setTimeout(r, 2000));
+
+  const observed = `response='${exchange.statusLine ?? 'none'}' bytes=${exchange.bytes} socket=${exchange.socketError ?? 'closed cleanly'}`;
+  const health = await httpGet('/healthz');
+  assert.equal(health.status, 200,
+    `the server stopped answering after a valid frame with trailing bytes (${observed})`);
+  const authenticated = await gql('{ currentUser { id email } }', { token: adminToken, path: METADATA });
+  assert.equal(authenticated.body.errors, undefined,
+    `an authenticated operation broke after the trailing-bytes request (${observed}): ${gqlErrorMessages(authenticated.body)}`);
+  assert.ok(authenticated.body.data.currentUser.id, 'the authenticated operation returned no user');
+
+  // Compose declares `restart: unless-stopped`, so a crashed server comes
+  // straight back and the two checks above would pass on a process that died.
+  // These four are what separate survival from replacement.
+  const after = serverProcessIdentity();
+  assert.equal(after.containerId, before.containerId, 'the server container was replaced: that is not survival');
+  assert.equal(after.restartCount, before.restartCount,
+    `Docker restarted the server ${after.restartCount - before.restartCount} time(s): an automatic restart is a crash, not survival (${observed})`);
+  assert.equal(after.pid, before.pid,
+    `the server process was replaced (pid ${before.pid} -> ${after.pid}): the decoder error killed it and the entrypoint brought it back (${observed})`);
+  assert.equal(after.startedAt, before.startedAt, 'the container reports a new start time, so it went down and came back');
 });
 
 test('public registration is closed once the single local workspace exists', async () => {
