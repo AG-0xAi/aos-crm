@@ -124,9 +124,40 @@ Reverificado reinstalando y volviendo a leer el árbol:
 /app/node_modules/body-parser                       1.20.9
 ```
 
-Límite honesto: **no se ejecutó la prueba negativa** (petición comprimida inválida contra
-el backend) porque la imagen de aplicación no llegó a construirse; ver
-`BUILD_BASELINE.md`. Esa prueba sigue siendo requisito antes de aceptar el backend.
+Límite honesto **de aquel momento**: no se ejecutó la prueba negativa porque la imagen de
+aplicación no llegó a construirse; ver `BUILD_BASELINE.md`.
+
+#### Actualización fix1/fix2: la regresión ya se ejecuta, y es la del advisory
+
+- **fix1** añadió al camino E2E una petición con `Content-Encoding: gzip` y bytes que no son
+  gzip. Es un control útil de rechazo genérico, pero **no es este advisory**: body-parser la
+  rechaza por delante, y llamarla "prueba exacta del CVE" habría sido falso.
+- **fix2** añadió la condición que describe el advisory y su parche primario
+  ([commit 1260c38](https://github.com/expressjs/body-parser/commit/1260c38)): un **frame
+  comprimido válido**, un byte cero y un bloque de relleno posterior. El fallo es una
+  excepción no capturada y **retardada** (CWE-248): el cuerpo se parsea y se responde, y solo
+  después los bytes sobrantes llegan al decodificador ya terminado, cuyo error nadie
+  escuchaba. No hace falta autenticación ni ruta válida, porque el parseo del cuerpo precede
+  al routing.
+- Esos bytes se compararon antes en un contenedor desechable aislado: **matan a body-parser
+  2.3.0 y 2.4.0 los responde 200**
+  (`.aos/onboarding/crm004-fix2/bodyparser-affected-vs-patched.txt`). Esa comparación es lo
+  que convierte la prueba en "la condición del advisory" y no en "un cuerpo gzip". Por eso
+  en la versión parcheada lo que se afirma es **supervivencia**, no un 4xx: exigir un 4xx a
+  ese caso concreto sería exigir lo contrario de lo que hace la versión corregida.
+- Lo que se comprueba tras la petición, sobre nuestra propia instancia local y ninguna otra:
+  `/healthz` 200, una operación **autenticada** correcta, y el **mismo** contenedor, pid,
+  `RestartCount` y hora de arranque. Compose declara `restart: unless-stopped`, así que sin
+  esas cuatro comprobaciones un proceso que hubiera muerto y vuelto pasaría por superviviente.
+  Un reinicio automático no cuenta como supervivencia.
+- La petición se envía por socket crudo, no con `fetch()`: medido en este stack, el servidor
+  responde distinto según el framing (200 con el cuerpo decodificado en `chunked`, y ninguna
+  respuesta con `Content-Length`, donde Nest registra el error del decodificador y cierra).
+  Afirmar un status concreto sería afirmar ese comportamiento incidental; lo que importa es
+  la identidad del proceso después.
+
+Resultado medido por el coordinador sobre `6e0d50b6`: el camino E2E completo pasa 13/13 en
+390 s, incluida esta regresión, con contenedor, pid y `RestartCount` sin cambios.
 
 ### Qué avisos alcanzan de verdad al runtime
 

@@ -1,4 +1,4 @@
-# Línea base de build (CRM-004 y CRM-004-fix1)
+# Línea base de build (CRM-004, fix1, fix2 y fix3)
 
 > **CRM-004-fix1, 28 de octubre de 2026 — el bloqueo está resuelto.** El coordinador amplió
 > el Scope (spec canónico y registro) a **una** variable del Dockerfile oficial y se aplicó:
@@ -190,14 +190,22 @@ Nunca hubo presión de memoria: el mínimo disponible fue 4,8 GB de 11,4 GB.
 
 El contexto de build es el coste dominante y no desaparece con la caché: el checkout vive
 en `/mnt/c`, así que BuildKit vuelve a recorrer el árbol en cada invocación
-(~100 MB y entre 9 y 11 minutos, incluso cuando el único cambio es una etiqueta). Por eso
-**construir no es un comando del gate**: su resultado se registra aquí y
-`verify-image-provenance.mjs` comprueba en cada corrida que el artefacto corresponde a este
-commit, que es la parte verificable en segundos.
+(~100 MB y entre 9 y 11 minutos, incluso cuando el único cambio es una etiqueta). En fix1
+eso se usó como razón para que **construir no fuera un comando del gate**: su resultado se
+registraba aquí y `verify-image-provenance.mjs` comprobaba en cada corrida que el artefacto
+correspondía a este commit.
+
+> **Corregido en fix2.** Esa decisión ya no es la vigente: R3 exige un build real dentro
+> del gate y una inspección de etiquetas no es un build. Hoy `.aos/verify.json` incluye
+> `node scripts/aos/verify-image-build.mjs`, que construye el target oficial `twenty`.
+> Ver [§ CRM-004-fix2 y fix3](#crm-004-fix2-y-fix3-lo-corregido-y-lo-medido-después).
 
 La imagen que usa el perfil local la construye Compose por el camino real
-(`local.ps1 -Action Start` → `docker compose up --build -d`), con la etiqueta
-`aos-crm-local/twenty:v2.51.0-15e4826d3b` y las etiquetas de procedencia de AOS.
+(`local.ps1 -Action Start` → `docker compose up --build -d`), con las etiquetas de
+procedencia de AOS. La referencia era `aos-crm-local/twenty:v2.51.0-15e4826d3b`, **que es
+la que fix2 dejó de usar**: cada commit de AOS sobre el mismo pin produce bytes distintos y
+esa etiqueta se sobrescribía. Hoy la referencia lleva también el commit de AOS
+(`...-aos<12 hex>`); ver la sección de fix2/fix3.
 
 ### Typecheck real de `twenty-server`
 
@@ -222,3 +230,101 @@ lo typechequea upstream, y `verify-server-typecheck.mjs` corre `tsgo -p tsconfig
 directo —nunca `nx typecheck`, que podría imprimir un verde desde la caché— y además exige
 que un fichero canario deliberadamente mal tipado **aparezca** entre los errores de una
 segunda pasada. Un `tsgo` que sale 0 sobre el código y sobre el canario no midió nada.
+
+> **Corregido en fix2: ese typecheck no estaba limpio.** Lo de arriba omite que fix1 dejaba
+> una concesión: permitía el `TS2307` de
+> `scripts/build-seed-front-components.ts` sobre `twenty-sdk/front-component-renderer/build`
+> porque el entorno no construía el SDK. No era un error intrínseco del código, era un
+> artefacto de dependencia ausente —el propio target `twenty-server:typecheck` de upstream
+> depende de `^build`— y llamar "limpia" a esa corrida fue incorrecto. Ver la sección
+> siguiente.
+
+## CRM-004-fix2 y fix3: lo corregido y lo medido después
+
+28 de octubre de 2026, misma distro y mismo checkout. Esta sección **corrige** afirmaciones
+de las anteriores; lo anterior se conserva como registro, no como estado vigente.
+
+### Lo que estaba mal escrito arriba
+
+| Afirmación anterior | Estado real |
+| --- | --- |
+| "construir no es un comando del gate" | Lo es desde fix2: `node scripts/aos/verify-image-build.mjs` construye el target oficial `twenty` con el mismo contexto, arg y etiquetas que Compose, y comprueba los artefactos **dentro** de la imagen resultante |
+| La imagen se llama `aos-crm-local/twenty:v2.51.0-15e4826d3b` | Esa referencia base ya no se usa: la reescribía cada commit de AOS. Hoy incluye el commit (`-aos<12 hex>`) y `verify-image-provenance.mjs` rechaza la referencia base sola |
+| El typecheck de fix1 era limpio | No lo era: llevaba una concesión por módulo ausente, retirada en fix2 |
+
+### Typecheck sin concesión
+
+fix2 suministró el artefacto en vez de permitir su ausencia:
+`scripts/aos/typecheck-sources.Dockerfile` ejecuta la **mitad de declaraciones del target
+oficial** de `twenty-sdk` (`tsgo --declaration --emitDeclarationOnly` + `tsc-alias`,
+verbatim de su `project.json`), sin stubs ni `.d.ts` escritos a mano, y el self-test lo
+comprueba contra el `project.json` real. No hay lista de módulos permitidos: `tsgo` tiene
+que salir 0 sobre `tsconfig.json`. El parser además falla cerrado si el build de
+dependencias no salió 0, si el contenedor no completó, o si el compilador salió distinto de
+0 sin imprimir diagnósticos (el caso `exit 137` que fix1 certificaba como verde).
+
+Tiempos registrados por el worker de fix2 en este host: build de fuentes/SDK en frío 562 s,
+`tsgo -p tsconfig.json` 609 s, pasada del canario 273 s. **Límite honesto:** el coordinador
+no volvió a ejecutar el typecheck real ni el build real sobre `6e0d50b6`, y fix3 tampoco los
+re-midió porque no modificó esos dos comandos. Son medidas de una sola corrida, no
+confirmadas por una segunda.
+
+### Specs de privacidad: el camino de fuentes, medido antes y después
+
+`verify-server-specs.mjs` copiaba las cuatro workspaces con `cp -r` desde montajes RO de
+`/mnt/c` en cada corrida:
+
+| Corrida | Resultado |
+| --- | --- |
+| Antes, coordinador (19:07 UTC) | **exit 124** al agotar la cota de 1200 s; el contenedor seguía en `cp -r` 21 min después, al 0,9 % de CPU |
+| Antes, reproducido en fix3 | **>600 s sin terminar**; a los 10 min 13 s el proceso seguía siendo `cp -r` con 19 s de CPU acumulado (14.545 ficheros por corrida cruzando drvfs) |
+| Después (fuentes en capa, árbol nuevo para la caché) | **192 s, exit 0**, 2/2 suites y 4/4 tests (deps 22 s, imagen de fuentes 134 s, jest 36 s) |
+| Después (estado estable, dos corridas seguidas) | **67 s y 75 s, exit 0**, con todos los pasos pesados `CACHED` |
+
+Lo que se mide no cambió: los mismos dos specs, el mismo árbol `server-deps` del Dockerfile
+oficial, `--network none` y un build de dependencias cuyo exit 0 sigue siendo obligatorio.
+
+Un detalle medido que vale para cualquier verificador con este patrón: BuildKit adjunta una
+atestación de procedencia cuyo contenido incluye marcas de tiempo del build, así que un
+rebuild **con todas las capas en caché** produce un image id distinto (medido:
+`63d83413` → `5a2585be`). Con `FROM <imagen-de-deps>` eso invalida la capa de fuentes en
+cada corrida. Con las atestaciones apagadas en esas imágenes internas del gate, el rebuild
+cacheado es idéntico byte a byte y la capa de fuentes se reutiliza: construyendo las mismas
+fuentes desde **dos commits distintos** se obtuvo el mismo digest de configuración en 0,1 s.
+`verify-server-typecheck.mjs` comparte el patrón y **no** se tocó en fix3 (no estaba en
+rojo); su imagen de fuentes sigue reconstruyéndose en cada commit por este mismo motivo.
+Queda anotado para que el coordinador decida, no aplicado por cuenta propia.
+
+### Arranque: la ventana de salud se dimensionó con el peor caso medido
+
+`local.ps1 -Action Start` salió 1 con "container aos-crm-local-server-1 is unhealthy" y dejó
+el worker en `Created`; dos minutos después el servidor estaba `healthy`. Medido: el
+entrypoint oficial arranca Nest **cuatro veces** (init/migraciones, upgrade, flush,
+cron:register) a ~2 min cada una, y el servidor escucha **516 s (8,6 min)** después de
+arrancar el contenedor, con `upgrade 1/1 ok`, 0 fallos y sin reinicio. La ventana efectiva
+era `start_period` 300 s + 20 x 5 s ≈ 400 s.
+
+fix3 fija `start_period: 900s` en `deploy/local/compose.yaml`: los 516 s medidos con un
+margen de 1,74x, deliberadamente mayor que la variabilidad del host porque esa corrida
+tenía la base de datos ya migrada y un volumen frío ejecuta todas las migraciones por
+primera vez. `interval`/`timeout`/`retries`, el test del healthcheck y el entrypoint oficial
+**no se tocaron**, así que un servidor que muere después de escuchar sigue siendo
+`unhealthy` en 100 s. Además, `Start`/`Restart` ya no toman el exit code de Compose como
+veredicto completo: leen `docker compose ps --format json --all` y distinguen "aún
+arrancando" (running + health starting) de "caído" (created/exited/restarting/unhealthy),
+con el estado y el `RestartCount` de cada servicio en el informe.
+
+### Límites que se conservan
+
+- **La primera captura de tráfico mezcló build y arranque.** La compatibilidad de las IPs
+  con la infraestructura de Docker no atribuye cada conexión a un proceso de la aplicación;
+  la ventana limpia posterior no prueba retroactivamente que en aquella no hubiera egress de
+  la app. La atribución inicial está registrada como trabajo de **CRM-005**, sobre recursos
+  sintéticos dedicados y sin build en la ventana.
+- **El gate interrumpido de `aea47607` no es un fallo de código.** Su `verify-server-specs`
+  salió 1 sin stdout inmediatamente después de que el coordinador terminara de forma
+  controlada la distro para recuperar el canal de exec de WSL; ver
+  [.aos/reports/CRM-004-WSL-EXEC-RECOVERY.md](../../../.aos/reports/CRM-004-WSL-EXEC-RECOVERY.md).
+  Hay que re-ejecutarlo, no atribuirle una causa establecida.
+- El inventario de dependencias sigue siendo presencia cruzada con avisos conocidos: no es
+  un SBOM ni un escáner de la imagen.

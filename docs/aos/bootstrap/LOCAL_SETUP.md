@@ -170,6 +170,73 @@ y comprueba que el `serverUrl` **efectivo** que la aplicación entrega al fronte
 puerto publicado, y que `analyticsEnabled` es `false` y el DSN de Sentry está vacío en
 ejecución, no solo en `privacy.env`.
 
+## Actualización CRM-004-fix2 y fix3 (28 de octubre de 2026)
+
+Lo de arriba (§ CRM-004-fix1) sigue siendo el procedimiento. Esto corrige y añade lo que
+se midió después. El informe del track es
+[.aos/reports/CRM-004-fix3.md](../../../.aos/reports/CRM-004-fix3.md).
+
+### `Start` y `Restart`: qué bloquean ahora, y qué cuentan como arranque
+
+- **Una versión de aplicación que el servidor no sabe parsear bloquea antes del `up`.**
+  `Main` ya calculaba la señal en fix1, pero ni `Invoke-StartAction` ni
+  `Invoke-RestartAction` la **declaraban**: PowerShell recoge en silencio un parámetro
+  nombrado que una función no declara, así que el valor no llegaba al veredicto y ambos
+  caminos ejecutaban `up` sobre una configuración que el servidor rechaza al arrancar. Ya se
+  propaga, y la orquestación real —no solo el agregador puro— está cubierta por self-test.
+- **Si el guardián de la sesión no se puede confirmar, no hay `up`.** Y en `Stop`, un
+  guardián que no se puede liberar sale con código propio en vez de pasar por éxito.
+- **El guardián se busca y se libera por su línea de comandos exacta** (`pgrep -x -f` /
+  `pkill -x -f` con los metacaracteres escapados): antes un patrón sin anclar podía casar
+  cualquier línea que lo contuviera.
+- **La ventana de arranque se dimensionó con el peor arranque medido.** El entrypoint
+  oficial arranca Nest cuatro veces y el servidor escucha a los 516 s (8,6 min); la ventana
+  era de ~400 s, así que `up` salía 1 ("server is unhealthy") sobre un stack que estaba
+  simplemente migrando y dejaba el worker en `Created`. Hoy `start_period` es 900 s
+  (`deploy/local/compose.yaml`), con `interval`/`timeout`/`retries` intactos: la detección
+  de un servidor que muere **después** de escuchar sigue siendo de 100 s.
+- **El exit code de Compose ya no es el veredicto completo.** `Start`/`Restart` leen
+  `docker compose ps --format json --all` y responden una sola pregunta: ¿está el stack
+  arriba? Un worker que nunca arrancó no es un arranque correcto aunque Compose salga 0; un
+  stack todavía dentro de su ventana de salud se informa como **aún arrancando**, no como
+  caído; y un estado que no se pudo leer no se cuenta como arriba. El informe incluye el
+  estado y el `RestartCount` de cada servicio.
+
+Si `Start` dice "STILL STARTING", lo correcto es volver a consultar
+`local.ps1 -Action Status` en unos minutos, no concluir que algo falló.
+
+### La distro recién despertada no es una distro lista
+
+WSL apaga una distro cuando sale su último proceso, así que un gate puede pillarla
+arrancando. Pasó: `preflight-host.ps1` salió 1 informando que el HEAD de Linux no coincidía
+y que `.aos` no era alcanzable, con el aviso `wsl: Failed to start the systemd user session
+for 'root'` **dentro del valor medido**; a mano, segundos después, coincidía. Ahora el
+preflight espera con cota de 120 s a que `systemctl is-system-running` deje de estar en
+`starting` **y** a que el lado Linux devuelva exactamente una línea de 40 hex igual al HEAD
+de Windows, y solo entonces comprueba `.aos`. Sigue fallando cerrado: una distro que no
+termina de arrancar, un estado de systemd que no se puede leer o un HEAD genuinamente
+distinto son fallos, y el informe dice cuál de ellos fue. No se toca la configuración
+global de WSL.
+
+### Imagen por commit
+
+La referencia local incluye el commit de AOS (`...-aos<12 hex>`), no solo el pin de
+upstream: cada commit sobre el mismo pin produce bytes distintos y la etiqueta base se
+sobrescribía. `verify-image-provenance.mjs` rechaza la referencia base sola, y el gate
+**construye** el target oficial (`verify-image-build.mjs`) en vez de limitarse a inspeccionar
+etiquetas.
+
+### Camino E2E
+
+13/13 (`node --test scripts/aos/test/crm-runtime-e2e.test.mjs`), 390 s medidos por el
+coordinador sobre `6e0d50b6`. Lo que fix2 añadió es la regresión **exacta** del advisory de
+body-parser (frame comprimido válido + bytes posteriores, con el fallo retardado), y lo que
+comprueba es supervivencia del proceso real: mismo contenedor, mismo pid, mismo
+`RestartCount` y una operación autenticada después. El alta pública rechazada se comprueba
+por presencia booleana con mensaje fijo, nunca comparando el objeto devuelto: la única forma
+de que esa aserción falle es un alta inesperada que sí triunfó, y volcar su valor imprimiría
+tokens.
+
 ### Captura de destinos, lista antes del primer arranque
 
 `.aos/onboarding/bootstrap-2026-10-27/capture-crm-egress.py` registra solo **a dónde** van
