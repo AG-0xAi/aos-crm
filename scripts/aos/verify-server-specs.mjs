@@ -36,6 +36,18 @@ const DISTRO = process.env.AOS_CRM_DISTRO || 'AOS-CRM-Ubuntu-24.04';
 const DEPS_IMAGE = 'aos-crm-local/server-deps:gate';
 const SOURCES_IMAGE = 'aos-crm-local/server-specs:gate';
 const SOURCE_TAR = '/tmp/aos-crm-server-specs-sources.tar';
+// Without this, BuildKit attaches a provenance attestation whose contents
+// include the build's own timestamps, so a FULLY CACHED rebuild of the
+// dependency image still produces a new image id (measured on 2026-10-28:
+// 63d83413 -> 5a2585be with every layer CACHED). `FROM ${DEPS_IMAGE}` then
+// changes on every run and the source layer below can never be reused -- which
+// is why the first fix3 run still paid 81 s of workspace build and 74 s of
+// export per gate. With attestations off, a cached dependency rebuild is
+// byte-identical and the source layer is keyed on the sources alone: measured
+// by building the same sources from two DIFFERENT commits, the second came back
+// as the same image config digest in 0.1 s. These are the gate's own throwaway
+// images; the application artifact is built by compose and is untouched.
+const NO_ATTESTATION = '--provenance=false';
 const SPECS = [
   'src/engine/core-modules/telemetry/__tests__/telemetry.service.spec.ts',
   'src/engine/core-modules/twenty-config/__tests__/twenty-config.service.spec.ts',
@@ -49,11 +61,13 @@ const EXPECTED_SUITES = SPECS.length;
 // own deadlines and tears down ONLY the container it named itself. Their sum
 // stays under the gate quota, which is what makes the teardown happen here
 // instead of after the harness has already killed the process.
-// Measured on this host, 2026-10-28 (fix3), whole command 192 s cold: warm
-// server-deps rebuild 22 s (a cold one re-installs the focus and took 353 s in
-// fix1), cold source/dependency-build image 134 s of which 81 s is the
-// workspace build (a warm one is a layer cache hit), jest 36 s. The budgets
-// are those numbers with room for a cold cache, not round guesses.
+// Measured on this host, 2026-10-28 (fix3): 192 s on a source tree the cache
+// has not seen (server-deps rebuild 22 s, source/dependency-build image 134 s
+// of which 81 s is the workspace build, jest 36 s) and 67 s / 75 s on two
+// consecutive steady-state runs, where every heavy step comes back CACHED and
+// the cost is the deps rebuild plus jest. A cold server-deps re-installs the
+// focus and took 353 s in fix1. The budgets are those numbers with room for a
+// cold cache, not round guesses.
 const DEPS_BUILD_TIMEOUT_MS = Number(process.env.AOS_CRM_SPECS_DEPS_TIMEOUT_MS || 420_000);
 const SOURCES_BUILD_TIMEOUT_MS = Number(process.env.AOS_CRM_SPECS_SOURCES_TIMEOUT_MS || 420_000);
 const RUN_TIMEOUT_MS = Number(process.env.AOS_CRM_SPECS_RUN_TIMEOUT_MS || 300_000);
@@ -201,7 +215,7 @@ function run() {
   const depsBuild = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(root)}; ` +
     `tar -cf - ${depsPaths} | ` +
-    `docker build --target server-deps -f packages/twenty-docker/twenty/Dockerfile -t ${DEPS_IMAGE} -`,
+    `docker build ${NO_ATTESTATION} --target server-deps -f packages/twenty-docker/twenty/Dockerfile -t ${DEPS_IMAGE} -`,
   ], { stdio: ['ignore', 'inherit', 'inherit'], timeout: DEPS_BUILD_TIMEOUT_MS });
   const depsBuildStatus = depsBuild.status;
   if (depsBuildStatus !== 0) fail(`docker build --target server-deps exited ${depsBuildStatus ?? 'unmeasured'}`);
@@ -220,7 +234,7 @@ function run() {
     `set -e; cd ${JSON.stringify(root)}; rm -f ${SOURCE_TAR}; ` +
     `git archive --format=tar -o ${SOURCE_TAR} HEAD -- ${archivePaths}; ` +
     `tar --append -f ${SOURCE_TAR} scripts/aos/server-specs-sources.Dockerfile; ` +
-    `docker build --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f scripts/aos/server-specs-sources.Dockerfile ` +
+    `docker build ${NO_ATTESTATION} --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f scripts/aos/server-specs-sources.Dockerfile ` +
     `-t ${SOURCES_IMAGE} - < ${SOURCE_TAR}; rm -f ${SOURCE_TAR}`,
   ], { stdio: ['ignore', 'inherit', 'inherit'], timeout: SOURCES_BUILD_TIMEOUT_MS });
   const sourcesBuildStatus = sourcesBuild.status;
@@ -364,6 +378,12 @@ function selfTest() {
       'the workspace dependency build changed shape; the specs would resolve whatever the layer happens to carry');
     assert(/find \/app\/packages\/twenty-shared\/dist/.test(instructions),
       'the source image no longer proves the dependency artifacts it exists to produce');
+  });
+  record('both builds disable the attestation that would make a cached rebuild non-reproducible', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    assert(NO_ATTESTATION === '--provenance=false', `the attestation opt-out changed shape: ${NO_ATTESTATION}`);
+    const builds = [...source.matchAll(/docker build \$\{NO_ATTESTATION\}/g)];
+    assert(builds.length === 2, `expected both docker builds to pass it, found ${builds.length}`);
   });
   record('the specs, their config and the no-network isolation are unchanged by the fix3 source change', () => {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
