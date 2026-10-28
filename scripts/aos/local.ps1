@@ -364,6 +364,73 @@ function Test-ServerOwnsPublishedPort {
   return $false
 }
 
+# Reads one field out of a `docker compose ps --format json` record,
+# case-insensitively (the key casing is Compose's, not ours) and without
+# throwing on a record that simply does not carry it.
+function Get-ComposePsField {
+  param([object] $Entry, [string] $Name, $Default = $null)
+  $prop = $Entry.PSObject.Properties | Where-Object { $_.Name -ieq $Name } | Select-Object -First 1
+  if ($null -eq $prop -or $null -eq $prop.Value) { return $Default }
+  return $prop.Value
+}
+
+# Pure: turns `docker compose ps --format json --all` output into the one
+# question Start/Restart have to answer -- is this stack actually up? -- and
+# keeps "still starting" distinct from "down".
+#
+# Why it exists: on 2026-10-28 `up` exited 1 because the server exceeded its
+# health window, and the orchestration reported only that exit code while the
+# worker sat in Created and the server went on to become healthy two minutes
+# later. An exit code alone cannot tell those two apart, and a Start that says
+# nothing about the worker can "succeed" with no worker running at all.
+#
+# A service is up only when it is running AND its healthcheck is not failing
+# (a service without a healthcheck reports no health, which is not a failure).
+# Anything that is not running -- created, exited, restarting, paused, dead --
+# is down, and its RestartCount travels into the detail so a crash loop is
+# visible rather than inferred. Required services with no record at all are
+# down too: this must fail closed, never on an empty read.
+function Get-StackReadiness {
+  param([string] $PsJsonOutput, [string[]] $RequiredServices = @('server', 'worker'))
+  $observed = [ordered]@{}
+  foreach ($line in ($PsJsonOutput -split "`r?`n")) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try { $entry = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+    $service = [string](Get-ComposePsField -Entry $entry -Name 'Service' -Default '')
+    if ([string]::IsNullOrWhiteSpace($service)) { continue }
+    $observed[$service] = [ordered]@{
+      State        = ([string](Get-ComposePsField -Entry $entry -Name 'State' -Default '')).ToLowerInvariant()
+      Health       = ([string](Get-ComposePsField -Entry $entry -Name 'Health' -Default '')).ToLowerInvariant()
+      RestartCount = [int](Get-ComposePsField -Entry $entry -Name 'RestartCount' -Default 0)
+    }
+  }
+  $parts = [System.Collections.Generic.List[string]]::new()
+  $verdicts = [System.Collections.Generic.List[string]]::new()
+  foreach ($name in $RequiredServices) {
+    if (-not $observed.Contains($name)) {
+      $verdicts.Add('down') | Out-Null
+      $parts.Add("${name}: no container at all") | Out-Null
+      continue
+    }
+    $info = $observed[$name]
+    $verdict = if ($info.State -ne 'running') { 'down' }
+      elseif ($info.Health -eq 'starting') { 'starting' }
+      elseif ($info.Health -eq 'unhealthy') { 'down' }
+      else { 'up' }
+    $verdicts.Add($verdict) | Out-Null
+    $health = if ($info.Health) { "/$($info.Health)" } else { '' }
+    $parts.Add("${name}: $($info.State)$health (restarts $($info.RestartCount))") | Out-Null
+  }
+  $ready = (@($verdicts | Where-Object { $_ -ne 'up' }).Count -eq 0)
+  $starting = (-not $ready) -and (@($verdicts | Where-Object { $_ -eq 'down' }).Count -eq 0)
+  return [ordered]@{
+    Ready    = $ready
+    Starting = $starting
+    Detail   = ($parts -join '; ')
+    Services = $observed
+  }
+}
+
 # Aggregates every gate signal into one fail-closed verdict. Pure: no I/O,
 # so -SelfTest can cover every combination without touching the host.
 function Get-StartGateVerdict {
@@ -437,6 +504,7 @@ function Invoke-StartAction {
     [string] $PrivacyVerifierStatus,
     [scriptblock] $ComposeInvoker,
     [scriptblock] $KeeperInvoker = {},
+    [scriptblock] $StackProbe = {},
     [bool] $PortConfigValid = $true,
     [bool] $AppVersionAcceptable = $true
   )
@@ -445,7 +513,7 @@ function Invoke-StartAction {
     -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid `
     -AppVersionAcceptable $AppVersionAcceptable
   if (-not $verdict.Proceed) {
-    return [ordered]@{ Invoked = $false; Verdict = $verdict }
+    return [ordered]@{ Invoked = $false; Verdict = $verdict; Stack = $null }
   }
   # Before `up`, not after: the session that has to outlive this process must
   # already be open when the containers start.
@@ -458,10 +526,17 @@ function Invoke-StartAction {
       Proceed  = $false
       Blockers = @("keeper: the distro session keeper could not be confirmed (state: $($script:KeeperState ?? 'not reported')); refusing to start a stack that would die with the WSL idle window")
     }
-    return [ordered]@{ Invoked = $false; Verdict = $keeperVerdict }
+    return [ordered]@{ Invoked = $false; Verdict = $keeperVerdict; Stack = $null }
   }
   & $ComposeInvoker | Out-Host
-  return [ordered]@{ Invoked = $true; Verdict = $verdict }
+  # `up` returning is not a started stack (see Get-StackReadiness). This probe
+  # is captured rather than streamed: it is a read-only query whose JSON is the
+  # verdict, and joining the native string[] with a newline keeps the JSON
+  # Lines shape its parser splits on.
+  return [ordered]@{
+    Invoked = $true; Verdict = $verdict
+    Stack = (Get-StackReadiness -PsJsonOutput ((@(& $StackProbe) -join "`n")))
+  }
 }
 
 # Stop is the only action that releases the distro session, and only once
@@ -514,6 +589,7 @@ function Invoke-RestartAction {
     [scriptblock] $PortFreeAfterDownProbe,
     [scriptblock] $UpInvoker,
     [scriptblock] $KeeperInvoker = {},
+    [scriptblock] $StackProbe = {},
     [bool] $PortConfigValid = $true,
     [bool] $AppVersionAcceptable = $true
   )
@@ -554,7 +630,10 @@ function Invoke-RestartAction {
     return [ordered]@{ Stage = 'blocked-keeper-failed'; Verdict = $keeperVerdict; ExitCode = 1 }
   }
   & $UpInvoker | Out-Host
-  return [ordered]@{ Stage = 'started'; Verdict = $verdict }
+  return [ordered]@{
+    Stage = 'started'; Verdict = $verdict
+    Stack = (Get-StackReadiness -PsJsonOutput ((@(& $StackProbe) -join "`n")))
+  }
 }
 
 # Refuses to recursively delete anything that is not, right now, a real
@@ -811,6 +890,58 @@ function Stop-DistroKeeper {
   return 'failed'
 }
 
+# Asks Compose for the state of EVERY service of this project, including the
+# ones that are not running (`--all`): a worker left in Created is exactly what
+# a success verdict must not miss. Returns the raw JSON Lines text, or '' if it
+# could not be read at all -- which Get-StackReadiness treats as "not up".
+function Get-ComposePsJson {
+  param([string] $RepoRoot, [string] $Distro)
+  $linuxRootRaw = & wsl.exe -d $Distro --exec wslpath -a $RepoRoot
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linuxRootRaw)) { return '' }
+  $composePath = "$($linuxRootRaw.Trim())/$ComposeRelPath"
+  $out = & wsl.exe -d $Distro --exec docker compose -f $composePath -p $ProjectName ps --format json --all 2>$null
+  if ($LASTEXITCODE -ne 0) { return '' }
+  return (@($out) -join "`n")
+}
+
+# Reports what the stack is actually doing after a mutating action. A compose
+# exit code is preserved when it is non-zero, but it is never the whole answer:
+# a zero exit with a worker in Created is not a started stack, and a non-zero
+# exit on a stack still inside its health window is "still starting", not
+# "crashed". Both end non-zero here -- this only refuses to call either of them
+# success, and says which one it saw.
+#
+# The exit code travels out via $script:StackExitCode, not a return value, for
+# the same reason as $script:ComposeExitCode: this function writes to the
+# output stream, and capturing its result would collect those lines into the
+# caller's value (the array leak this file has hit before).
+function Write-StackOutcome {
+  param(
+    [string] $Action,
+    [System.Collections.Specialized.OrderedDictionary] $Stack,
+    [int] $ComposeExitCode
+  )
+  Write-Output "aos-crm-local services: $($Stack.Detail)"
+  if ($ComposeExitCode -ne 0) {
+    if ($Stack.Starting) {
+      Write-Output "aos-crm-local: compose $Action exited $ComposeExitCode, but no service is down: the stack is STILL STARTING inside its health window. Re-check with -Action Status before concluding anything failed."
+    } elseif ($Stack.Ready) {
+      Write-Output "aos-crm-local: compose $Action exited $ComposeExitCode even though every required service is up; not reported as success."
+    } else {
+      Write-Output "aos-crm-local: compose $Action exited $ComposeExitCode and the stack is NOT up."
+    }
+    $script:StackExitCode = $ComposeExitCode
+    return
+  }
+  if ($Stack.Ready) { $script:StackExitCode = 0; return }
+  if ($Stack.Starting) {
+    Write-Output "aos-crm-local: compose $Action exited 0 but the stack is still starting; not reported as a completed start."
+  } else {
+    Write-Output "aos-crm-local: compose $Action exited 0 while a required service is NOT running; not reported as success."
+  }
+  $script:StackExitCode = 1
+}
+
 # Runs as a BARE statement at every call site (never assigned, never wrapped
 # in parens): capturing a PowerShell call's output is how you consume it
 # instead of letting it stream live, and `docker compose logs --follow`
@@ -902,6 +1033,7 @@ function Invoke-Main {
         -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
         -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid -AppVersionAcceptable $signals.AppVersionAcceptable `
         -KeeperInvoker { $script:KeeperState = Start-DistroKeeper -Distro $Distro; Write-Output "distro session keeper: $script:KeeperState" } `
+        -StackProbe { Get-ComposePsJson -RepoRoot $RepoRoot -Distro $Distro } `
         -ComposeInvoker {
           if (-not (Update-SourceStamp -RepoRoot $RepoRoot -EnvPath $EnvPath)) {
             Write-Output 'aos-crm-local: could not stamp the source commit/tree into deploy/local/.env; refusing to build an image nobody can trace back to a source.'
@@ -915,7 +1047,9 @@ function Invoke-Main {
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit 1
       }
-      exit $script:ComposeExitCode
+      # Bare statement, then the code: see Write-StackOutcome.
+      Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode $script:ComposeExitCode
+      exit $script:StackExitCode
     }
     'Stop' {
       $result = Invoke-StopAction `
@@ -936,6 +1070,7 @@ function Invoke-Main {
         -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
         -PortFreeAfterDownProbe { Test-PortFree -Port $signals.ResolvedPort } `
         -KeeperInvoker { $script:KeeperState = Start-DistroKeeper -Distro $Distro; Write-Output "distro session keeper: $script:KeeperState" } `
+        -StackProbe { Get-ComposePsJson -RepoRoot $RepoRoot -Distro $Distro } `
         -UpInvoker {
           if (-not (Update-SourceStamp -RepoRoot $RepoRoot -EnvPath $EnvPath)) {
             Write-Output 'aos-crm-local: could not stamp the source commit/tree into deploy/local/.env; refusing to build an image nobody can trace back to a source.'
@@ -949,7 +1084,9 @@ function Invoke-Main {
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit $result.ExitCode
       }
-      exit $script:ComposeExitCode
+      # Bare statement, then the code: see Write-StackOutcome.
+      Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode $script:ComposeExitCode
+      exit $script:StackExitCode
     }
     'Logs' {
       $logsArgs = @('logs')
@@ -1290,6 +1427,141 @@ function Invoke-SelfTest {
         -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $false } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'blocked-after-down') { throw "expected Stage=blocked-after-down, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe') { throw "expected down,probe without up, got $($order -join ',')" }
+    }
+
+    # CRM-004 fix3. `up` exited 1 on a server that was merely still inside its
+    # health window, the worker was left in Created, and the orchestration
+    # reported only that exit code. A started stack is now a measured claim.
+    Record 'Get-StackReadiness: both services running and healthy is the only thing read as up' {
+      $json = @(
+        '{"Service":"server","State":"running","Health":"healthy","RestartCount":0}',
+        '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+      ) -join "`n"
+      $r = Get-StackReadiness -PsJsonOutput $json
+      if (-not $r.Ready) { throw "expected Ready=true, got detail: $($r.Detail)" }
+      if ($r.Starting) { throw 'a ready stack must not also report Starting' }
+    }
+
+    Record 'Get-StackReadiness: a worker left in Created is NOT a started stack, however healthy the server is (the exact 18:36 UTC defect)' {
+      $json = @(
+        '{"Service":"server","State":"running","Health":"healthy","RestartCount":0}',
+        '{"Service":"worker","State":"created","Health":"","RestartCount":0}'
+      ) -join "`n"
+      $r = Get-StackReadiness -PsJsonOutput $json
+      if ($r.Ready) { throw 'expected Ready=false with the worker in Created' }
+      if ($r.Starting) { throw 'a worker that was never started is down, not "still starting"' }
+      if ($r.Detail -notmatch 'worker: created') { throw "expected the worker state in the detail, got: $($r.Detail)" }
+    }
+
+    Record 'Get-StackReadiness: "still starting" is distinguished from "down" by state and health' {
+      $starting = Get-StackReadiness -PsJsonOutput (@(
+        '{"Service":"server","State":"running","Health":"starting","RestartCount":0}',
+        '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+      ) -join "`n")
+      if ($starting.Ready) { throw 'a server inside its health window is not up yet' }
+      if (-not $starting.Starting) { throw 'expected Starting=true for a server still inside its health window' }
+
+      $unhealthy = Get-StackReadiness -PsJsonOutput (@(
+        '{"Service":"server","State":"running","Health":"unhealthy","RestartCount":0}',
+        '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+      ) -join "`n")
+      if ($unhealthy.Starting) { throw 'an unhealthy server is down, not still starting' }
+      if ($unhealthy.Ready) { throw 'an unhealthy server is not up' }
+    }
+
+    Record 'Get-StackReadiness: a crash-looping service is down and its RestartCount is reported, not inferred' {
+      $r = Get-StackReadiness -PsJsonOutput (@(
+        '{"Service":"server","State":"restarting","Health":"","RestartCount":7}',
+        '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+      ) -join "`n")
+      if ($r.Ready -or $r.Starting) { throw 'a restarting service is down' }
+      if ($r.Detail -notmatch 'restarts 7') { throw "expected the restart count in the detail, got: $($r.Detail)" }
+    }
+
+    Record 'Get-StackReadiness: an unreadable or empty `compose ps` fails closed instead of reading as up' {
+      foreach ($output in @('', '   ', 'not json at all', '{"Service":"db","State":"running","Health":"healthy"}')) {
+        $r = Get-StackReadiness -PsJsonOutput $output
+        if ($r.Ready) { throw "expected Ready=false for output '$output'" }
+        if ($r.Starting) { throw "expected Starting=false for output '$output': nothing was measured" }
+      }
+    }
+
+    Record 'Invoke-StartAction: a stack whose worker never started is not reported as a successful start, and the compose exit code is not the whole verdict' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $script:KeeperState = 'started' } -ComposeInvoker { $script:ComposeExitCode = 0 } `
+        -StackProbe {
+          @(
+            '{"Service":"server","State":"running","Health":"healthy","RestartCount":0}',
+            '{"Service":"worker","State":"created","Health":"","RestartCount":0}'
+          )
+        }
+      if (-not $result.Invoked) { throw 'expected the gate to have let up run' }
+      if ($result.Stack.Ready) { throw 'expected the orchestration itself to report a stack that is not up' }
+      Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode 0 *> $null
+      if ($script:StackExitCode -eq 0) { throw 'a compose exit 0 with no worker running must not exit 0' }
+    }
+
+    Record 'Invoke-StartAction: a started stack probed as running and healthy does exit 0 (the fix does not block a good start)' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $script:KeeperState = 'started' } -ComposeInvoker { $script:ComposeExitCode = 0 } `
+        -StackProbe {
+          @(
+            '{"Service":"server","State":"running","Health":"healthy","RestartCount":0}',
+            '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+          )
+        }
+      if (-not $result.Stack.Ready) { throw "expected Ready=true, got: $($result.Stack.Detail)" }
+      Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode 0 *> $null
+      if ($script:StackExitCode -ne 0) { throw "expected exit 0 for a fully started stack, got $($script:StackExitCode)" }
+    }
+
+    Record 'Invoke-StartAction: a stack that could not be probed at all is not a successful start (fail-closed default)' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $script:KeeperState = 'started' } -ComposeInvoker { $script:ComposeExitCode = 0 }
+      if ($result.Stack.Ready -or $result.Stack.Starting) { throw 'an unprobed stack must not be read as up or starting' }
+      Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode 0 *> $null
+      if ($script:StackExitCode -eq 0) { throw 'expected a non-zero exit when the stack state was never measured' }
+    }
+
+    Record 'Invoke-RestartAction: the same post-up measurement applies to Restart, and a still-starting stack is not called crashed' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $script:ComposeExitCode = 0 } -PortFreeAfterDownProbe { $true } `
+        -KeeperInvoker { $script:KeeperState = 'started' } -UpInvoker { $script:ComposeExitCode = 1 } `
+        -StackProbe {
+          @(
+            '{"Service":"server","State":"running","Health":"starting","RestartCount":0}',
+            '{"Service":"worker","State":"running","Health":"","RestartCount":0}'
+          )
+        }
+      if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
+      if (-not $result.Stack.Starting) { throw 'expected the restart to report a stack still starting' }
+      $output = Write-StackOutcome -Action 'up' -Stack $result.Stack -ComposeExitCode 1 *>&1
+      if ($script:StackExitCode -ne 1) { throw "expected the compose exit code 1 to be preserved, got $($script:StackExitCode)" }
+      if (($output -join ' ') -notmatch 'STILL STARTING') { throw "expected the report to distinguish still-starting from down, got: $($output -join ' ')" }
+    }
+
+    Record 'the startup health window in the real compose.yaml covers the worst start measured on this host' {
+      $compose = Get-Content -LiteralPath (Join-Path $RepoRootForSelfTest $ComposeRelPath) -Raw
+      $startPeriod = [int]([regex]::Match($compose, 'start_period:\s*(\d+)s').Groups[1].Value)
+      $interval = [int]([regex]::Match($compose, 'healthcheck:[\s\S]*?interval:\s*(\d+)s').Groups[1].Value)
+      $retries = [int]([regex]::Match($compose, 'healthcheck:[\s\S]*?retries:\s*(\d+)').Groups[1].Value)
+      if ($startPeriod -le 0 -or $interval -le 0 -or $retries -le 0) { throw "could not read the server healthcheck window out of compose.yaml (start_period=$startPeriod interval=$interval retries=$retries)" }
+      # 516 s is the measured worst case: the official entrypoint boots Nest
+      # four times before the server listens (2026-10-28, BUILD_BASELINE.md).
+      $measuredWorstCaseSeconds = 516
+      $window = $startPeriod + ($interval * $retries)
+      if ($window -le $measuredWorstCaseSeconds) { throw "the health window ($window s) does not even cover the measured worst start ($measuredWorstCaseSeconds s)" }
+      if ($startPeriod -lt $measuredWorstCaseSeconds) { throw "start_period ($startPeriod s) is below the measured worst start ($measuredWorstCaseSeconds s), so a normal cold start would count failures" }
+      # The detection of a server that dies AFTER listening must not widen with it.
+      if (($interval * $retries) -gt 300) { throw "the post-start failure window ($($interval * $retries) s) was widened; a dead server must still be caught quickly" }
     }
 
     Record 'Test-AppVersionAcceptable: the value the server would reject at boot is rejected here instead (the crash loop this track hit)' {

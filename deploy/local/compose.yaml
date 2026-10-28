@@ -94,7 +94,21 @@ services:
       # a start period, 20 x 5 s elapses first and the dependent worker is
       # refused with "dependency failed to start" on a stack that is merely
       # still migrating. Failures inside this window do not count.
-      start_period: 300s
+      #
+      # Sized from the worst start actually measured on this host, not from a
+      # fast run: on 2026-10-28 the official entrypoint booted Nest FOUR times
+      # (init/migrations, upgrade, flush, cron:register) at ~2 min each and the
+      # server began listening 8.6 min (516 s) after container start, with
+      # upgrade 1/1 ok and no restart. The window then was 300 s + 20 x 5 s
+      # (~6.7 min), so `up` gave up at 6.7 min on a server that was healthy
+      # 2 min later and left the dependent worker in Created.
+      # 900 s is that 516 s with a 1.74x margin, which is deliberately more
+      # than host jitter: the measured run had an already-migrated database,
+      # and a cold volume runs every migration for the first time.
+      # The failure detection is NOT widened with it -- interval/timeout/
+      # retries are untouched, so once the server has answered /healthz once,
+      # a server that dies is still unhealthy within 20 x 5 s.
+      start_period: 900s
 
   worker:
     <<: *aos-crm-app
