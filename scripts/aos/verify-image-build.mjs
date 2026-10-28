@@ -10,10 +10,15 @@
 // This runs the official target, the official way:
 //   docker build --target twenty -f packages/twenty-docker/twenty/Dockerfile .
 // with the same build arg and the same five labels deploy/local/compose.yaml
-// passes, from the same repo-root context, under the same image reference. The
-// stages, arguments and labels are not reimplemented here: the self-test parses
-// compose.yaml and fails if this command stops matching what the deployment
-// builds.
+// passes, from the same repo-root context. The stages, arguments and labels are
+// not reimplemented here: the self-test parses compose.yaml and fails if this
+// command stops matching what the deployment builds.
+//
+// CRM-004 fix4: under the GATE's own reference, never the deployment one. Two
+// BuildKit builds of one context do not share an image id, so building under
+// the deployment reference moved that tag onto this build while the containers
+// kept the bytes they were created from -- and the provenance gate failed on
+// bytes that were correct. See gateImageReference below.
 //
 // Cheap when nothing changed, honest when something did. The official
 // Dockerfile only ever COPYs named paths (manifests, .yarn, and the workspace
@@ -32,7 +37,7 @@
 //   node scripts/aos/verify-image-build.mjs --self-test   (no WSL/Docker)
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -46,6 +51,12 @@ const TARGET = 'twenty';
 // plus the context transfer; the cold one that produced the first image took
 // ~40 min and is recorded in docs/aos/bootstrap/BUILD_BASELINE.md.
 const BUILD_TIMEOUT_MS = Number(process.env.AOS_CRM_BUILD_TIMEOUT_MS || 3_300_000);
+// Measured in fix3 on the gate's other images: BuildKit's default provenance
+// attestation embeds its own timestamps, so even a FULLY CACHED rebuild comes
+// back with a new image id. The gate's artifact is identified by its commit
+// reference and compared by layer, so the attestation buys nothing and costs
+// reproducibility.
+const NO_ATTESTATION = '--provenance=false';
 
 // Measured inside the built image, not inferred from the target name. Each one
 // is the output of a stage that has actually failed in this track: the server
@@ -73,9 +84,30 @@ export function readEnvKeys(path) {
 
 // The same reference scripts/aos/local.ps1 derives (Get-SourcePinnedImageTag):
 // upstream version, upstream pin, and the AOS commit these bytes came from.
+// This is the DEPLOYMENT reference -- what compose builds and what the running
+// containers were created from. This command reads it, and never writes it.
 export function imageReference({ upstreamTag, upstreamSha, aosCommit }) {
   const version = String(upstreamTag).split('/').pop();
   return `aos-crm-local/twenty:${version}-${upstreamSha.slice(0, 10)}-aos${aosCommit.slice(0, 12)}`;
+}
+
+// CRM-004 fix4: where THIS command's build lands. A separate repository, same
+// commit-pinned tag shape.
+//
+// Measured 2026-10-29: building under the deployment reference moved that tag
+// onto the rebuild (image id f6f2c342) while server and worker kept running the
+// bytes they were created from (6361980c) -- same commit, same labels,
+// IDENTICAL 26 layers, two ids, because BuildKit does not give two builds of
+// one context one identity (the attestation it attaches carries its own
+// timestamps). The containerd image store then dropped the dereferenced old
+// record, so the image the stack was running could not even be inspected, and
+// verify-image-provenance.mjs failed the gate on bytes that were correct.
+// Own reference, shared layer cache: the build still measures this source, and
+// nothing the deployment runs is touched. scripts/aos/verify-image-provenance.mjs
+// imports this to find the result and compares its layers with the deployed ones.
+export function gateImageReference({ upstreamTag, upstreamSha, aosCommit }) {
+  const version = String(upstreamTag).split('/').pop();
+  return `aos-crm-local/twenty-gate:${version}-${upstreamSha.slice(0, 10)}-aos${aosCommit.slice(0, 12)}`;
 }
 
 // Pure: the verdict, so the self-test covers every rule without Docker.
@@ -162,6 +194,8 @@ function run() {
     fail(`deploy/local/.env names the image '${env.AOS_CRM_IMAGE_TAG || '(unset)'}' but this commit's artifact is '${expectedTag}'. Run scripts/aos/local.ps1 -Action Restart so the profile, the build and the running services agree on one reference.`);
   }
 
+  const gateReference = gateImageReference({ upstreamTag: provenance.tag, upstreamSha: provenance.sha, aosCommit: head });
+
   const compose = parseComposeBuild(readFileSync(COMPOSE_PATH, 'utf8'));
   if (compose.target !== TARGET || compose.dockerfile !== DOCKERFILE) {
     fail(`compose.yaml builds target '${compose.target}' from '${compose.dockerfile}'; this command builds '${TARGET}' from '${DOCKERFILE}'`);
@@ -186,16 +220,25 @@ function run() {
   if (labelArgs.length !== 10) fail(`expected compose.yaml's five build labels, parsed ${labelArgs.length / 2}`);
 
   // Same context (the repo root, filtered by .dockerignore), same Dockerfile,
-  // same target, same arg, same labels, same reference as compose: that is what
-  // makes the layer cache shared instead of a second, parallel 40-minute build.
-  console.log(`[INFO] docker build --target ${TARGET} -f ${DOCKERFILE} -t ${expectedTag} (context: the checkout root, filtered by .dockerignore)`);
+  // same target, same arg, same labels as compose: that is what makes the layer
+  // cache shared instead of a second, parallel 40-minute build. The one thing
+  // that is NOT shared is the reference. Building under the deployment one
+  // moved that tag onto this build while the containers kept running the bytes
+  // they were created from, and the provenance gate then failed on bytes that
+  // were correct (2026-10-29, see gateImageReference). The attestation opt-out
+  // is the same one the other gate images carry: without it a fully cached
+  // rebuild still produces a new image id, because the attestation carries its
+  // own timestamps.
+  console.log(`[INFO] docker build --target ${TARGET} -f ${DOCKERFILE} -t ${gateReference} (context: the checkout root, filtered by .dockerignore)`);
+  console.log(`[INFO] the deployment reference ${expectedTag} is read, never written: it stays on the bytes the stack is running`);
   const started = Date.now();
   const build = wsl(['docker', 'build',
+    NO_ATTESTATION,
     '--target', TARGET,
     '-f', `${root}/${DOCKERFILE}`,
     '--build-arg', `APP_VERSION=${appVersion}`,
     ...labelArgs,
-    '-t', expectedTag,
+    '-t', gateReference,
     root,
   ], { stdio: ['ignore', 'inherit', 'inherit'], timeout: BUILD_TIMEOUT_MS });
   const seconds = Math.round((Date.now() - started) / 1000);
@@ -211,7 +254,7 @@ function run() {
   if (build.status === 0) {
     missingArtifacts = [];
     for (const artifact of REQUIRED_ARTIFACTS) {
-      const probe = wsl(['docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'test', expectedTag, '-s', artifact]);
+      const probe = wsl(['docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'test', gateReference, '-s', artifact]);
       if (probe.status === 1) missingArtifacts.push(artifact);
       else if (probe.status !== 0) {
         missingArtifacts = null;
@@ -219,7 +262,7 @@ function run() {
         break;
       }
     }
-    const inspect = wsl(['docker', 'image', 'inspect', '--format', '{{.Id}}|{{range .Config.Env}}{{println .}}{{end}}', expectedTag]);
+    const inspect = wsl(['docker', 'image', 'inspect', '--format', '{{.Id}}|{{range .Config.Env}}{{println .}}{{end}}', gateReference]);
     if (inspect.status === 0) {
       const [id, ...envLines] = inspect.stdout.split('|');
       builtImageId = id.trim();
@@ -232,11 +275,12 @@ function run() {
     for (const problem of verdict.problems) console.error(`  - ${problem}`);
     fail(`the application build did not produce a usable artifact (${verdict.problems.length} problem(s), ${seconds}s)`);
   }
-  console.log(`[PASS] built ${expectedTag} in ${seconds}s (exit 0)`);
+  console.log(`[PASS] built ${gateReference} in ${seconds}s (exit 0)`);
   console.log(`  image id: ${builtImageId}`);
   console.log(`  APP_VERSION: ${imageAppVersion}`);
   console.log(`  artifacts measured inside the image: ${REQUIRED_ARTIFACTS.join(', ')}`);
-  console.log('Scope: the official `twenty` target, built from this commit with compose.yaml\'s own arg and labels. It does not start the stack, does not run migrations and does not scan the image.');
+  console.log(`  the deployment reference ${expectedTag} was not touched; scripts/aos/verify-image-provenance.mjs compares its layers with this build's`);
+  console.log('Scope: the official `twenty` target, built from this commit with compose.yaml\'s own arg and labels, under the gate\'s own reference. It does not start the stack, does not run migrations, does not scan the image and does not change what the stack runs.');
 }
 
 function selfTest() {
@@ -312,7 +356,7 @@ function selfTest() {
     assert(resolveComposeValue('"literal"', {}) === '"literal"', 'a literal should come back unchanged');
     assert(resolveComposeValue('${AOS_CRM_SOURCE_COMMIT:-unset}', {}) === 'unset', 'the unset default should surface so the caller can reject it');
   });
-  record('the image reference this command builds is the one local.ps1 and the provenance gate expect', () => {
+  record('the deployment reference this command checks is the one local.ps1 and the provenance gate expect', () => {
     const provenance = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')).upstream;
     const head = 'b'.repeat(40);
     const reference = imageReference({ upstreamTag: provenance.tag, upstreamSha: provenance.sha, aosCommit: head });
@@ -321,6 +365,46 @@ function selfTest() {
     assert(/aosTagSuffix/.test(provenanceGate), 'the provenance gate no longer checks the AOS half of the reference');
     const local = readFileSync(resolve(REPO_ROOT, 'scripts/aos/local.ps1'), 'utf8');
     assert(/Get-SourcePinnedImageTag/.test(local), 'local.ps1 no longer derives the same reference');
+    // The provenance gate has to look for the image THIS command writes, and it
+    // imports the derivation rather than copying it: two definitions would mean
+    // it inspects a reference nobody built and could never compare anything.
+    assert(/import \{ gateImageReference \} from '\.\/verify-image-build\.mjs'/.test(provenanceGate),
+      'the provenance gate no longer imports this command\'s gate reference');
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    assert(/pathToFileURL\(resolve\(invokedPath\)\)\.href === import\.meta\.url/.test(source),
+      'the entry-point guard that keeps that import from running a build is gone');
+    assert(/verify-image-build\\\.mjs\$\/i\.test\(invokedPath\)/.test(source),
+      'nothing fails closed if this file is run as a command but does not recognise itself');
+  });
+  // CRM-004 fix4, the measured red: this build used to carry '-t <deployment
+  // reference>', so running the gate moved that tag from the bytes the stack
+  // was created from onto a fresh build with an identical layer stack and a
+  // different id. The deployment reference must be read-only here.
+  record('the build lands on the gate\'s own reference and never writes the deployment one', () => {
+    // The production half only: these assertions name the very patterns they
+    // forbid, so reading the whole file would match themselves.
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('function selfTest()')[0];
+    const provenance = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')).upstream;
+    const head = 'b'.repeat(40);
+    const args = { upstreamTag: provenance.tag, upstreamSha: provenance.sha, aosCommit: head };
+    const gate = gateImageReference(args);
+    const deployment = imageReference(args);
+    assert(gate !== deployment, 'the gate reference is the deployment reference');
+    assert(gate.split(':')[0] !== deployment.split(':')[0], `both references share the repository ${gate.split(':')[0]}, so one build can still overwrite the other`);
+    assert(gate.includes(`aos${head.slice(0, 12)}`) && gate.includes(provenance.sha.slice(0, 10)),
+      `the gate reference must name this commit and the pin: ${gate}`);
+    assert(/'-t', gateReference,/.test(source), 'the build no longer tags the gate reference');
+    assert(!/'-t', expectedTag,/.test(source), 'the build tags the deployment reference again');
+    // Everything measured after the build must look at the gate's image too: a
+    // probe against the deployment reference would measure bytes this command
+    // did not build.
+    assert(!/'--entrypoint', 'test', expectedTag/.test(source), 'the artifact probe reads the deployment image instead of the one just built');
+    assert(!/'inspect',[^\n]*expectedTag/.test(source), 'the image inspection reads the deployment image instead of the one just built');
+  });
+  record('a fully cached rebuild of the gate reference is the same image: the attestation that would change its id is off', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    assert(NO_ATTESTATION === '--provenance=false', `the attestation opt-out changed shape: ${NO_ATTESTATION}`);
+    assert(/'docker', 'build',\s*\n\s*NO_ATTESTATION,/.test(source), 'the build no longer passes the attestation opt-out');
   });
   record('the context is the checkout root that compose builds from, so the layer cache is shared and not duplicated', () => {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
@@ -328,7 +412,7 @@ function selfTest() {
     assert(/^\s*context:\s*\.\.\/\.\.$/m.test(compose), 'compose.yaml no longer builds from the checkout root, so this command would miss its cache');
     // A different context (a tar, a subdirectory) changes the content hash of
     // every COPY and would mean a second full build rather than a cache hit.
-    assert(/'-t', expectedTag,\s*\n\s*root,/.test(source), 'the build no longer passes the checkout root as its context');
+    assert(/'-t', gateReference,\s*\n\s*root,/.test(source), 'the build no longer passes the checkout root as its context');
     // Assembled so this assertion cannot match itself. A tar context and the
     // .dockerignore-filtered tree do not hash the same, and a mismatch means a
     // second full build instead of a cache hit.
@@ -359,5 +443,15 @@ function selfTest() {
   process.exit(failures === 0 ? 0 : 1);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
-else run();
+// scripts/aos/verify-image-provenance.mjs imports gateImageReference from here,
+// so building cannot be a top-level side effect. If this file is ever the main
+// command and still fails to recognise itself, it exits 1 rather than exiting 0
+// without building: a gate command that measures nothing must not look green.
+const invokedPath = process.argv[1] || '';
+if (invokedPath && pathToFileURL(resolve(invokedPath)).href === import.meta.url) {
+  if (process.argv.includes('--self-test')) selfTest();
+  else run();
+} else if (/verify-image-build\.mjs$/i.test(invokedPath)) {
+  console.error(`[FAIL] ${invokedPath} was invoked as a command but this module could not recognise itself as the entry point, so no build ran`);
+  process.exit(1);
+}
