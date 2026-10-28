@@ -328,3 +328,64 @@ con el estado y el `RestartCount` de cada servicio en el informe.
   Hay que re-ejecutarlo, no atribuirle una causa establecida.
 - El inventario de dependencias sigue siendo presencia cruzada con avisos conocidos: no es
   un SBOM ni un escáner de la imagen.
+
+## CRM-004-fix4: la referencia del gate y la prueba por capas
+
+29 de octubre de 2026, mismo host. El gate del arnés sobre `ed1425a4` quedó 18/19 con
+`verify-image-provenance.mjs` en **exit 1**, y la causa no era la imagen: era el propio gate
+pisándose.
+
+### Lo medido
+
+| Qué | Valor |
+| --- | --- |
+| Imagen que corrían server y worker | `sha256:6361980c…` (construida por Compose en el `Restart` de fix3) |
+| Imagen que resolvía la referencia de despliegue después del gate | `sha256:f6f2c342…` (la construyó el comando 15 bajo la MISMA referencia) |
+| Etiquetas de las dos | mismo `ai.aos.crm.source.commit` `ed1425a420…`, mismo árbol, `dirty=false` |
+| Capas (RootFS diff IDs) | **26 y 26, idénticas una por una** |
+| Estado del registro viejo | `docker image inspect sha256:6361980c…` → *No such image*: el store containerd descartó el registro al quedar sin referencia, con los contenedores aún corriéndolo |
+
+Dos builds BuildKit del mismo contexto **no** comparten ImageID: la atestación de procedencia
+que BuildKit adjunta por defecto lleva marcas de tiempo propias, así que incluso con todas
+las capas en caché el resultado es otra identidad (lo mismo que fix3 midió en las imágenes
+internas del gate, `63d83413` → `5a2585be`). La comparación por ImageID de un build contra
+otro no mide bytes: mide identidades.
+
+### El arreglo
+
+- `verify-image-build.mjs` construye en una referencia **propia**,
+  `aos-crm-local/twenty-gate:<versión>-<pin>-aos<12 hex>`, y pasa `--provenance=false`. La
+  referencia de despliegue se lee y nunca se escribe. Contexto, Dockerfile, target, arg y
+  etiquetas siguen siendo los de Compose, así que la caché de capas se comparte: no es un
+  segundo build. Los artefactos y `APP_VERSION` se miden dentro de **esa** imagen.
+- `verify-image-provenance.mjs` mantiene todo lo anterior (referencia no móvil que nombra pin
+  y commit, etiquetas = este HEAD, árbol limpio, frontend dentro de la imagen, server **y**
+  worker corriendo ese ImageID) y añade la mitad que las etiquetas no pueden dar: compara las
+  **capas** de la imagen de despliegue con las de la imagen del gate. Las etiquetas son una
+  afirmación de quien construyó; las capas son los bytes. Capa distinta → fallo nombrando el
+  índice y los dos diff IDs. Configuración distinta sobre las mismas capas → no es fallo.
+- El chequeo de árbol sucio de `verify-server-specs.mjs` cubre ahora **todo** lo que entra al
+  contexto desde el árbol de trabajo en vez de por `git archive HEAD`, incluida
+  `scripts/aos/server-specs-sources.Dockerfile`, que se empaqueta del árbol y quedaba fuera.
+  El self-test exige que la lista del chequeo **sea** la lista del contexto, no una copia.
+
+### Orden del gate (comandos 15 a 18)
+
+Con referencias separadas, ninguno escribe lo del otro: 15 crea un registro de imagen propio
+(capas compartidas, sin capas nuevas) y no toca contenedores, volúmenes ni la etiqueta de
+despliegue; 17 solo lee y lanza un contenedor `--rm` de prueba; 16 y 18 no usan Docker. La
+única dependencia es deliberada y declarada: 17 **lee** el artefacto que produce 15, y en el
+orden de `.aos/verify.json` 15 va antes. Correr 17 sin 15 no da un PASS: falla cerrado
+nombrando `verify-image-build.mjs`.
+
+### Límites honestos
+
+- La comparación de capas es contra un build sobre la caché de capas de **este** daemon:
+  prueba que los bytes que corren son los que construye esta fuente aquí, **no** que el build
+  sea reproducible bit a bit desde frío. Una caché fría que produjera capas distintas para la
+  misma fuente se informaría como fallo, no como PASS.
+- Cada commit deja un registro de imagen más (`twenty-gate:...`), metadatos sobre capas ya
+  presentes, no 1,65 GB por commit. No se borró ninguna imagen: preservar evidencias manda.
+- Las medidas de la corrida final (tiempos, ImageID, capas) están en
+  [.aos/reports/CRM-004-fix4.md](../../../.aos/reports/CRM-004-fix4.md); este fichero no las
+  duplica.

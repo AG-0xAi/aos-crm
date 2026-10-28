@@ -226,6 +226,18 @@ sobrescribía. `verify-image-provenance.mjs` rechaza la referencia base sola, y 
 **construye** el target oficial (`verify-image-build.mjs`) en vez de limitarse a inspeccionar
 etiquetas.
 
+**El build del gate no toca la imagen del stack (fix4).** Construye en una referencia propia
+(`aos-crm-local/twenty-gate:...-aos<12 hex>`) y solo **lee** la de despliegue. Construir bajo
+la de despliegue movía esa etiqueta al build del gate mientras server y worker seguían con
+los bytes con los que se crearon: dos builds BuildKit del mismo contexto no comparten
+ImageID, aunque sus capas sean las mismas. Lo que `verify-image-provenance.mjs` exige ahora
+es doble: que server y worker corran el ImageID de la referencia de despliegue con etiquetas
+de este commit, **y** que las capas (RootFS diff IDs) de esa imagen sean las que produce un
+build de esta fuente. Una capa distinta falla nombrando la primera diferencia; la misma capa
+con otra configuración no es fallo. Como ese build lo hace `verify-image-build.mjs`, el
+comando de procedencia lo necesita ya construido: sin imagen del gate para este HEAD falla
+cerrado y dice qué comando la produce, nunca da PASS.
+
 ### Camino E2E
 
 13/13 (`node --test scripts/aos/test/crm-runtime-e2e.test.mjs`), 390 s medidos por el
