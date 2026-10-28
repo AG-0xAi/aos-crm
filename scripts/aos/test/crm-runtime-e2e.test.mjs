@@ -523,7 +523,12 @@ test('public registration is closed once the single local workspace exists', asy
     },
   );
   assert.ok(res.body.errors, 'a second public signup succeeded: registration is still open');
-  assert.equal(res.body.data?.signUp, undefined, 'the refused signup still returned tokens');
+  // Presence as a boolean, with a fixed message: comparing the payload itself
+  // would make node's assert print the ACTUAL value on failure, and the only
+  // way this assertion can fail is the one case where that value holds real
+  // access tokens.
+  const returnedSignUpPayload = (res.body.data?.signUp ?? null) !== null;
+  assert.equal(returnedSignUpPayload, false, 'the refused signup still returned a signUp payload (not printed: it would carry tokens)');
   // The specific refusal, not just any error: posting to the wrong schema also
   // errors ("Authentication required"), which would make this pass while
   // proving nothing about registration being closed.
