@@ -118,6 +118,100 @@ function Test-OptionalFeatureRequiredForWsl2 {
   return ($FeatureName -eq 'VirtualMachinePlatform')
 }
 
+# A distro that was asleep is not a distro that is ready. WSL shuts a
+# distribution down when its last process exits, and the next command boots it
+# again; during that boot `wsl.exe` can print its own warning (measured here:
+# "wsl: Failed to start the systemd user session for 'root'") into the Linux
+# command's stream, and /mnt/c is not necessarily mounted yet. On 2026-10-28
+# that made this preflight report a HEAD mismatch and an unreachable .aos on a
+# checkout that matched seconds later.
+#
+# Pure: turns one `systemctl is-system-running` observation into a decision.
+# The exit code alone cannot do it -- 'degraded' (booted, with a failed unit)
+# and 'starting' (still booting) are both non-zero -- and the state word can
+# arrive next to foreign warning lines, so the known states are matched as
+# whole lines instead of by substring. Anything unrecognized or ambiguous is
+# 'unknown', which fails closed rather than waiting forever.
+function Get-SystemdState {
+  param([string] $Text)
+  $known = @{
+    initializing = 'starting'; starting = 'starting'
+    running      = 'settled';  degraded = 'settled'
+    maintenance  = 'unusable'; stopping = 'unusable'; offline = 'unusable'
+  }
+  if ([string]::IsNullOrWhiteSpace($Text)) { return 'unknown' }
+  $states = @($Text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $known.ContainsKey($_) })
+  if ($states.Count -ne 1) { return 'unknown' }
+  return $known[$states[0]]
+}
+
+# Pure: the ONE 40-hex line in a probe's output, or $null. `git rev-parse HEAD`
+# prints exactly that and nothing else, so a line-exact match survives
+# wsl.exe's warnings being interleaved on the same stream, while a probe that
+# printed no sha -- or two different ones -- stays unanswered instead of being
+# resolved in the gate's favour.
+function Select-Sha1Line {
+  param([string] $Text)
+  if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+  # -cmatch, not -match: PowerShell compares case-insensitively by default, and
+  # git prints lowercase. Accepting uppercase would accept text no git produced.
+  $shaLines = @($Text -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -cmatch '^[0-9a-f]{40}$' })
+  if (@($shaLines | Select-Object -Unique).Count -ne 1) { return $null }
+  return $shaLines[0]
+}
+
+# Waits, under a hard cap, for the distro to finish booting AND for its view of
+# this checkout's HEAD to match the Windows one exactly. Still fails closed: a
+# distro that never leaves 'starting', a state that cannot be read, or a HEAD
+# that never matches all return Ready=false with the reason. $Clock/$Sleep are
+# injected so -SelfTest can exercise the real loop without waiting.
+function Wait-DistroReady {
+  param(
+    [Parameter(Mandatory)] [scriptblock] $SystemdProbe,
+    [Parameter(Mandatory)] [scriptblock] $HeadProbe,
+    [Parameter(Mandatory)] [string] $ExpectedHeadSha,
+    [int] $TimeoutMs = 120000,
+    [int] $IntervalMs = 3000,
+    [scriptblock] $Clock = { [datetime]::UtcNow },
+    [scriptblock] $Sleep = { param([int] $Ms) Start-Sleep -Milliseconds $Ms }
+  )
+  $started = & $Clock
+  $attempts = 0
+  $state = 'unknown'
+  $headSha = $null
+  $headExit = $null
+  while ($true) {
+    $attempts++
+    $systemd = & $SystemdProbe
+    $state = Get-SystemdState -Text $systemd.Text
+    if ($state -eq 'settled') {
+      $head = & $HeadProbe
+      $headExit = $head.ExitCode
+      $headSha = Select-Sha1Line -Text $head.Text
+      if ($headExit -eq 0 -and $headSha -eq $ExpectedHeadSha) {
+        return [ordered]@{
+          Ready = $true; SystemdState = $state; HeadSha = $headSha; HeadExitCode = $headExit
+          Attempts = $attempts; WaitedMs = [int]((& $Clock) - $started).TotalMilliseconds; Detail = $null
+        }
+      }
+    }
+    $elapsedMs = [int]((& $Clock) - $started).TotalMilliseconds
+    $remainingMs = $TimeoutMs - $elapsedMs
+    if ($remainingMs -le 0) { break }
+    & $Sleep ([math]::Min($IntervalMs, $remainingMs))
+  }
+  $detail = switch ($state) {
+    'starting' { "the distro was still booting (systemctl is-system-running: starting) after $TimeoutMs ms" }
+    'settled'  { "the distro finished booting but its 'git rev-parse HEAD' never returned the Windows HEAD exactly once (exit $headExit, sha $(if ($headSha) { $headSha } else { 'unreadable' }))" }
+    'unusable' { 'the distro reported a systemd state it cannot run commands in (stopping/offline/maintenance)' }
+    default    { 'the distro''s systemd state could not be read at all' }
+  }
+  return [ordered]@{
+    Ready = $false; SystemdState = $state; HeadSha = $headSha; HeadExitCode = $headExit
+    Attempts = $attempts; WaitedMs = [int]((& $Clock) - $started).TotalMilliseconds; Detail = $detail
+  }
+}
+
 function Get-InstallStateName([int] $State) {
   switch ($State) {
     1 { 'Enabled' }
@@ -238,6 +332,69 @@ function Invoke-SelfTest {
   # ---- firmware-virtualization trust gate + WSL1-vs-WSL2 feature requirement, pure ----
   Assert-True (Test-FirmwareVirtualizationTrustworthy -HypervisorPresent $false) 'Test-FirmwareVirtualizationTrustworthy: trusts the CIM read when no hypervisor is running yet'
   Assert-True (-not (Test-FirmwareVirtualizationTrustworthy -HypervisorPresent $true)) 'Test-FirmwareVirtualizationTrustworthy: distrusts the CIM read once a hypervisor is already active (reproduced live on this host: HypervisorPresent=true while the CIM bits read false)'
+
+  # ---- cold-distro readiness (CRM-004 fix3), pure + injected clock: no WSL, no sleeping ----
+  # The exact line wsl.exe mixed into the Linux command's stream on 2026-10-28
+  # while the idled-out distro was booting.
+  # Script-scoped on purpose: these fixtures are read from inside the probe
+  # scriptblocks below, which run in a child scope of Wait-DistroReady, and a
+  # plain local would be shadowed by that function's own same-named locals.
+  $script:wslBootWarning = "wsl: Failed to start the systemd user session for 'root'"
+  $script:fixtureHeadSha = '6e0d50b661cbf7911cc0c058039456328531f836'
+  $wslBootWarning = $script:wslBootWarning
+  $headSha = $script:fixtureHeadSha
+
+  Assert-True ((Get-SystemdState -Text "$wslBootWarning`nstarting") -eq 'starting') 'Get-SystemdState: a booting distro is "starting" even with wsl.exe''s own warning on the same stream (the measured contamination)'
+  Assert-True ((Get-SystemdState -Text "$wslBootWarning`nrunning") -eq 'settled') 'Get-SystemdState: a booted distro is "settled" with the same warning present'
+  Assert-True ((Get-SystemdState -Text 'degraded') -eq 'settled') 'Get-SystemdState: "degraded" is booted (a failed unit is not a boot in progress)'
+  Assert-True ((Get-SystemdState -Text 'offline') -eq 'unusable') 'Get-SystemdState: "offline" is not something to wait for'
+  Assert-True ((Get-SystemdState -Text $wslBootWarning) -eq 'unknown') 'Get-SystemdState: output with no state word at all fails closed as "unknown"'
+  Assert-True ((Get-SystemdState -Text '') -eq 'unknown') 'Get-SystemdState: empty output fails closed as "unknown"'
+  Assert-True ((Get-SystemdState -Text "starting`nrunning") -eq 'unknown') 'Get-SystemdState: two contradictory state lines are ambiguous, not resolved in the gate''s favour'
+
+  Assert-True ((Select-Sha1Line -Text "$wslBootWarning`n$headSha") -eq $headSha) 'Select-Sha1Line: the exact 40-hex HEAD survives wsl.exe''s warning on the same stream (the measured false mismatch)'
+  Assert-True ((Select-Sha1Line -Text "$headSha`n$wslBootWarning") -eq $headSha) 'Select-Sha1Line: order does not matter'
+  Assert-True ($null -eq (Select-Sha1Line -Text $wslBootWarning)) 'Select-Sha1Line: output with no sha at all stays unanswered'
+  Assert-True ($null -eq (Select-Sha1Line -Text "$headSha`n$('b' * 40)")) 'Select-Sha1Line: two DIFFERENT shas are ambiguous and rejected'
+  Assert-True ((Select-Sha1Line -Text "$headSha`n$headSha") -eq $headSha) 'Select-Sha1Line: the same sha echoed twice is still one answer'
+  Assert-True ($null -eq (Select-Sha1Line -Text ('a' * 39))) 'Select-Sha1Line: a 39-character string is not a sha'
+  Assert-True ($null -eq (Select-Sha1Line -Text ('A' * 40))) 'Select-Sha1Line: uppercase hex is not what git prints, so it is not accepted'
+  Assert-True ($null -eq (Select-Sha1Line -Text "fatal: not a git repository`n")) 'Select-Sha1Line: a git error is not a sha'
+
+  # A fake clock advanced by the injected sleep: the real loop runs, nothing waits.
+  $script:fakeNow = [datetime]::new(2026, 10, 28, 20, 0, 0, [System.DateTimeKind]::Utc)
+  $clock = { $script:fakeNow }
+  $sleep = { param([int] $Ms) $script:fakeNow = $script:fakeNow.AddMilliseconds($Ms) }
+
+  # The measured sequence: the first probe catches the distro booting (warning
+  # in the stream, no usable HEAD), a later one agrees.
+  $script:probeCount = 0
+  $coldStart = Wait-DistroReady -ExpectedHeadSha $headSha -TimeoutMs 120000 -IntervalMs 3000 -Clock $clock -Sleep $sleep `
+    -SystemdProbe {
+      $script:probeCount++
+      if ($script:probeCount -le 2) { [pscustomobject]@{ ExitCode = 1; Text = "$script:wslBootWarning`nstarting" } }
+      else { [pscustomobject]@{ ExitCode = 0; Text = "$script:wslBootWarning`nrunning" } }
+    } `
+    -HeadProbe { [pscustomobject]@{ ExitCode = 0; Text = "$($script:wslBootWarning)`n$($script:fixtureHeadSha)" } }
+  Assert-True ($coldStart.Ready -and $coldStart.HeadSha -eq $headSha) 'Wait-DistroReady: a distro caught mid-boot is waited out and then measured correctly (the exact 17:48 UTC failure)'
+  Assert-True ($coldStart.Attempts -eq 3 -and $coldStart.WaitedMs -le 120000) 'Wait-DistroReady: it re-probed instead of giving up, inside the 120 s cap'
+
+  $neverBoots = Wait-DistroReady -ExpectedHeadSha $headSha -TimeoutMs 120000 -IntervalMs 3000 -Clock $clock -Sleep $sleep `
+    -SystemdProbe { [pscustomobject]@{ ExitCode = 1; Text = 'starting' } } `
+    -HeadProbe { throw 'the HEAD probe must not run while the distro is still booting' }
+  Assert-True (-not $neverBoots.Ready) 'Wait-DistroReady: a distro that never finishes booting still FAILS CLOSED'
+  Assert-True ($neverBoots.WaitedMs -le 120000 -and $neverBoots.Attempts -gt 1) 'Wait-DistroReady: that failure is bounded by the cap, not an infinite wait'
+  Assert-True ($neverBoots.Detail -match 'still booting') 'Wait-DistroReady: the reason says the distro was still booting, instead of blaming the checkout'
+
+  $wrongHead = Wait-DistroReady -ExpectedHeadSha $headSha -TimeoutMs 30000 -IntervalMs 3000 -Clock $clock -Sleep $sleep `
+    -SystemdProbe { [pscustomobject]@{ ExitCode = 0; Text = 'running' } } `
+    -HeadProbe { [pscustomobject]@{ ExitCode = 0; Text = ('c' * 40) } }
+  Assert-True (-not $wrongHead.Ready) 'Wait-DistroReady: a genuinely different Linux-side HEAD is still a failure after the wait (the wait does not launder a real mismatch)'
+
+  $unreadableState = Wait-DistroReady -ExpectedHeadSha $headSha -TimeoutMs 9000 -IntervalMs 3000 -Clock $clock -Sleep $sleep `
+    -SystemdProbe { [pscustomobject]@{ ExitCode = 127; Text = 'systemctl: not found' } } `
+    -HeadProbe { [pscustomobject]@{ ExitCode = 0; Text = $headSha } }
+  Assert-True (-not $unreadableState.Ready -and $unreadableState.SystemdState -eq 'unknown') 'Wait-DistroReady: a systemd state that cannot be read fails closed instead of assuming readiness'
 
   Assert-True (Test-OptionalFeatureRequiredForWsl2 -FeatureName 'VirtualMachinePlatform') 'Test-OptionalFeatureRequiredForWsl2: VirtualMachinePlatform is a hard WSL2 prerequisite'
   Assert-True (-not (Test-OptionalFeatureRequiredForWsl2 -FeatureName 'Microsoft-Windows-Subsystem-Linux')) 'Test-OptionalFeatureRequiredForWsl2: the legacy WSL1 feature is not a WSL2 prerequisite (reproduced live on this host: Linux already runs via WSL2 while this feature reports Disabled)'
@@ -427,20 +584,34 @@ try {
       Add-Missing "could not translate the checkout path for Linux via '$selectedDistro'"
     } else {
       $linuxPath = $linuxPathProbe.Text
-      $headProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD')
-      $busProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'test', '-d', "$linuxPath/.aos")
-      $shaMatches = ($headProbe.ExitCode -eq 0 -and $headProbe.Text -eq $windowsHeadSha)
-      $busReachable = ($busProbe.ExitCode -eq 0)
+      # Bounded wait first (see Wait-DistroReady): a distro that idled out and
+      # is mid-boot answers these two probes wrongly, and that is a measurement
+      # artifact, not a host that is not ready. The cap keeps it fail-closed.
+      $readiness = Wait-DistroReady -ExpectedHeadSha $windowsHeadSha `
+        -SystemdProbe { Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--exec', 'systemctl', 'is-system-running') } `
+        -HeadProbe { Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'git', '-C', $linuxPath, 'rev-parse', 'HEAD') }
+      $shaMatches = $readiness.Ready
+      # Not measured at all when the distro never became ready: reporting a
+      # false here would blame the bus for a distro that was still booting.
+      $busReachable = if ($shaMatches) {
+        (Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '--exec', 'test', '-d', "$linuxPath/.aos")).ExitCode -eq 0
+      } else { $null }
       $linuxAccess = [ordered]@{
-        attempted     = $true
-        ok            = ($shaMatches -and $busReachable)
-        distro        = $selectedDistro
-        linuxPath     = $linuxPath
-        headShaMatches = $shaMatches
-        busReachable  = $busReachable
+        attempted         = $true
+        ok                = ($shaMatches -and $busReachable -eq $true)
+        distro            = $selectedDistro
+        linuxPath         = $linuxPath
+        headShaMatches    = $shaMatches
+        busReachable      = $busReachable
+        systemdState      = $readiness.SystemdState
+        readinessAttempts = $readiness.Attempts
+        readinessWaitMs   = $readiness.WaitedMs
       }
-      if (-not $shaMatches) { Add-Missing "Linux-side 'git rev-parse HEAD' under '$selectedDistro' does not match the Windows checkout HEAD" }
-      if (-not $busReachable) { Add-Missing "Linux-side '$linuxPath/.aos' is not reachable under '$selectedDistro'" }
+      if ($readiness.Attempts -gt 1) {
+        Add-Note "the distro was not ready on the first probe; waited $($readiness.WaitedMs) ms over $($readiness.Attempts) attempts for systemd to leave 'starting' and for the Linux-side HEAD to match (WSL shuts a distro down when its last process exits, so a cold distro is normal, not a fault)"
+      }
+      if (-not $shaMatches) { Add-Missing "Linux-side 'git rev-parse HEAD' under '$selectedDistro' does not match the Windows checkout HEAD: $($readiness.Detail)" }
+      if ($shaMatches -and $busReachable -ne $true) { Add-Missing "Linux-side '$linuxPath/.aos' is not reachable under '$selectedDistro'" }
     }
 
     $dockerProbe = Invoke-WslLinux -Exe 'wsl.exe' -NativeArgs @('-d', $selectedDistro, '-u', 'root', '--exec', 'bash', '-lc', 'command -v docker >/dev/null 2>&1 && docker version --format "{{.Server.Version}}" && systemctl is-active docker')
