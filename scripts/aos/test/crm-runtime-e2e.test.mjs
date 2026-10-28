@@ -393,6 +393,10 @@ test('the worker is alive and holds its queue in this project own Redis', () => 
   assert.ok(ps.stdout.includes('"Service":"worker"'), 'the worker container is not running');
   const keys = redis(['--scan', '--pattern', 'bull*']).split(/\r?\n/).filter(Boolean);
   assert.ok(keys.length > 0, 'this project Redis holds no queue key: the worker never registered one');
+  // The queue is state: without append-only persistence on its own volume,
+  // every `compose down` drops it and the stack comes back looking fine.
+  assert.match(redis(['config', 'get', 'appendonly']), /\byes\b/,
+    'Redis is running without append-only persistence, so the queue would not survive a container recreation');
   const logs = compose(['logs', '--tail', '200', 'worker']);
   assert.equal(logs.status, 0, `docker compose logs worker exited ${logs.status}`);
   const fatal = logs.stdout.split(/\r?\n/)
