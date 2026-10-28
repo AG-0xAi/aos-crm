@@ -9,9 +9,17 @@ FROM node:24.22.1-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af61
 # including twenty-app-dev. .yarnrc.yml also carries enableTelemetry: false;
 # this env var is Nx's own opt-out plus a build-time floor that a missing or
 # edited .yarnrc.yml cannot silently remove.
+# THREADS_WORKER_INIT_TIMEOUT raises the 10s init budget that threads@1.7.0
+# (via @lingui/cli) gives each worker of its pool. `lingui extract` spawns the
+# pool and then blocks the main thread enqueuing ~11k files for ~30s, so the
+# workers cannot answer in time and the rejected promise kills the build with
+# "Did not receive an init message from worker after 10000ms". Reproduced on the
+# pinned upstream source with zero AOS changes (docs/aos/bootstrap/BUILD_BASELINE.md);
+# it only widens a timeout and does not skip any translation stage.
 ENV YARN_ENABLE_TELEMETRY=0 \
     NX_NO_CLOUD=true \
-    NX_DAEMON=false
+    NX_DAEMON=false \
+    THREADS_WORKER_INIT_TIMEOUT=180000
 
 # ===========================================================================
 # Dependency stages

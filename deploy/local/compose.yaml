@@ -16,12 +16,22 @@ x-aos-crm-app: &aos-crm-app
     target: twenty
     args:
       APP_VERSION: ${AOS_CRM_APP_VERSION:-twenty-v2.51.0+15e4826d3b}
-    # Make the artifact self-describing: the image carries the upstream
-    # commit it was built from, so `docker inspect` answers "which source is
-    # this?" without trusting the mutable tag it happens to be named with.
+    # Make the artifact self-describing: the image carries the upstream commit
+    # it was built from AND the AOS commit/tree that actually produced these
+    # bytes, so `docker inspect` answers "which source is this?" without
+    # trusting the mutable tag it happens to be named with. The upstream
+    # revision alone is not an answer: every AOS commit on top of the pin
+    # builds a different image while naming the same upstream SHA.
+    # local.ps1 refreshes the three ai.aos.crm.source.* values in
+    # deploy/local/.env immediately before building, and
+    # scripts/aos/verify-image-provenance.mjs rejects an image whose labels do
+    # not match this checkout (including the literal 'unset' default below).
     labels:
       org.opencontainers.image.revision: "15e4826d3b5fc5867baeabeeb42b253892b2d4da"
       org.opencontainers.image.version: "twenty-v2.51.0"
+      ai.aos.crm.source.commit: "${AOS_CRM_SOURCE_COMMIT:-unset}"
+      ai.aos.crm.source.tree: "${AOS_CRM_SOURCE_TREE:-unset}"
+      ai.aos.crm.source.dirty: "${AOS_CRM_SOURCE_DIRTY:-unset}"
   image: ${AOS_CRM_IMAGE_TAG:?set AOS_CRM_IMAGE_TAG in deploy/local/.env to a local, non-moving tag such as aos-crm-local/twenty:v2.51.0-15e4826d3b}
   pull_policy: never
   # deploy/local/privacy.env is the CRM-003 contract (telemetry/analytics/

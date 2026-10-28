@@ -37,6 +37,18 @@ $ProjectName = 'aos-crm-local'
 $ComposeRelPath = 'deploy/local/compose.yaml'
 $DefaultWebPort = 43000
 
+# WSL2 terminates a distro once its last process exits, and systemd services
+# inside it do not keep it alive (learn.microsoft.com/windows/wsl/systemd), so
+# `docker compose up -d` returning is not the same as a stack that survives:
+# when every wsl.exe caller exits and the idle window passes, the distro (and
+# with it dockerd and every container) goes down. Start therefore holds one
+# hidden session open on a marker file of this product's own, and Stop releases
+# it. The marker is what makes the keeper identifiable: it is matched by its
+# exact command line, so Stop never touches another distro, another product's
+# process, or the global WSL configuration.
+$KeeperMarker = '/tmp/aos-crm-local-keeper'
+$KeeperPattern = "tail -f $KeeperMarker"
+
 # ---------------------------------------------------------------------------
 # Pure helpers: take explicit paths/values so -SelfTest can exercise them
 # against isolated fixtures instead of the real checkout.
@@ -175,6 +187,78 @@ function Test-WebPortUrlCoherent {
   return $effective -eq "http://127.0.0.1:$Port"
 }
 
+# Pure: rewrites KEY=value lines, replacing the keys in $Values in place and
+# appending the ones that were absent. Everything else -- comments, order,
+# unrelated keys -- survives untouched, because this edits a file that also
+# holds this install's secrets. Returns the new lines; never logs a value.
+function Set-EnvKeyLines {
+  param([string[]] $Lines, [System.Collections.IDictionary] $Values)
+  $remaining = [System.Collections.Generic.List[string]]::new()
+  foreach ($k in $Values.Keys) { $remaining.Add([string] $k) }
+  $out = [System.Collections.Generic.List[string]]::new()
+  foreach ($line in $Lines) {
+    $replaced = $false
+    if ($line -notmatch '^\s*#' -and $line -match '=') {
+      $key = ($line -split '=', 2)[0].Trim()
+      if ($Values.Contains($key)) {
+        $out.Add("$key=$($Values[$key])")
+        $null = $remaining.Remove($key)
+        $replaced = $true
+      }
+    }
+    if (-not $replaced) { $out.Add($line) }
+  }
+  foreach ($key in $remaining) { $out.Add("$key=$($Values[$key])") }
+  return @($out)
+}
+
+# The identity of the source these bytes were built from: the AOS commit, its
+# tree, and whether the working tree had uncommitted changes at build time. A
+# dirty build must never be able to present itself as a clean commit, so the
+# flag is part of the stamp rather than something a reader has to infer.
+function Get-GitSourceStamp {
+  param([string] $RepoRoot)
+  $commit = (& git -C $RepoRoot rev-parse HEAD 2>$null)
+  if ($LASTEXITCODE -ne 0) { return $null }
+  $tree = (& git -C $RepoRoot rev-parse 'HEAD^{tree}' 2>$null)
+  if ($LASTEXITCODE -ne 0) { return $null }
+  $status = (& git -C $RepoRoot status --porcelain 2>$null)
+  if ($LASTEXITCODE -ne 0) { return $null }
+  return [ordered]@{
+    AOS_CRM_SOURCE_COMMIT = $commit.Trim()
+    AOS_CRM_SOURCE_TREE   = $tree.Trim()
+    AOS_CRM_SOURCE_DIRTY  = (@($status | Where-Object { $_ -ne '' }).Count -gt 0) ? 'true' : 'false'
+  }
+}
+
+# Stamps the source identity into deploy/local/.env so compose can label the
+# image it is about to build with it. Returns $true only if the stamp was
+# written: a build whose provenance could not be recorded must not proceed.
+function Update-SourceStamp {
+  param([string] $RepoRoot, [string] $EnvPath)
+  $stamp = Get-GitSourceStamp -RepoRoot $RepoRoot
+  if ($null -eq $stamp) { return $false }
+  if (-not (Test-Path -LiteralPath $EnvPath -PathType Leaf)) { return $false }
+  $lines = @(Get-Content -LiteralPath $EnvPath -ErrorAction Stop)
+  [System.IO.File]::WriteAllLines($EnvPath, (Set-EnvKeyLines -Lines $lines -Values $stamp))
+  return $true
+}
+
+# Pure: turns `pgrep -f` output into pids. pgrep exits 1 and prints nothing
+# when there is no match, and a broken/absent pgrep prints a message on stderr
+# that must never be read as "the keeper is alive".
+function Get-KeeperPids {
+  param([string] $PgrepOutput)
+  if ([string]::IsNullOrWhiteSpace($PgrepOutput)) { return @() }
+  $pids = [System.Collections.Generic.List[int]]::new()
+  foreach ($line in ($PgrepOutput -split "`r?`n")) {
+    $trimmed = $line.Trim()
+    if ($trimmed -notmatch '^\d+$') { continue }
+    $pids.Add([int] $trimmed)
+  }
+  return @($pids)
+}
+
 # A bind-test alone cannot tell a foreign listener from this project's own
 # server container (WSL2 forwards both onto the same Windows loopback port).
 # Get-PortOccupancy turns the two independent I/O results (a raw bind probe,
@@ -270,6 +354,7 @@ function Invoke-StartAction {
     [bool] $ConfigVerifierOk,
     [string] $PrivacyVerifierStatus,
     [scriptblock] $ComposeInvoker,
+    [scriptblock] $KeeperInvoker = {},
     [bool] $PortConfigValid = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
@@ -278,8 +363,28 @@ function Invoke-StartAction {
   if (-not $verdict.Proceed) {
     return [ordered]@{ Invoked = $false; Verdict = $verdict }
   }
+  # Before `up`, not after: the session that has to outlive this process must
+  # already be open when the containers start.
+  & $KeeperInvoker
   & $ComposeInvoker
   return [ordered]@{ Invoked = $true; Verdict = $verdict }
+}
+
+# Stop is the only action that releases the distro session, and only once
+# `compose down` really succeeded: killing the keeper while containers are
+# still up would take them down by shutting the distro instead of stopping
+# them, which is exactly the uncontrolled shutdown this orchestration exists
+# to avoid. The down exit code travels via $script:ComposeExitCode (same
+# convention as Invoke-RestartAction).
+function Invoke-StopAction {
+  param([scriptblock] $DownInvoker, [scriptblock] $KeeperStopInvoker)
+  & $DownInvoker
+  $downExitCode = $script:ComposeExitCode
+  if ($downExitCode -ne 0) {
+    return [ordered]@{ Stage = 'down-failed'; KeeperReleased = $false; ExitCode = $downExitCode }
+  }
+  & $KeeperStopInvoker
+  return [ordered]@{ Stage = 'stopped'; KeeperReleased = $true; ExitCode = 0 }
 }
 
 # Orchestrates Restart in three stages so a live restart of THIS project's
@@ -301,6 +406,7 @@ function Invoke-RestartAction {
     [scriptblock] $DownInvoker,
     [scriptblock] $PortFreeAfterDownProbe,
     [scriptblock] $UpInvoker,
+    [scriptblock] $KeeperInvoker = {},
     [bool] $PortConfigValid = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
@@ -327,6 +433,9 @@ function Invoke-RestartAction {
     $stuckVerdict = [ordered]@{ Proceed = $false; Blockers = @("port: still occupied after stopping this project's own services") }
     return [ordered]@{ Stage = 'blocked-after-down'; Verdict = $stuckVerdict; ExitCode = 1 }
   }
+  # Re-ensured here rather than released anywhere in this path: a restart must
+  # not be the moment the stack loses the session holding its distro open.
+  & $KeeperInvoker
   & $UpInvoker
   return [ordered]@{ Stage = 'started'; Verdict = $verdict }
 }
@@ -515,6 +624,63 @@ function Invoke-Prepare {
   $script:PrepareOk = $true
 }
 
+# Asks the distro itself which keeper processes of OURS are alive, matched by
+# the exact command line Start-DistroKeeper launches. Returns pids only.
+function Get-DistroKeeperPids {
+  param([string] $Distro)
+  $out = & wsl.exe -d $Distro --exec pgrep -f $KeeperPattern 2>$null
+  if ($LASTEXITCODE -ne 0) { return @() }
+  return Get-KeeperPids -PgrepOutput (@($out) -join "`n")
+}
+
+# Holds one hidden WSL session open so the distro (and dockerd, and every
+# container) survives after every CLI invocation exits and the idle window
+# passes. UseShellExecute + WindowStyle Hidden is the detached-and-invisible
+# combination: the child gets its own console instead of inheriting this one,
+# so closing the window that ran Start cannot take the stack down with it.
+# .ArgumentList still builds the command line with real per-argument quoting
+# (see Invoke-PowerShellScript for why -ArgumentList's array form is not used).
+# Returns a category, never a handle: 'already-running' | 'started' | 'failed'.
+function Start-DistroKeeper {
+  param([string] $Distro, [int] $TimeoutSeconds = 30)
+  if (@(Get-DistroKeeperPids -Distro $Distro).Count -gt 0) { return 'already-running' }
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = 'wsl.exe'
+  foreach ($a in @('-d', $Distro, '--exec', 'sh', '-c', ": > $KeeperMarker; exec $KeeperPattern")) {
+    $psi.ArgumentList.Add($a)
+  }
+  $psi.UseShellExecute = $true
+  $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+  try {
+    $null = [System.Diagnostics.Process]::Start($psi)
+  } catch {
+    return 'failed'
+  }
+  # Confirm by observation inside the distro, not by "Process.Start did not
+  # throw": a session that dies immediately would otherwise read as started.
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (@(Get-DistroKeeperPids -Distro $Distro).Count -gt 0) { return 'started' }
+    Start-Sleep -Milliseconds 500
+  }
+  return 'failed'
+}
+
+# Releases only this product's keeper, by its own command line. Never shuts
+# down the distro, never touches another distribution, never edits global WSL
+# configuration. 'not-running' | 'stopped' | 'failed'.
+function Stop-DistroKeeper {
+  param([string] $Distro, [int] $TimeoutSeconds = 20)
+  if (@(Get-DistroKeeperPids -Distro $Distro).Count -eq 0) { return 'not-running' }
+  & wsl.exe -d $Distro --exec pkill -f $KeeperPattern 2>$null | Out-Null
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (@(Get-DistroKeeperPids -Distro $Distro).Count -eq 0) { return 'stopped' }
+    Start-Sleep -Milliseconds 500
+  }
+  return 'failed'
+}
+
 # Runs as a BARE statement at every call site (never assigned, never wrapped
 # in parens): capturing a PowerShell call's output is how you consume it
 # instead of letting it stream live, and `docker compose logs --follow`
@@ -590,6 +756,7 @@ function Invoke-Main {
       Write-Output "aos-crm-local gate: $(if ($verdict.Proceed) { 'READY to start' } else { 'NOT ready' }) (configured port: $($signals.ResolvedPort), occupancy: $($signals.PortOccupancy))"
       foreach ($b in $verdict.Blockers) { Write-Output "  - $b" }
       if ($signals.HostReady) {
+        Write-Output "distro session keeper: $(if (@(Get-DistroKeeperPids -Distro $Distro).Count -gt 0) { 'running' } else { 'not running (the stack would not survive an idle window)' })"
         Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('ps')
         exit $script:ComposeExitCode
       }
@@ -600,17 +767,34 @@ function Invoke-Main {
       $result = Invoke-StartAction -HostReady $signals.HostReady -EnvCheck $signals.EnvCheck -PrivacyCheck $signals.PrivacyCheck `
         -PortOccupancy $signals.PortOccupancy -WebPortUrlCoherent $signals.WebPortUrlCoherent -ConfigVerifierOk $signals.ConfigVerifierOk `
         -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid `
-        -ComposeInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
+        -KeeperInvoker { $script:KeeperState = Start-DistroKeeper -Distro $Distro; Write-Output "distro session keeper: $script:KeeperState" } `
+        -ComposeInvoker {
+          if (-not (Update-SourceStamp -RepoRoot $RepoRoot -EnvPath $EnvPath)) {
+            Write-Output 'aos-crm-local: could not stamp the source commit/tree into deploy/local/.env; refusing to build an image nobody can trace back to a source.'
+            $script:ComposeExitCode = 2
+            return
+          }
+          Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d')
+        }
       if (-not $result.Invoked) {
         Write-Output 'aos-crm-local: BLOCKED (fail-closed), no build/up attempted:'
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit 1
       }
+      if ($script:KeeperState -eq 'failed') {
+        Write-Output 'aos-crm-local: the distro session keeper could not be confirmed; the stack may not survive this CLI exiting.'
+        exit 1
+      }
       exit $script:ComposeExitCode
     }
     'Stop' {
-      Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down')
-      exit $script:ComposeExitCode
+      $result = Invoke-StopAction `
+        -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
+        -KeeperStopInvoker { Write-Output "distro session keeper: $(Stop-DistroKeeper -Distro $Distro)" }
+      if ($result.Stage -ne 'stopped') {
+        Write-Output "aos-crm-local: compose down exited $($result.ExitCode); the distro session keeper was left running on purpose."
+      }
+      exit $result.ExitCode
     }
     'Restart' {
       $signals = Get-GateSignals
@@ -619,7 +803,15 @@ function Invoke-Main {
         -PrivacyVerifierStatus $signals.PrivacyVerifierStatus -PortConfigValid $signals.PortConfigValid `
         -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
         -PortFreeAfterDownProbe { Test-PortFree -Port $signals.ResolvedPort } `
-        -UpInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d') }
+        -KeeperInvoker { $script:KeeperState = Start-DistroKeeper -Distro $Distro; Write-Output "distro session keeper: $script:KeeperState" } `
+        -UpInvoker {
+          if (-not (Update-SourceStamp -RepoRoot $RepoRoot -EnvPath $EnvPath)) {
+            Write-Output 'aos-crm-local: could not stamp the source commit/tree into deploy/local/.env; refusing to build an image nobody can trace back to a source.'
+            $script:ComposeExitCode = 2
+            return
+          }
+          Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('up', '--build', '-d')
+        }
       if ($result.Stage -ne 'started') {
         Write-Output 'aos-crm-local: BLOCKED (fail-closed):'
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
@@ -960,6 +1152,70 @@ function Invoke-SelfTest {
         -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $false } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'blocked-after-down') { throw "expected Stage=blocked-after-down, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe') { throw "expected down,probe without up, got $($order -join ',')" }
+    }
+
+    Record 'Set-EnvKeyLines: replaces a key in place, appends a missing one and leaves every other line (and the secrets) untouched' {
+      $before = @('# generated', 'AOS_CRM_PG_PASSWORD=keep-me', 'AOS_CRM_SOURCE_COMMIT=old', '# AOS_CRM_SOURCE_TREE=commented-out')
+      $after = Set-EnvKeyLines -Lines $before -Values ([ordered]@{ AOS_CRM_SOURCE_COMMIT = 'new'; AOS_CRM_SOURCE_TREE = 'tree' })
+      if (@($after | Where-Object { $_ -eq 'AOS_CRM_PG_PASSWORD=keep-me' }).Count -ne 1) { throw 'an unrelated key was dropped or duplicated' }
+      if (@($after | Where-Object { $_ -eq 'AOS_CRM_SOURCE_COMMIT=new' }).Count -ne 1) { throw 'the existing key was not replaced exactly once' }
+      if (@($after | Where-Object { $_ -match '^AOS_CRM_SOURCE_COMMIT=old$' }).Count -ne 0) { throw 'the old value survived' }
+      if (@($after | Where-Object { $_ -eq 'AOS_CRM_SOURCE_TREE=tree' }).Count -ne 1) { throw 'the missing key was not appended exactly once' }
+      if (@($after | Where-Object { $_ -eq '# AOS_CRM_SOURCE_TREE=commented-out' }).Count -ne 1) { throw 'a commented line was rewritten' }
+      if (@($after)[0] -ne '# generated') { throw 'the leading comment moved' }
+    }
+
+    Record 'Get-KeeperPids: reads pids out of real pgrep output and ignores anything that is not one' {
+      if (@(Get-KeeperPids -PgrepOutput "123`n456").Count -ne 2) { throw 'expected two pids' }
+      if (@(Get-KeeperPids -PgrepOutput '').Count -ne 0) { throw 'expected no pid from empty output (pgrep exits 1 with no match)' }
+      if (@(Get-KeeperPids -PgrepOutput "pgrep: not found`n").Count -ne 0) { throw 'expected a non-numeric line to be ignored, not parsed as a pid' }
+      if (@(Get-KeeperPids -PgrepOutput " 789 `n`n").Count -ne 1) { throw 'expected whitespace/blank lines to be tolerated' }
+    }
+
+    Record 'Invoke-StartAction: the distro session is held open BEFORE compose up, so the stack cannot outlive its own WSL session' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
+      if (-not $result.Invoked) { throw 'expected Invoked=true' }
+      if (($order -join ',') -ne 'keeper,up') { throw "expected keeper,up in order, got $($order -join ',')" }
+    }
+
+    Record 'Invoke-StartAction: a blocked verdict never starts the keeper either (no side effect on the host from a failed gate)' {
+      $envMissing = [ordered]@{ Exists = $false; MissingKeys = @($RequiredEnvKeys); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envMissing -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
+      if ($result.Invoked) { throw 'expected Invoked=false' }
+      if ($order.Count -ne 0) { throw "expected neither keeper nor up to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-StopAction: compose down first, and only then is the distro session released' {
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -KeeperStopInvoker { $order.Add('keeper-stop') }
+      if ($result.Stage -ne 'stopped') { throw "expected Stage=stopped, got $($result.Stage)" }
+      if (($order -join ',') -ne 'down,keeper-stop') { throw "expected down,keeper-stop in order, got $($order -join ',')" }
+    }
+
+    Record 'Invoke-StopAction: a failed compose down keeps the session alive and preserves its exit code (releasing it would kill containers that are still up)' {
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 7; $order.Add('down') } -KeeperStopInvoker { $order.Add('keeper-stop') }
+      if ($result.Stage -ne 'down-failed') { throw "expected Stage=down-failed, got $($result.Stage)" }
+      if ($result.ExitCode -ne 7) { throw "expected exit code 7 preserved, got $($result.ExitCode)" }
+      if (($order -join ',') -ne 'down') { throw "expected the keeper to survive a failed down, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-RestartAction: the keeper is re-ensured after down and before up, never released mid-restart' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } `
+        -KeeperInvoker { $order.Add('keeper') } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
+      if (($order -join ',') -ne 'down,probe,keeper,up') { throw "expected down,probe,keeper,up in order, got $($order -join ',')" }
     }
 
     Record 'Invoke-PowerShellScript: a script path and argument containing spaces and Unicode survive intact' {

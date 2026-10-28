@@ -15,6 +15,7 @@
 //   node scripts/aos/verify-server-specs.mjs
 //   node scripts/aos/verify-server-specs.mjs --self-test   (no WSL, no Docker)
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -26,6 +27,41 @@ const SPECS = [
   'src/engine/core-modules/twenty-config/__tests__/twenty-config.service.spec.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
+
+// Exactly what the official Dockerfile's `server-deps` stage COPYs, plus the
+// Dockerfile itself. The stage is rebuilt on EVERY run from a tar context
+// holding only these paths: "the tag already exists" is not evidence that the
+// dependencies behind it match today's lockfile, and a gate that trusts a
+// stale tag can report PASS against dependencies nobody installed. Keeping the
+// context this small is what makes always-rebuilding affordable -- the full
+// checkout crosses drvfs at ~200 MB per build, these are a few hundred KB --
+// and it also keeps the bus, deploy/local/.env and .git out of the daemon.
+export const DEPS_CONTEXT_PATHS = [
+  'package.json',
+  'yarn.lock',
+  '.yarnrc.yml',
+  'tsconfig.base.json',
+  'nx.json',
+  '.yarn/releases',
+  '.yarn/patches',
+  'packages/twenty-docker/twenty/Dockerfile',
+  'packages/twenty-emails/package.json',
+  'packages/twenty-server/package.json',
+  'packages/twenty-server/patches',
+  'packages/twenty-shared/package.json',
+  'packages/twenty-client-sdk/package.json',
+  'packages/twenty-oxlint-rules/package.json',
+];
+
+// The specs need these four workspaces and nothing else. Mounted one by one,
+// read-only, instead of the whole checkout: a container that can read
+// deploy/local/.env, .aos/ or .git does not need to for this measurement.
+export const SPEC_SOURCE_PACKAGES = [
+  'twenty-emails',
+  'twenty-shared',
+  'twenty-client-sdk',
+  'twenty-server',
+];
 
 // Jest's own summary is the only thing we trust for a verdict. "exit 0" is not
 // enough: a config that matched zero files also exits 0, and that would be a
@@ -64,21 +100,23 @@ function run() {
   }
   const root = linuxRoot.stdout.trim();
 
-  const hasImage = wsl(['docker', 'image', 'inspect', DEPS_IMAGE]);
-  if (hasImage.status !== 0) {
-    console.log(`[INFO] ${DEPS_IMAGE} not present; building it from the official Dockerfile (first run only, several minutes)`);
-    const build = wsl(['docker', 'build', '--target', 'server-deps',
-      '-f', `${root}/packages/twenty-docker/twenty/Dockerfile`,
-      '-t', DEPS_IMAGE, root], { stdio: ['ignore', 'inherit', 'inherit'] });
-    if (build.status !== 0) fail(`docker build --target server-deps exited ${build.status}`);
+  for (const relative of DEPS_CONTEXT_PATHS) {
+    const probe = wsl(['test', '-e', `${root}/${relative}`]);
+    if (probe.status !== 0) fail(`server-deps build input is missing from the checkout: ${relative}`);
   }
+  console.log('[INFO] rebuilding the server-deps stage from the official Dockerfile (Docker layer cache makes this seconds once warm)');
+  const buildCommand =
+    `cd ${JSON.stringify(root)} && tar -cf - ${DEPS_CONTEXT_PATHS.map((p) => JSON.stringify(p)).join(' ')} | ` +
+    `docker build --target server-deps -f packages/twenty-docker/twenty/Dockerfile -t ${DEPS_IMAGE} -`;
+  const build = wsl(['sh', '-c', buildCommand], { stdio: ['ignore', 'inherit', 'inherit'] });
+  if (build.status !== 0) fail(`docker build --target server-deps exited ${build.status}`);
 
-  // Copied into the container rather than run from the read-only mount: jest
+  // Copied into the container rather than run from the read-only mounts: jest
   // and the workspace builds write next to the sources, and the checkout must
   // come back untouched.
   const script = [
     'set -e',
-    'cp -r /src/packages/twenty-emails /src/packages/twenty-shared /src/packages/twenty-client-sdk /src/packages/twenty-server /app/packages/',
+    `cp -r ${SPEC_SOURCE_PACKAGES.map((p) => `/src/${p}`).join(' ')} /app/packages/`,
     'cd /app',
     'export NX_DAEMON=false NX_NO_CLOUD=true',
     'npx nx run-many -t build -p twenty-shared twenty-client-sdk twenty-emails --skip-nx-cache >/tmp/build.log 2>&1',
@@ -86,8 +124,9 @@ function run() {
     `npx jest --config jest.config.mjs --runInBand ${SPECS.join(' ')}`,
   ].join('\n');
 
+  const mounts = SPEC_SOURCE_PACKAGES.flatMap((p) => ['-v', `${root}/packages/${p}:/src/${p}:ro`]);
   const res = wsl(['docker', 'run', '--rm', '--network', 'none',
-    '-v', `${root}:/src:ro`, DEPS_IMAGE, 'sh', '-c', script]);
+    ...mounts, DEPS_IMAGE, 'sh', '-c', script]);
   const output = `${res.stdout || ''}\n${res.stderr || ''}`;
   if (res.status !== 0) {
     console.error(output.split('\n').slice(-25).join('\n'));
@@ -97,7 +136,7 @@ function run() {
   if (!verdict.ok) fail(`privacy specs: ${verdict.detail}`);
 
   console.log(`[PASS] CRM-003 privacy specs executed against the real classes: ${verdict.detail}`);
-  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence, run in the server-deps image with no network. This does NOT start the CRM, build its image, or observe runtime traffic.');
+  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence, run with no network in a server-deps image rebuilt from this run\'s lockfile. This does NOT start the CRM or observe runtime traffic.');
 }
 
 function selfTest() {
@@ -130,6 +169,29 @@ function selfTest() {
     for (const spec of SPECS) {
       execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])',
         resolve(REPO_ROOT, 'packages', 'twenty-server', spec)]);
+    }
+  });
+  record('every server-deps build input exists in the checkout, so the stage is rebuilt from a complete context', () => {
+    for (const relative of DEPS_CONTEXT_PATHS) {
+      execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])', resolve(REPO_ROOT, relative)]);
+    }
+  });
+  record('the build context declares every path the server-deps stage COPYs (a missing one would install from a partial context)', () => {
+    const dockerfile = readFileSync(resolve(REPO_ROOT, 'packages/twenty-docker/twenty/Dockerfile'), 'utf8');
+    const stage = dockerfile.split(/^FROM .* AS server-deps$/m)[1].split(/^FROM /m)[0];
+    const copied = [...stage.matchAll(/^COPY\s+(.+?)\s+\/app/gm)]
+      .flatMap((m) => m[1].trim().split(/\s+/))
+      .map((p) => p.replace(/^\.\//, ''));
+    assert(copied.length > 0, 'parsed no COPY source out of the server-deps stage');
+    const missing = copied.filter((p) => !DEPS_CONTEXT_PATHS.includes(p));
+    assert(missing.length === 0, `the stage COPYs path(s) absent from DEPS_CONTEXT_PATHS: ${missing.join(', ')}`);
+  });
+  record('the container mounts only the four workspaces the specs need, never the checkout root', () => {
+    assert(SPEC_SOURCE_PACKAGES.length === 4, `expected 4 spec source packages, got ${SPEC_SOURCE_PACKAGES.length}`);
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    assert(!/-v['"\s,]+\$\{root\}:/.test(source), 'the whole checkout is mounted into the container again');
+    for (const pkg of SPEC_SOURCE_PACKAGES) {
+      execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])', resolve(REPO_ROOT, 'packages', pkg)]);
     }
   });
 
