@@ -398,10 +398,17 @@ function Get-StackReadiness {
     try { $entry = $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
     $service = [string](Get-ComposePsField -Entry $entry -Name 'Service' -Default '')
     if ([string]::IsNullOrWhiteSpace($service)) { continue }
+    # RestartCount is in Compose's schema but this version leaves it empty for
+    # running containers (measured against the real stack), so it is reported
+    # as unreported rather than as a zero nobody measured. The verdict does not
+    # depend on it: a container that died and came back is in `restarting`, and
+    # that state is read below.
+    $restarts = 0
+    $restartsKnown = [int]::TryParse([string](Get-ComposePsField -Entry $entry -Name 'RestartCount' -Default ''), [ref] $restarts)
     $observed[$service] = [ordered]@{
       State        = ([string](Get-ComposePsField -Entry $entry -Name 'State' -Default '')).ToLowerInvariant()
       Health       = ([string](Get-ComposePsField -Entry $entry -Name 'Health' -Default '')).ToLowerInvariant()
-      RestartCount = [int](Get-ComposePsField -Entry $entry -Name 'RestartCount' -Default 0)
+      RestartCount = if ($restartsKnown) { $restarts } else { $null }
     }
   }
   $parts = [System.Collections.Generic.List[string]]::new()
@@ -419,7 +426,8 @@ function Get-StackReadiness {
       else { 'up' }
     $verdicts.Add($verdict) | Out-Null
     $health = if ($info.Health) { "/$($info.Health)" } else { '' }
-    $parts.Add("${name}: $($info.State)$health (restarts $($info.RestartCount))") | Out-Null
+    $restartText = if ($null -eq $info.RestartCount) { 'unreported' } else { [string]$info.RestartCount }
+    $parts.Add("${name}: $($info.State)$health (restarts $restartText)") | Out-Null
   }
   $ready = (@($verdicts | Where-Object { $_ -ne 'up' }).Count -eq 0)
   $starting = (-not $ready) -and (@($verdicts | Where-Object { $_ -eq 'down' }).Count -eq 0)
@@ -1476,6 +1484,16 @@ function Invoke-SelfTest {
       ) -join "`n")
       if ($r.Ready -or $r.Starting) { throw 'a restarting service is down' }
       if ($r.Detail -notmatch 'restarts 7') { throw "expected the restart count in the detail, got: $($r.Detail)" }
+    }
+
+    Record 'Get-StackReadiness: a RestartCount Compose did not report is said to be unreported, not claimed as zero (measured: this Compose leaves it empty)' {
+      $r = Get-StackReadiness -PsJsonOutput (@(
+        '{"Service":"server","State":"running","Health":"healthy","RestartCount":""}',
+        '{"Service":"worker","State":"running","Health":""}'
+      ) -join "`n")
+      if (-not $r.Ready) { throw "a missing RestartCount must not change the verdict: $($r.Detail)" }
+      if ($r.Detail -notmatch 'restarts unreported') { throw "expected an unreported restart count to say so, got: $($r.Detail)" }
+      if ($r.Detail -match 'restarts 0') { throw "expected no claim of zero restarts, got: $($r.Detail)" }
     }
 
     Record 'Get-StackReadiness: an unreadable or empty `compose ps` fails closed instead of reading as up' {
