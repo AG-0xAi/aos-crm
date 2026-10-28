@@ -54,6 +54,19 @@ $KeeperPattern = "tail -f $KeeperMarker"
 # against isolated fixtures instead of the real checkout.
 # ---------------------------------------------------------------------------
 
+# `pgrep -f <pattern>` / `pkill -f <pattern>` match an EXTENDED REGEX against
+# any SUBSTRING of the whole command line, so the keeper's own marker also
+# matches every longer line that merely contains it (another product's
+# `tail -f /tmp/aos-crm-local-keeper-2`, or a `grep` someone is running over
+# the marker), and any regex metacharacter in the marker would stand for more
+# than itself. Callers pair this with `-x`, which anchors the match to the
+# COMPLETE command line, so between the two the pattern can only ever mean
+# this product's own exact keeper line.
+function ConvertTo-EreLiteral {
+  param([string] $Text)
+  return ($Text -replace '([\\^$.\[\]|()*+?{}])', '\$1')
+}
+
 function Test-PortFree {
   param([int] $Port, [string] $BindAddress = '127.0.0.1')
   $listener = $null
@@ -353,10 +366,26 @@ function Get-StartGateVerdict {
   return [ordered]@{ Proceed = ($blockers.Count -eq 0); Blockers = @($blockers) }
 }
 
+# Runs $KeeperInvoker and judges whether the distro session this stack needs is
+# actually open. The invoker reports through $script:KeeperState (same
+# convention as $script:ComposeExitCode, and for the same reason: its output is
+# piped to Out-Host so `docker compose`'s own stream stays live, which means a
+# return value cannot travel back). Anything other than a confirmed session --
+# including an invoker that reported nothing at all -- is a failure: `up`
+# without a keeper produces a stack that dies with the idle window, and that
+# must not look like a successful start.
+function Test-KeeperHeld {
+  param([scriptblock] $KeeperInvoker)
+  $script:KeeperState = $null
+  & $KeeperInvoker | Out-Host
+  return ($script:KeeperState -in @('started', 'already-running'))
+}
+
 # Orchestrates Start: computes the verdict, then only invokes the mutating
-# $ComposeInvoker when every gate is green. -SelfTest swaps $ComposeInvoker
-# for a non-mutating recorder, proving the wiring itself (not just the
-# isolated boolean aggregator) refuses to reach Docker when blocked.
+# $ComposeInvoker when every gate is green AND the distro session is held.
+# -SelfTest swaps $ComposeInvoker for a non-mutating recorder, proving the
+# wiring itself (not just the isolated boolean aggregator) refuses to reach
+# Docker when blocked.
 function Invoke-StartAction {
   param(
     [bool] $HostReady,
@@ -368,11 +397,13 @@ function Invoke-StartAction {
     [string] $PrivacyVerifierStatus,
     [scriptblock] $ComposeInvoker,
     [scriptblock] $KeeperInvoker = {},
-    [bool] $PortConfigValid = $true
+    [bool] $PortConfigValid = $true,
+    [bool] $AppVersionAcceptable = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
     -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
-    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid
+    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid `
+    -AppVersionAcceptable $AppVersionAcceptable
   if (-not $verdict.Proceed) {
     return [ordered]@{ Invoked = $false; Verdict = $verdict }
   }
@@ -382,7 +413,13 @@ function Invoke-StartAction {
   # anything to the output stream would otherwise be collected into this
   # function's return value, and the caller's `$result.Invoked` would fail on
   # an array. Out-Host still streams live, which `docker compose` needs.
-  & $KeeperInvoker | Out-Host
+  if (-not (Test-KeeperHeld -KeeperInvoker $KeeperInvoker)) {
+    $keeperVerdict = [ordered]@{
+      Proceed  = $false
+      Blockers = @("keeper: the distro session keeper could not be confirmed (state: $($script:KeeperState ?? 'not reported')); refusing to start a stack that would die with the WSL idle window")
+    }
+    return [ordered]@{ Invoked = $false; Verdict = $keeperVerdict }
+  }
   & $ComposeInvoker | Out-Host
   return [ordered]@{ Invoked = $true; Verdict = $verdict }
 }
@@ -392,7 +429,11 @@ function Invoke-StartAction {
 # still up would take them down by shutting the distro instead of stopping
 # them, which is exactly the uncontrolled shutdown this orchestration exists
 # to avoid. The down exit code travels via $script:ComposeExitCode (same
-# convention as Invoke-RestartAction).
+# convention as Invoke-RestartAction); the release outcome travels via
+# $script:KeeperStopState, and a release that could NOT be confirmed is
+# reported as a failure with its own exit code instead of being dropped: a
+# keeper left behind after a successful `down` keeps the distro (and dockerd)
+# alive for nothing, and silently exiting 0 is how that goes unnoticed.
 function Invoke-StopAction {
   param([scriptblock] $DownInvoker, [scriptblock] $KeeperStopInvoker)
   & $DownInvoker | Out-Host
@@ -400,7 +441,16 @@ function Invoke-StopAction {
   if ($downExitCode -ne 0) {
     return [ordered]@{ Stage = 'down-failed'; KeeperReleased = $false; ExitCode = $downExitCode }
   }
+  $script:KeeperStopState = $null
   & $KeeperStopInvoker | Out-Host
+  if ($script:KeeperStopState -notin @('stopped', 'not-running')) {
+    return [ordered]@{
+      Stage          = 'keeper-release-failed'
+      KeeperReleased = $false
+      ExitCode       = 1
+      KeeperState    = ($script:KeeperStopState ?? 'not reported')
+    }
+  }
   return [ordered]@{ Stage = 'stopped'; KeeperReleased = $true; ExitCode = 0 }
 }
 
@@ -424,11 +474,13 @@ function Invoke-RestartAction {
     [scriptblock] $PortFreeAfterDownProbe,
     [scriptblock] $UpInvoker,
     [scriptblock] $KeeperInvoker = {},
-    [bool] $PortConfigValid = $true
+    [bool] $PortConfigValid = $true,
+    [bool] $AppVersionAcceptable = $true
   )
   $verdict = Get-StartGateVerdict -HostReady $HostReady -EnvCheck $EnvCheck -PrivacyCheck $PrivacyCheck `
     -PortOccupancy $PortOccupancy -WebPortUrlCoherent $WebPortUrlCoherent -ConfigVerifierOk $ConfigVerifierOk `
-    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid
+    -PrivacyVerifierStatus $PrivacyVerifierStatus -PortConfigValid $PortConfigValid `
+    -AppVersionAcceptable $AppVersionAcceptable
   if (-not $verdict.Proceed) {
     return [ordered]@{ Stage = 'blocked-before-down'; Verdict = $verdict; ExitCode = 1 }
   }
@@ -451,8 +503,16 @@ function Invoke-RestartAction {
     return [ordered]@{ Stage = 'blocked-after-down'; Verdict = $stuckVerdict; ExitCode = 1 }
   }
   # Re-ensured here rather than released anywhere in this path: a restart must
-  # not be the moment the stack loses the session holding its distro open.
-  & $KeeperInvoker | Out-Host
+  # not be the moment the stack loses the session holding its distro open. And
+  # if it cannot be confirmed, the stack stays down instead of coming back up
+  # with nothing holding the distro open.
+  if (-not (Test-KeeperHeld -KeeperInvoker $KeeperInvoker)) {
+    $keeperVerdict = [ordered]@{
+      Proceed  = $false
+      Blockers = @("keeper: the distro session keeper could not be confirmed (state: $($script:KeeperState ?? 'not reported')); refusing to start a stack that would die with the WSL idle window")
+    }
+    return [ordered]@{ Stage = 'blocked-keeper-failed'; Verdict = $keeperVerdict; ExitCode = 1 }
+  }
   & $UpInvoker | Out-Host
   return [ordered]@{ Stage = 'started'; Verdict = $verdict }
 }
@@ -647,7 +707,7 @@ function Invoke-Prepare {
 # the exact command line Start-DistroKeeper launches. Returns pids only.
 function Get-DistroKeeperPids {
   param([string] $Distro)
-  $out = & wsl.exe -d $Distro --exec pgrep -f $KeeperPattern 2>$null
+  $out = & wsl.exe -d $Distro --exec pgrep -x -f (ConvertTo-EreLiteral $KeeperPattern) 2>$null
   if ($LASTEXITCODE -ne 0) { return @() }
   return Get-KeeperPids -PgrepOutput (@($out) -join "`n")
 }
@@ -691,7 +751,7 @@ function Start-DistroKeeper {
 function Stop-DistroKeeper {
   param([string] $Distro, [int] $TimeoutSeconds = 20)
   if (@(Get-DistroKeeperPids -Distro $Distro).Count -eq 0) { return 'not-running' }
-  & wsl.exe -d $Distro --exec pkill -f $KeeperPattern 2>$null | Out-Null
+  & wsl.exe -d $Distro --exec pkill -x -f (ConvertTo-EreLiteral $KeeperPattern) 2>$null | Out-Null
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   while ((Get-Date) -lt $deadline) {
     if (@(Get-DistroKeeperPids -Distro $Distro).Count -eq 0) { return 'stopped' }
@@ -804,18 +864,16 @@ function Invoke-Main {
         foreach ($b in $result.Verdict.Blockers) { Write-Output "  - $b" }
         exit 1
       }
-      if ($script:KeeperState -eq 'failed') {
-        Write-Output 'aos-crm-local: the distro session keeper could not be confirmed; the stack may not survive this CLI exiting.'
-        exit 1
-      }
       exit $script:ComposeExitCode
     }
     'Stop' {
       $result = Invoke-StopAction `
         -DownInvoker { Invoke-ComposeOnLinux -RepoRoot $RepoRoot -Distro $Distro -ComposeArgs @('down') } `
-        -KeeperStopInvoker { Write-Output "distro session keeper: $(Stop-DistroKeeper -Distro $Distro)" }
-      if ($result.Stage -ne 'stopped') {
+        -KeeperStopInvoker { $script:KeeperStopState = Stop-DistroKeeper -Distro $Distro; Write-Output "distro session keeper: $script:KeeperStopState" }
+      if ($result.Stage -eq 'down-failed') {
         Write-Output "aos-crm-local: compose down exited $($result.ExitCode); the distro session keeper was left running on purpose."
+      } elseif ($result.Stage -ne 'stopped') {
+        Write-Output "aos-crm-local: compose down succeeded but the distro session keeper could not be released (state: $($result.KeeperState)); it is still holding the distro open."
       }
       exit $result.ExitCode
     }
@@ -1122,7 +1180,8 @@ function Invoke-SelfTest {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $calls = @(0)
-      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' -ComposeInvoker { $calls[0] += 1 }
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $script:KeeperState = 'started' } -ComposeInvoker { $calls[0] += 1 }
       if (-not $result.Invoked) { throw 'expected Invoked=true' }
       if ($calls[0] -ne 1) { throw "expected the compose invoker to run exactly once, ran $($calls[0]) time(s)" }
     }
@@ -1141,7 +1200,8 @@ function Invoke-SelfTest {
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } -UpInvoker { $order.Add('up') }
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } `
+        -KeeperInvoker { $script:KeeperState = 'started' } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe,up') { throw "expected down,probe,up in order, got $($order -join ',')" }
     }
@@ -1196,13 +1256,13 @@ function Invoke-SelfTest {
       $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -KeeperInvoker { Write-Output 'keeper chatter' } -ComposeInvoker { Write-Output 'compose chatter' }
+        -KeeperInvoker { $script:KeeperState = 'started'; Write-Output 'keeper chatter' } -ComposeInvoker { Write-Output 'compose chatter' }
       if ($result -is [array]) { throw 'the verdict came back as an array: invoker output leaked into the return value' }
       if (-not $result.Invoked) { throw 'expected Invoked=true' }
     }
 
     Record 'Invoke-StopAction: the same leak is impossible on the stop path' {
-      $result = Invoke-StopAction -DownInvoker { Write-Output 'down chatter'; $script:ComposeExitCode = 0 } -KeeperStopInvoker { Write-Output 'keeper chatter' }
+      $result = Invoke-StopAction -DownInvoker { Write-Output 'down chatter'; $script:ComposeExitCode = 0 } -KeeperStopInvoker { $script:KeeperStopState = 'stopped'; Write-Output 'keeper chatter' }
       if ($result -is [array]) { throw 'the stop result came back as an array' }
       if ($result.Stage -ne 'stopped') { throw "expected Stage=stopped, got $($result.Stage)" }
     }
@@ -1230,7 +1290,7 @@ function Invoke-SelfTest {
       $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
-        -KeeperInvoker { $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
+        -KeeperInvoker { $script:KeeperState = 'started'; $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
       if (-not $result.Invoked) { throw 'expected Invoked=true' }
       if (($order -join ',') -ne 'keeper,up') { throw "expected keeper,up in order, got $($order -join ',')" }
     }
@@ -1247,7 +1307,7 @@ function Invoke-SelfTest {
 
     Record 'Invoke-StopAction: compose down first, and only then is the distro session released' {
       $order = [System.Collections.Generic.List[string]]::new()
-      $result = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -KeeperStopInvoker { $order.Add('keeper-stop') }
+      $result = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -KeeperStopInvoker { $script:KeeperStopState = 'stopped'; $order.Add('keeper-stop') }
       if ($result.Stage -ne 'stopped') { throw "expected Stage=stopped, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,keeper-stop') { throw "expected down,keeper-stop in order, got $($order -join ',')" }
     }
@@ -1266,9 +1326,108 @@ function Invoke-SelfTest {
       $order = [System.Collections.Generic.List[string]]::new()
       $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
         -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } `
-        -KeeperInvoker { $order.Add('keeper') } -UpInvoker { $order.Add('up') }
+        -KeeperInvoker { $script:KeeperState = 'started'; $order.Add('keeper') } -UpInvoker { $order.Add('up') }
       if ($result.Stage -ne 'started') { throw "expected Stage=started, got $($result.Stage)" }
       if (($order -join ',') -ne 'down,probe,keeper,up') { throw "expected down,probe,keeper,up in order, got $($order -join ',')" }
+    }
+
+    # CRM-004 fix2. Main already computed and passed -AppVersionAcceptable, but
+    # neither orchestrator DECLARED it: a simple PowerShell function silently
+    # collects unknown named arguments into $args, so the value landed nowhere
+    # and both Start and Restart ran `up` on a configuration the server rejects
+    # at boot. The isolated Get-StartGateVerdict test above passed throughout,
+    # which is exactly why the orchestration needs its own coverage.
+    Record 'Invoke-StartAction: an APP_VERSION the server cannot parse blocks the real orchestration, not just the isolated aggregator' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -AppVersionAcceptable $false `
+        -KeeperInvoker { $script:KeeperState = 'started'; $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
+      if ($result.Invoked) { throw 'expected Invoked=false for an unparseable APP_VERSION' }
+      if (-not (@($result.Verdict.Blockers) -match 'app-version:')) { throw "expected an app-version: blocker, got: $($result.Verdict.Blockers -join '; ')" }
+      if ($order.Count -ne 0) { throw "expected neither keeper nor up to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-RestartAction: an APP_VERSION the server cannot parse blocks before down, up or the keeper' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -AppVersionAcceptable $false `
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } `
+        -KeeperInvoker { $script:KeeperState = 'started'; $order.Add('keeper') } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-before-down') { throw "expected Stage=blocked-before-down, got $($result.Stage)" }
+      if (-not (@($result.Verdict.Blockers) -match 'app-version:')) { throw "expected an app-version: blocker, got: $($result.Verdict.Blockers -join '; ')" }
+      if ($order.Count -ne 0) { throw "expected nothing to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-StartAction: a keeper that could not be confirmed blocks `up` instead of starting a stack that dies with the idle window' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      foreach ($state in @('failed', $null)) {
+        $order = [System.Collections.Generic.List[string]]::new()
+        $stateToReport = $state
+        $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+          -KeeperInvoker { $script:KeeperState = $stateToReport; $order.Add('keeper') } -ComposeInvoker { $order.Add('up') }
+        if ($result.Invoked) { throw "expected Invoked=false when the keeper reported '$state'" }
+        if (-not (@($result.Verdict.Blockers) -match '^keeper:')) { throw 'expected a keeper: blocker' }
+        if (($order -join ',') -ne 'keeper') { throw "expected the keeper attempt and no up, ran: $($order -join ',')" }
+      }
+    }
+
+    Record 'Invoke-RestartAction: a keeper that could not be confirmed after down refuses to bring the stack back up' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-RestartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'OwnedBySelf' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -DownInvoker { $script:ComposeExitCode = 0; $order.Add('down') } -PortFreeAfterDownProbe { $order.Add('probe'); $true } `
+        -KeeperInvoker { $script:KeeperState = 'failed'; $order.Add('keeper') } -UpInvoker { $order.Add('up') }
+      if ($result.Stage -ne 'blocked-keeper-failed') { throw "expected Stage=blocked-keeper-failed, got $($result.Stage)" }
+      if ($result.ExitCode -eq 0) { throw 'expected a non-zero exit code' }
+      if (($order -join ',') -ne 'down,probe,keeper') { throw "expected down,probe,keeper without up, got $($order -join ',')" }
+    }
+
+    Record 'Invoke-StartAction: a keeper that was ALREADY running counts as held (a restart must not re-block on it)' {
+      $envOk = [ordered]@{ Exists = $true; MissingKeys = @(); PlaceholderKeys = @() }
+      $privacyOk = [ordered]@{ Exists = $true; MissingKeys = @(); WrongValueKeys = @() }
+      $order = [System.Collections.Generic.List[string]]::new()
+      $result = Invoke-StartAction -HostReady $true -EnvCheck $envOk -PrivacyCheck $privacyOk -PortOccupancy 'Free' -WebPortUrlCoherent $true -ConfigVerifierOk $true -PrivacyVerifierStatus 'Pass' `
+        -KeeperInvoker { $script:KeeperState = 'already-running' } -ComposeInvoker { $order.Add('up') }
+      if (-not $result.Invoked) { throw 'expected an already-running keeper to be accepted' }
+      if (($order -join ',') -ne 'up') { throw "expected up to run, ran: $($order -join ',')" }
+    }
+
+    Record 'Invoke-StopAction: a keeper that could not be released is a non-zero exit, not a silent success' {
+      foreach ($state in @('failed', $null)) {
+        $stateToReport = $state
+        $result = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 0 } -KeeperStopInvoker { $script:KeeperStopState = $stateToReport }
+        if ($result.Stage -ne 'keeper-release-failed') { throw "expected Stage=keeper-release-failed for '$state', got $($result.Stage)" }
+        if ($result.ExitCode -eq 0) { throw 'expected a non-zero exit code' }
+        if ($result.KeeperReleased) { throw 'expected KeeperReleased=false' }
+      }
+      $notRunning = Invoke-StopAction -DownInvoker { $script:ComposeExitCode = 0 } -KeeperStopInvoker { $script:KeeperStopState = 'not-running' }
+      if ($notRunning.Stage -ne 'stopped') { throw "a keeper that was not running is already released, got $($notRunning.Stage)" }
+    }
+
+    Record 'ConvertTo-EreLiteral: every regex metacharacter in our own keeper line is escaped, so `pgrep -x -f` can only mean that exact line' {
+      $escaped = ConvertTo-EreLiteral -Text 'tail -f /tmp/a.b+c[d]'
+      if ($escaped -ne 'tail -f /tmp/a\.b\+c\[d\]') { throw "unexpected escaping: $escaped" }
+      if ((ConvertTo-EreLiteral -Text $KeeperPattern) -ne $KeeperPattern) { throw 'the current keeper line needs no escaping, so it must come back unchanged' }
+      # The regression this closes: the pattern used to be passed to `pgrep -f`
+      # unanchored, which matches any command line CONTAINING it.
+      if ([System.Text.RegularExpressions.Regex]::IsMatch("$KeeperPattern-2", "^$(ConvertTo-EreLiteral -Text $KeeperPattern)$")) {
+        throw 'an anchored match still matched a longer, foreign command line'
+      }
+      if (-not [System.Text.RegularExpressions.Regex]::IsMatch($KeeperPattern, "^$(ConvertTo-EreLiteral -Text $KeeperPattern)$")) {
+        throw 'the anchored pattern no longer matches our own keeper line'
+      }
+    }
+
+    Record 'the keeper is looked up and released by its exact anchored command line, never by substring' {
+      $source = Get-Content -LiteralPath $PSCommandPath -Raw
+      if ($source -notmatch 'pgrep -x -f \(ConvertTo-EreLiteral \$KeeperPattern\)') { throw 'Get-DistroKeeperPids no longer uses an anchored, escaped pgrep' }
+      if ($source -notmatch 'pkill -x -f \(ConvertTo-EreLiteral \$KeeperPattern\)') { throw 'Stop-DistroKeeper no longer uses an anchored, escaped pkill' }
     }
 
     Record 'Invoke-PowerShellScript: a script path and argument containing spaces and Unicode survive intact' {
