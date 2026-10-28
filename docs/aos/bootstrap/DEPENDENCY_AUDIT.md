@@ -156,3 +156,36 @@ No se encontró ningún crítico confirmado en la ruta necesaria del runtime med
 Presencia no es explotabilidad, y este cruce no sustituye un SBOM ni un escaneo de la
 imagen final (que no existe todavía). El JSON del cruce está en
 `.aos/onboarding/bootstrap-2026-10-27/runtime-advisory-crosscheck.json`.
+
+## Inventario sobre la imagen final (CRM-004-fix1, 28 de octubre de 2026)
+
+El cruce anterior se hizo **reproduciendo** el pruning de producción del Dockerfile. Ahora
+existe la imagen de aplicación, así que se inventariaron los paquetes **realmente presentes
+dentro de ella**, leyendo cada `package.json` del árbol instalado desde un contenedor con
+`--network none` (`fix1/walk-installed.js`, `fix1/inventory-final-image.sh`):
+
+| Dato | Valor |
+| --- | --- |
+| Imagen inspeccionada | `aos-crm-local/twenty:v2.51.0-15e4826d3b` (la que construye Compose) |
+| Paquetes presentes | **1.084** (890 nombres distintos) |
+| Pares señalados por este documento | 47 |
+| Presentes con la versión exacta señalada | **14** |
+| Mismo paquete en otra versión | 12 |
+| Ausentes de la imagen | 21 |
+
+Los 14 presentes son: `@azure/msal-node@5.2.4`, `@graphql-tools/utils` en 9.2.1/10.3.4/12.0.0,
+`dompurify@3.4.16`, `follow-redirects@1.16.0`, `ip-address@10.7.2`, `multer@2.4.0`,
+`nodemailer@10.0.12`, `sanitize-html@2.17.7`, `undici` en 7.30.0/8.10.2/8.11.2 y
+`zod@4.1.11`. **El conjunto es idéntico al que predijo la reproducción del pruning**
+(1.087 paquetes entonces, 1.084 ahora), así que aquella medida era correcta y esta la
+confirma sobre el artefacto real.
+
+De esos 14, el único con un aviso crítico en el inventario inicial es `dompurify@3.4.16`, y
+su triage de alcance (tres llamadas, ninguna con `SAFE_FOR_TEMPLATES`, `IN_PLACE` ni parser
+XHTML) está más arriba en este documento: sigue siendo un triage de alcance, no una
+exoneración. Los críticos que concentraban el inventario (`next`, `storybook`, `electron`,
+`vite`, `@modelcontextprotocol/sdk`, `compression`) **no están en la imagen**.
+
+`body-parser` aparece solo como 2.4.0. Esto sigue sin ser un SBOM ni un escaneo de
+vulnerabilidades de la imagen: es un inventario de presencia cruzado con una lista de avisos
+conocida. El JSON está en `fix1/final-image-advisory-crosscheck.json`.

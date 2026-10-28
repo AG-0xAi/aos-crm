@@ -136,6 +136,17 @@ secretos y coherencia puerto/URL se miden **antes** de cualquier `build`/`up`. L
   dependencias disfrazada con la etiqueta de la aplicación (comprueba dentro de la imagen
   que el frontend servido existe).
 
+### Lo que se midió del arranque, no lo que se supone
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Migraciones | 182 filas en `core._typeorm_migrations`, 75 tablas en `core` |
+| Arranque completo | servidor `healthy`, worker arriba, `db` y `redis` `healthy` |
+| Camino E2E | 12/12 (`node --test scripts/aos/test/crm-runtime-e2e.test.mjs`, exit 0) |
+| Supervivencia a la ventana de inactividad | tras **190 s sin una sola invocación `wsl.exe`** (solo el guardián oculto vivo), `http://127.0.0.1:43000/healthz` devuelve 200 desde Windows y los cuatro contenedores siguen arriba |
+| Persistencia | la fila escrita por la API sobrevive a `compose restart db` y la vuelve a leer la propia API |
+| Tráfico en ejecución | ventana limpia de 300 s cubriendo login, CRUD, reinicio y casos de error: **un solo destino remoto, NTP de Canonical** (reloj de la distro), 0 paquetes perdidos |
+
 ### Primer administrador
 
 Se crea una sola vez, por el flujo real de autenticación (`signUp` →

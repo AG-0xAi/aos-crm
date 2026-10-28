@@ -170,3 +170,55 @@ los ~10 s en cada intento anterior.
 `cpu-features`, `esbuild`, `msgpackr-extract`, `msw`, `nx`, `protobufjs`, `ssh2`,
 `unrs-resolver`) con el texto literal "lists build scripts, but all build scripts have been
 disabled". No se habilitó ningún script, ni global ni individual.
+
+### La imagen de aplicación completa
+
+Un solo comando, secuenciado y con su serie de memoria propia
+(`fix1/A2-twenty.log`, `fix1/ram-A2-twenty.log`):
+
+| Dato | Valor medido |
+| --- | --- |
+| Comando | `docker build --progress=plain --target twenty -f packages/twenty-docker/twenty/Dockerfile -t aos-crm-local/twenty:fix1-build .` |
+| Código de salida | **0** |
+| Duración | **2.220 s** (37 min) |
+| Memoria, 103 muestras cada 20 s | pico **6.821 MB usados**, mínimo **4.829 MB disponibles** |
+| `twenty-front:lingui:extract/compile` + `nx build twenty-front` | DONE 243,2 s |
+| Exportar la imagen final (incluye 45,6 s de unpacking) | DONE 125,5 s |
+| Tamaño de la imagen | 1,65 GB |
+
+Nunca hubo presión de memoria: el mínimo disponible fue 4,8 GB de 11,4 GB.
+
+El contexto de build es el coste dominante y no desaparece con la caché: el checkout vive
+en `/mnt/c`, así que BuildKit vuelve a recorrer el árbol en cada invocación
+(~100 MB y entre 9 y 11 minutos, incluso cuando el único cambio es una etiqueta). Por eso
+**construir no es un comando del gate**: su resultado se registra aquí y
+`verify-image-provenance.mjs` comprueba en cada corrida que el artefacto corresponde a este
+commit, que es la parte verificable en segundos.
+
+La imagen que usa el perfil local la construye Compose por el camino real
+(`local.ps1 -Action Start` → `docker compose up --build -d`), con la etiqueta
+`aos-crm-local/twenty:v2.51.0-15e4826d3b` y las etiquetas de procedencia de AOS.
+
+### Typecheck real de `twenty-server`
+
+Medir `tsgo` exige el entorno correcto, y aquí hubo dos pasos en falso que vale la pena
+dejar escritos:
+
+1. En el árbol de `server-deps` (enfocado al runtime y podado con `--production`), `tsgo`
+   devolvía 14 errores de módulos ausentes. No es rojo ni verde: el entorno no era el que
+   la medida supone.
+2. En el **cierre de dependencias declarado de `twenty-server`** (devDependencies incluidas,
+   sin poda) siguen apareciendo **13 errores**, 11 de ellos
+   `TS7016: Could not find a declaration file for module 'semver'`, más
+   `graphql-sse` y `twenty-sdk/front-component-renderer/build`. Tampoco es el entorno
+   correcto: `@types/semver@^7.5.8` y `graphql-sse@^2.5.4` **están en el lockfile**,
+   declarados por `twenty-cli`, `twenty-front` y `twenty-sdk`, y una instalación de todo el
+   monorepo los eleva a `node_modules` de la raíz, que es donde `twenty-server` los
+   resuelve. Son una propiedad del alcance de la instalación, no del código.
+
+Por eso `scripts/aos/typecheck.Dockerfile` instala **el monorepo completo**
+(`yarn install --immutable`, todos los manifiestos de workspace en el contexto), que es como
+lo typechequea upstream, y `verify-server-typecheck.mjs` corre `tsgo -p tsconfig.json`
+directo —nunca `nx typecheck`, que podría imprimir un verde desde la caché— y además exige
+que un fichero canario deliberadamente mal tipado **aparezca** entre los errores de una
+segunda pasada. Un `tsgo` que sale 0 sobre el código y sobre el canario no midió nada.
