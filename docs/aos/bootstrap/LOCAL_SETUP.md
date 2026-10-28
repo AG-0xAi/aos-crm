@@ -144,7 +144,8 @@ secretos y coherencia puerto/URL se miden **antes** de cualquier `build`/`up`. L
 | Arranque completo | servidor `healthy`, worker arriba, `db` y `redis` `healthy` |
 | Camino E2E | 12/12 (`node --test scripts/aos/test/crm-runtime-e2e.test.mjs`, exit 0) |
 | Supervivencia a la ventana de inactividad | tras **190 s sin una sola invocación `wsl.exe`** (solo el guardián oculto vivo), `http://127.0.0.1:43000/healthz` devuelve 200 desde Windows y los cuatro contenedores siguen arriba |
-| Persistencia | la fila escrita por la API sobrevive a `compose restart db` y la vuelve a leer la propia API |
+| Persistencia de PostgreSQL | la fila escrita por la API sobrevive a `compose restart db` y la vuelve a leer la propia API; tras un `Stop` + `Start` completo siguen ahí el workspace, el administrador y las 75 tablas de `core` |
+| Persistencia de la cola | Redis guarda append-only en su propio volumen `aos-crm-local-redis`. Probado con centinela: una clave escrita antes de eliminar los contenedores se vuelve a leer después (`QUEUE_PERSISTED=yes`). Sin volumen, cada `compose down` se la llevaba y el stack volvía con aspecto normal porque el servidor re-registra los cron al arrancar |
 | Tráfico en ejecución | ventana limpia de 300 s cubriendo login, CRUD, reinicio y casos de error: **un solo destino remoto, NTP de Canonical** (reloj de la distro), 0 paquetes perdidos |
 
 ### Primer administrador
