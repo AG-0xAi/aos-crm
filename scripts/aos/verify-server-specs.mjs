@@ -36,6 +36,7 @@ const DISTRO = process.env.AOS_CRM_DISTRO || 'AOS-CRM-Ubuntu-24.04';
 const DEPS_IMAGE = 'aos-crm-local/server-deps:gate';
 const SOURCES_IMAGE = 'aos-crm-local/server-specs:gate';
 const SOURCE_TAR = '/tmp/aos-crm-server-specs-sources.tar';
+const SOURCES_DOCKERFILE = 'scripts/aos/server-specs-sources.Dockerfile';
 // Without this, BuildKit attaches a provenance attestation whose contents
 // include the build's own timestamps, so a FULLY CACHED rebuild of the
 // dependency image still produces a new image id (measured on 2026-10-28:
@@ -97,6 +98,15 @@ export const DEPS_CONTEXT_PATHS = [
   'packages/twenty-client-sdk/package.json',
   'packages/twenty-oxlint-rules/package.json',
 ];
+
+// Everything that reaches a build context from the WORKING TREE rather than
+// through `git archive HEAD`: the dependency manifests above (tarred from the
+// tree, see why below) plus the Dockerfile appended to the source context.
+// `git archive` content is committed by definition; these are not, so this is
+// the exact list the uncommitted-change check below has to cover. CRM-004 fix4:
+// the Dockerfile was in the context but outside that check, so an edit to it
+// was packaged and measured while the gate still claimed to run HEAD.
+export const WORKING_TREE_CONTEXT_PATHS = [...DEPS_CONTEXT_PATHS, SOURCES_DOCKERFILE];
 
 // The specs need these four workspaces and nothing else -- the same four the
 // official `twenty-server-build` stage copies. They arrive as a git archive
@@ -180,8 +190,7 @@ function run() {
   }
   const root = linuxRoot.stdout.trim();
 
-  const buildInputs = [...DEPS_CONTEXT_PATHS, 'scripts/aos/server-specs-sources.Dockerfile'];
-  for (const relative of buildInputs) {
+  for (const relative of WORKING_TREE_CONTEXT_PATHS) {
     if (wsl(['test', '-e', `${root}/${relative}`]).status !== 0) {
       fail(`server-specs build input is missing from the checkout: ${relative}`);
     }
@@ -191,11 +200,12 @@ function run() {
   // definition. Running the specs against HEAD while the working tree says
   // something else would be a measurement of code nobody is running, so an
   // uncommitted change under these inputs fails closed instead. The dependency
-  // manifests below are tarred from the working tree (see why there), and this
-  // same check is what makes the two halves describe one commit.
+  // manifests and the sources Dockerfile are tarred from the working tree (see
+  // why there), and this same check is what makes every half describe one
+  // commit -- so it takes WORKING_TREE_CONTEXT_PATHS itself, never a copy.
   const trackedInputs = [
     ...SPEC_SOURCE_PACKAGES.map((p) => `packages/${p}`),
-    ...DEPS_CONTEXT_PATHS,
+    ...WORKING_TREE_CONTEXT_PATHS,
   ];
   const dirty = git(['status', '--porcelain', '--', ...trackedInputs])
     .split('\n').filter((l) => l.trim() !== '');
@@ -233,8 +243,8 @@ function run() {
   const sourcesBuild = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(root)}; rm -f ${SOURCE_TAR}; ` +
     `git archive --format=tar -o ${SOURCE_TAR} HEAD -- ${archivePaths}; ` +
-    `tar --append -f ${SOURCE_TAR} scripts/aos/server-specs-sources.Dockerfile; ` +
-    `docker build ${NO_ATTESTATION} --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f scripts/aos/server-specs-sources.Dockerfile ` +
+    `tar --append -f ${SOURCE_TAR} ${SOURCES_DOCKERFILE}; ` +
+    `docker build ${NO_ATTESTATION} --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f ${SOURCES_DOCKERFILE} ` +
     `-t ${SOURCES_IMAGE} - < ${SOURCE_TAR}; rm -f ${SOURCE_TAR}`,
   ], { stdio: ['ignore', 'inherit', 'inherit'], timeout: SOURCES_BUILD_TIMEOUT_MS });
   const sourcesBuildStatus = sourcesBuild.status;
@@ -362,6 +372,28 @@ function selfTest() {
     for (const pkg of SPEC_SOURCE_PACKAGES) {
       execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])', resolve(REPO_ROOT, 'packages', pkg)]);
     }
+  });
+  // CRM-004 fix4 (reviewer finding). `git archive HEAD` can only emit committed
+  // content, but anything appended to that context from the WORKING TREE can
+  // differ from HEAD, and then the gate measures a tree nobody committed. The
+  // sources Dockerfile is exactly that case: it is tarred in from the working
+  // tree, and it was not covered by the uncommitted-change check.
+  record('every file that enters a build context from the working tree is covered by the uncommitted-change check', () => {
+    const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    assert(WORKING_TREE_CONTEXT_PATHS.includes(SOURCES_DOCKERFILE),
+      `${SOURCES_DOCKERFILE} enters the build context from the working tree but is not checked for uncommitted changes`);
+    for (const relative of DEPS_CONTEXT_PATHS) {
+      assert(WORKING_TREE_CONTEXT_PATHS.includes(relative), `${relative} is tarred from the working tree but is not dirty-checked`);
+    }
+    // The dirty check must take the context list itself, not a hand-kept copy:
+    // a path added to the context later would otherwise slip through unchecked.
+    assert(/const trackedInputs = \[\s*\.\.\.SPEC_SOURCE_PACKAGES\.map\(\(p\) => `packages\/\$\{p\}`\),\s*\.\.\.WORKING_TREE_CONTEXT_PATHS,\s*\]/.test(source),
+      'the uncommitted-change check no longer derives its inputs from the working-tree context list');
+    // And no tar may name a path literally: that is how the Dockerfile escaped
+    // the check in the first place.
+    const appended = [...source.matchAll(/tar --append -f \$\{SOURCE_TAR\} ([^;\s]+)/g)].map((m) => m[1]);
+    assert(appended.length === 1 && appended[0] === '${SOURCES_DOCKERFILE}',
+      `a working-tree path is appended to the source context outside the checked list: ${appended.join(', ')}`);
   });
   record('the source image builds on the OFFICIAL server-deps stage and bypasses the Nx cache for the dependency build', () => {
     const dockerfilePath = resolve(REPO_ROOT, 'scripts/aos/server-specs-sources.Dockerfile');
