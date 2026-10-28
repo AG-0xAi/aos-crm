@@ -1,4 +1,15 @@
-# Línea base de build (CRM-004)
+# Línea base de build (CRM-004 y CRM-004-fix1)
+
+> **CRM-004-fix1, 28 de octubre de 2026 — el bloqueo está resuelto.** El coordinador amplió
+> el Scope (spec canónico y registro) a **una** variable del Dockerfile oficial y se aplicó:
+> `THREADS_WORKER_INIT_TIMEOUT=180000` en el bloque `ENV` que ya existía en `node-base`,
+> junto al opt-out de telemetría. Con eso, `lingui:extract`/`compile` de `twenty-server` y
+> `twenty-emails`, `nx run twenty-server:build`, el frontend y la imagen final `twenty` se
+> construyen de verdad. Las medidas nuevas están al final, en
+> [§ CRM-004-fix1](#crm-004-fix1-el-build-completo-medido). Todo lo que sigue hasta esa
+> sección es el registro **anterior** y se conserva tal cual, incluida la línea base del
+> fallo, porque es la prueba de que no lo provocó ningún cambio de AOS.
+
 
 27 de octubre de 2026. Todo lo que sigue se ejecutó de verdad en la distro dedicada
 `AOS-CRM-Ubuntu-24.04` sobre este mismo checkout. Los registros completos están en
@@ -121,3 +132,41 @@ Tests:       4 passed, 4 total
 Son `telemetry.service.spec.ts` (spy HTTP sobre la clase real) y
 `twenty-config.service.spec.ts` (precedencia ENV-vs-BD). Esto cierra la cobertura que
 `.aos/verify.json` declaraba pendiente desde CRM-003.
+
+## CRM-004-fix1: el build completo, medido
+
+28 de octubre de 2026, misma distro `AOS-CRM-Ubuntu-24.04` y mismo checkout. El cambio
+autorizado es exactamente este, en la etapa `node-base` del Dockerfile oficial:
+
+```
+ENV YARN_ENABLE_TELEMETRY=0 \
+    NX_NO_CLOUD=true \
+    NX_DAEMON=false \
+    THREADS_WORKER_INIT_TIMEOUT=180000
+```
+
+Ensancha el presupuesto de init que `threads@1.7.0` da a cada worker de su pool. **No omite
+ninguna etapa de traducción**: los cuatro `lingui` siguen ejecutándose y el build de
+`twenty-server` también. Al ir en `node-base` invalida la caché de las etapas de
+dependencias, así que `server-deps` se reinstaló por completo.
+
+### Etapa a etapa (log `fix1/A1-twenty-server-build-coordinator-launched.log`)
+
+| Paso | Qué hace | Resultado |
+| --- | --- | --- |
+| `#16` | `yarn workspaces focus` de `server-deps` (reinstalación completa) | DONE 352,9 s |
+| `#17`–`#20` | COPY de los cuatro workspaces del servidor | DONE 7,8 / 2,3 / 0,5 / 19,0 s |
+| `#21` | **los cuatro `lingui` (extract+compile de server y emails)** | **DONE 458,0 s** |
+| `#22` | `nx run twenty-server:build` | DONE 86,5 s |
+| `#23` | limpieza de `.d.ts` y tests compilados | DONE 3,5 s |
+| `#24` | `yarn workspaces focus --production` | DONE 77,4 s |
+| `#25` | exportar imagen (incluye 150,4 s de unpacking) | DONE 350,6 s |
+
+Cero líneas `ERROR` en el log y los 25 pasos en `DONE`. El paso `#21` es el que fallaba a
+los ~10 s en cada intento anterior.
+
+**La política de scripts se respetó de verdad**, otra vez medido y no supuesto: 12 avisos
+`YN0004` sobre 11 paquetes distintos (`@sentry/node-cpu-profiler`, `@swc/core`, `bcrypt`,
+`cpu-features`, `esbuild`, `msgpackr-extract`, `msw`, `nx`, `protobufjs`, `ssh2`,
+`unrs-resolver`) con el texto literal "lists build scripts, but all build scripts have been
+disabled". No se habilitó ningún script, ni global ni individual.

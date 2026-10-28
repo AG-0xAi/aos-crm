@@ -15,7 +15,12 @@ x-aos-crm-app: &aos-crm-app
     dockerfile: packages/twenty-docker/twenty/Dockerfile
     target: twenty
     args:
-      APP_VERSION: ${AOS_CRM_APP_VERSION:-twenty-v2.51.0+15e4826d3b}
+      # Must parse as semver: the server validates APP_VERSION with
+      # semver.parse() at boot (IsTwentySemVer) and a value it rejects makes
+      # every start crash-loop with "Config variables validation failed",
+      # which the healthcheck only reports as "unhealthy". The upstream tag
+      # lives in the labels below, not here.
+      APP_VERSION: ${AOS_CRM_APP_VERSION:-2.51.0+15e4826d3b}
     # Make the artifact self-describing: the image carries the upstream commit
     # it was built from AND the AOS commit/tree that actually produced these
     # bytes, so `docker inspect` answers "which source is this?" without
@@ -84,6 +89,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      # The entrypoint runs database:init:prod + upgrade + cron:register:all
+      # before the server listens, which on a cold volume is minutes. Without
+      # a start period, 20 x 5 s elapses first and the dependent worker is
+      # refused with "dependency failed to start" on a stack that is merely
+      # still migrating. Failures inside this window do not count.
+      start_period: 300s
 
   worker:
     <<: *aos-crm-app

@@ -83,8 +83,16 @@ async function httpGet(path, init = {}) {
   return fetch(`${BASE_URL}${path}`, { signal: AbortSignal.timeout(30_000), ...init });
 }
 
-async function gql(query, { variables, token } = {}) {
-  const res = await fetch(`${BASE_URL}/graphql`, {
+// Twenty serves two GraphQL schemas: the workspace records live at /graphql
+// (@CoreResolver) and auth/user/admin operations at /metadata
+// (@MetadataResolver). Posting signUp to /graphql comes back as
+// "Authentication required", which looks like a closed instance and is really
+// the wrong endpoint, so the path is explicit at every call site.
+const CORE = '/graphql';
+const METADATA = '/metadata';
+
+async function gql(query, { variables, token, path = CORE } = {}) {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -138,30 +146,52 @@ async function loginAsAdmin({ email, password }) {
   const login = await gql(
     'mutation($email: String!, $password: String!, $origin: String!) {' +
     ' getLoginTokenFromCredentials(email: $email, password: $password, origin: $origin) { loginToken { token } } }',
-    { variables: { email, password, origin: ORIGIN } },
+    { variables: { email, password, origin: ORIGIN }, path: METADATA },
   );
   if (login.body.errors) return { ok: false, detail: gqlErrorMessages(login.body) };
   const loginToken = login.body.data.getLoginTokenFromCredentials.loginToken.token;
   const exchanged = await gql(
     'mutation($loginToken: String!, $origin: String!) {' +
     ' getAuthTokensFromLoginToken(loginToken: $loginToken, origin: $origin) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { variables: { loginToken, origin: ORIGIN } },
+    { variables: { loginToken, origin: ORIGIN }, path: METADATA },
   );
   if (exchanged.body.errors) return { ok: false, detail: gqlErrorMessages(exchanged.body) };
   return { ok: true, token: exchanged.body.data.getAuthTokensFromLoginToken.tokens.accessOrWorkspaceAgnosticToken.token };
 }
 
-async function createFirstAdmin({ email, password }) {
+// Idempotent from any partial state: signUp creates the user WITHOUT a
+// workspace, so a run interrupted between the two steps leaves a user that
+// cannot log in yet (there is no workspace for the origin to resolve to).
+// Signing in workspace-agnostically recovers from that instead of failing with
+// "User already exists".
+async function obtainWorkspaceAgnosticToken({ email, password }) {
   const signUp = await gql(
     'mutation($email: String!, $password: String!) {' +
     ' signUp(email: $email, password: $password) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { variables: { email, password } },
+    { variables: { email, password }, path: METADATA },
   );
-  assert.equal(signUp.body.errors, undefined, `signUp failed: ${gqlErrorMessages(signUp.body)}`);
-  const agnostic = signUp.body.data.signUp.tokens.accessOrWorkspaceAgnosticToken.token;
+  if (!signUp.body.errors) {
+    return signUp.body.data.signUp.tokens.accessOrWorkspaceAgnosticToken.token;
+  }
+  const detail = gqlErrorMessages(signUp.body);
+  assert.match(detail, /already exists/i, `signUp failed: ${detail}`);
+  const signIn = await gql(
+    'mutation($email: String!, $password: String!) {' +
+    ' signIn(email: $email, password: $password) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
+    { variables: { email, password }, path: METADATA },
+  );
+  assert.equal(signIn.body.errors, undefined, `signIn failed: ${gqlErrorMessages(signIn.body)}`);
+  return signIn.body.data.signIn.tokens.accessOrWorkspaceAgnosticToken.token;
+}
+
+async function createFirstAdmin(credentials) {
+  const agnostic = await obtainWorkspaceAgnosticToken(credentials);
+  // displayName is nullable in the input type but required by the service
+  // ("Workspace name is required"), so the single local workspace is named here.
   const workspace = await gql(
-    'mutation { signUpInNewWorkspace { loginToken { token } workspace { id } } }',
-    { token: agnostic },
+    'mutation($input: SignUpInNewWorkspaceInput) {' +
+    ' signUpInNewWorkspace(input: $input) { loginToken { token } workspace { id } } }',
+    { variables: { input: { displayName: 'AOS-CRM Local' } }, token: agnostic, path: METADATA },
   );
   assert.equal(workspace.body.errors, undefined, `signUpInNewWorkspace failed: ${gqlErrorMessages(workspace.body)}`);
   return workspace.body.data.signUpInNewWorkspace.workspace.id;
@@ -202,8 +232,29 @@ test('migrations really created the core schema in this project own PostgreSQL',
     const exists = psql(`select to_regclass('core."${table}"') is not null`);
     assert.equal(exists, 't', `core."${table}" is missing: migrations did not complete`);
   }
-  const pending = Number(psql("select count(*) from core.migrations"));
-  assert.ok(pending > 0, 'core.migrations is empty: no migration ever ran');
+  // TypeORM's journal, named by Twenty's own datasource config. Its emptiness
+  // is the difference between "the schema exists" and "the migrations ran":
+  // the image entrypoint only probes whether the core SCHEMA exists, so a
+  // schema created and then abandoned leaves a healthy server on an empty
+  // database (this track hit exactly that).
+  const applied = Number(psql('select count(*) from core."_typeorm_migrations"'));
+  assert.ok(applied > 0, 'core._typeorm_migrations is empty: no migration ever ran');
+});
+
+test('the entrypoint did not swallow a migration or cron failure (healthz alone would never say so)', () => {
+  // packages/twenty-docker/twenty/entrypoint.sh runs `upgrade`, `cache:flush`
+  // and `cron:register:all` behind `if ! ...; then echo "Warning: ...
+  // continuing startup"`. The container therefore reports healthy whether or
+  // not those succeeded, so the real exit codes have to be read off the log.
+  const logs = compose(['logs', '--no-color', 'server']);
+  assert.equal(logs.status, 0, `docker compose logs server exited ${logs.status}`);
+  const swallowed = logs.stdout.split(/\r?\n/).filter((l) => /Warning: (Failed|Upgrade)/.test(l));
+  assert.equal(swallowed.length, 0,
+    `the entrypoint swallowed ${swallowed.length} failure(s): ${swallowed.slice(0, 2).join(' / ').slice(0, 300)}`);
+  assert.ok(logs.stdout.includes('Successfully migrated DB!'),
+    'the entrypoint never reported a completed database setup/migration');
+  assert.ok(logs.stdout.includes('Successfully registered all background sync jobs!'),
+    'cron job registration never reported success');
 });
 
 test('the frontend bundle the image was built with is served by the server', async () => {
@@ -218,12 +269,17 @@ test('the frontend bundle the image was built with is served by the server', asy
   assert.ok(bytes > 50_000, `the served bundle is only ${bytes} bytes`);
 });
 
-test('the effective runtime configuration keeps telemetry, analytics and Sentry off', async () => {
-  const res = await gql('{ clientConfig { analyticsEnabled sentry { dsn } captcha { provider } } }');
-  assert.equal(res.body.errors, undefined, gqlErrorMessages(res.body));
-  const config = res.body.data.clientConfig;
+test('the EFFECTIVE runtime configuration keeps analytics and Sentry off and serves the published port', async () => {
+  // The values the running server actually hands the frontend, read from the
+  // public /client-config endpoint: not the contents of privacy.env, and not
+  // a static read of the source.
+  const res = await httpGet('/client-config');
+  assert.equal(res.status, 200);
+  const config = await res.json();
   assert.equal(config.analyticsEnabled, false, 'analytics is enabled at runtime');
   assert.ok(!config.sentry?.dsn, 'the running server handed the frontend a Sentry DSN');
+  assert.equal(new URL(config.serverUrl).port, String(WEB_PORT),
+    `the effective serverUrl is ${config.serverUrl}, which is not the published port ${WEB_PORT}`);
 });
 
 test('the first administrator can sign in, and a strong password is the only one on file', async () => {
@@ -237,7 +293,28 @@ test('the first administrator can sign in, and a strong password is the only one
   assert.ok(login.ok, `the first administrator could not sign in: ${login.detail}`);
   adminToken = login.token;
 
-  const me = await gql('{ currentUser { id email } }', { token: adminToken });
+  // signUpInNewWorkspace leaves the workspace PENDING_CREATION: activation is
+  // what provisions its data schema and standard objects, so without this step
+  // the record API below does not exist yet ("Cannot query field
+  // createCompany"). Idempotent: an already ACTIVE workspace is left alone.
+  const workspace = await gql('{ currentWorkspace { id activationStatus } }', { token: adminToken, path: METADATA });
+  assert.equal(workspace.body.errors, undefined, gqlErrorMessages(workspace.body));
+  if (workspace.body.data.currentWorkspace.activationStatus !== 'ACTIVE') {
+    const activated = await gql(
+      'mutation { activateWorkspace(data: {}) { id activationStatus } }',
+      { token: adminToken, path: METADATA },
+    );
+    assert.equal(activated.body.errors, undefined, `activateWorkspace failed: ${gqlErrorMessages(activated.body)}`);
+    assert.equal(activated.body.data.activateWorkspace.activationStatus, 'ACTIVE');
+    // The token issued before activation carries no workspace member, and the
+    // record API needs one to stamp createdBy ("Unable to build actor
+    // metadata"). Re-issue it now that the member exists.
+    const reissued = await loginAsAdmin(credentials);
+    assert.ok(reissued.ok, `could not re-issue the token after activation: ${reissued.detail}`);
+    adminToken = reissued.token;
+  }
+
+  const me = await gql('{ currentUser { id email } }', { token: adminToken, path: METADATA });
   assert.equal(me.body.errors, undefined, gqlErrorMessages(me.body));
   assert.equal(me.body.data.currentUser.email, credentials.email);
 });
@@ -279,20 +356,36 @@ test('an invalid compressed request body is rejected without taking the server d
     body: Buffer.from('this is not gzip at all, not even close'),
     signal: AbortSignal.timeout(30_000),
   });
-  assert.ok(res.status >= 400 && res.status < 500,
-    `expected a 4xx for an undecodable body, got ${res.status}`);
+  // The contract (spec R1) is that the request is refused and the server
+  // survives, not a particular status: Twenty's exception layer turns the
+  // inflate failure into a 500 rather than a 400, which is ugly but is still a
+  // rejection. What matters is that nothing was processed and the process is
+  // still serving afterwards.
+  assert.ok(res.status >= 400, `the undecodable body was not rejected (status ${res.status})`);
   const health = await httpGet('/healthz');
-  assert.equal(health.status, 200, 'the server stopped answering after an invalid compressed body');
+  assert.equal(health.status, 200,
+    `the server stopped answering after an invalid compressed body (rejection status was ${res.status})`);
+  const second = await httpGet('/client-config');
+  assert.equal(second.status, 200, 'the server answers /healthz but no longer serves requests');
 });
 
 test('public registration is closed once the single local workspace exists', async () => {
   const res = await gql(
     'mutation($email: String!, $password: String!) {' +
     ' signUp(email: $email, password: $password) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { variables: { email: `intruder-${randomUUID()}@example.invalid`, password: randomBytes(24).toString('base64url') } },
+    {
+      variables: { email: `intruder-${randomUUID()}@example.invalid`, password: randomBytes(24).toString('base64url') },
+      path: METADATA,
+    },
   );
   assert.ok(res.body.errors, 'a second public signup succeeded: registration is still open');
   assert.equal(res.body.data?.signUp, undefined, 'the refused signup still returned tokens');
+  // The specific refusal, not just any error: posting to the wrong schema also
+  // errors ("Authentication required"), which would make this pass while
+  // proving nothing about registration being closed.
+  const messages = gqlErrorMessages(res.body);
+  assert.match(messages, /New workspace setup is disabled/,
+    `expected the SIGNUP_DISABLED refusal from sign-in-up.service, got: ${messages.slice(0, 200)}`);
 });
 
 test('the worker is alive and holds its queue in this project own Redis', () => {

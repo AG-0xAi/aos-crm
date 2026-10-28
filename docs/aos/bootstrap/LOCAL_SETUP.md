@@ -96,6 +96,68 @@ un literal fijo. La aplicación habría construido sus enlaces sobre el puerto e
 Ahora `local.ps1` lee el valor por defecto directamente de `compose.yaml` y compara la
 **URL efectiva**; si ese valor por defecto no se puede leer, bloquea en vez de pasar.
 
+## Actualización CRM-004-fix1 (28 de octubre de 2026): el CRM arranca
+
+Lo de arriba (§ CRM-004) describe el estado **anterior** y se conserva como registro. Lo
+que sigue lo sustituye: el coordinador amplió el Scope a una variable del Dockerfile
+oficial, se aplicó, y la aplicación se construye y arranca. Tiempos, códigos de salida y
+memoria están en [BUILD_BASELINE.md](BUILD_BASELINE.md); el informe del track es
+[.aos/reports/CRM-004-fix1.md](../../../.aos/reports/CRM-004-fix1.md).
+
+### Procedimiento (validado, no propuesto)
+
+```
+pwsh -NoProfile -File scripts/aos/local.ps1 -Action Prepare   # una vez: genera deploy/local/.env
+pwsh -NoProfile -File scripts/aos/local.ps1 -Action Start     # gate + build + up -d
+pwsh -NoProfile -File scripts/aos/local.ps1 -Action Status
+pwsh -NoProfile -File scripts/aos/local.ps1 -Action Stop
+pwsh -NoProfile -File scripts/aos/local.ps1 -Action Restart
+```
+
+`Start` y `Restart` siguen siendo fail-closed: host, configuración local, privacidad,
+secretos y coherencia puerto/URL se miden **antes** de cualquier `build`/`up`. Lo nuevo:
+
+- **La distro no se apaga debajo del stack.** WSL2 termina una distro cuando sale su último
+  proceso, y los servicios systemd de dentro **no** la mantienen viva
+  ([documentación de Microsoft](https://learn.microsoft.com/en-us/windows/wsl/systemd)). Por
+  eso `docker compose up -d` devolviendo no equivale a un stack que sobreviva: en cuanto
+  salen todas las llamadas `wsl.exe` y pasa la ventana de inactividad, se van la distro, el
+  demonio y los contenedores. `Start`/`Restart` abren una **sesión oculta propia** (un
+  `tail -f` sobre un marcador de este producto) antes del `up`; `Stop` la libera, y solo si
+  el `compose down` salió 0 — soltarla con contenedores vivos sería apagarlos por la
+  puerta de atrás. Se identifica por su propia línea de comandos: nunca toca otra distro,
+  otro producto ni la configuración global de WSL. `Status` dice si está o no.
+- **La imagen queda trazable a su fuente.** `Start`/`Restart` estampan el commit de AOS, su
+  árbol y si el working tree estaba sucio en `deploy/local/.env`
+  (`AOS_CRM_SOURCE_COMMIT`/`_TREE`/`_DIRTY`), y `compose.yaml` los convierte en etiquetas
+  de la imagen. Si no se puede registrar la procedencia, **no se construye**.
+  `scripts/aos/verify-image-provenance.mjs` rechaza una imagen cuyas etiquetas no
+  correspondan a ESTE commit, una construida con cambios sin commitear, o una imagen de
+  dependencias disfrazada con la etiqueta de la aplicación (comprueba dentro de la imagen
+  que el frontend servido existe).
+
+### Primer administrador
+
+Se crea una sola vez, por el flujo real de autenticación (`signUp` →
+`signUpInNewWorkspace` → `getAuthTokensFromLoginToken`), con una contraseña de 36 bytes
+aleatorios criptográficos. Queda en `deploy/local/.env` (ignorado por Git), **nunca se
+imprime** y ninguna herramienta la devuelve: los scripts solo informan de booleanos y
+categorías. Con `IS_MULTIWORKSPACE_ENABLED=false` y el workspace ya creado, un segundo alta
+pública queda **rechazada por el servidor**, y eso se comprueba ejecutando el alta, no
+leyendo la variable de entorno (`getSignUpWithoutWorkspaceDecision` devuelve `refused`
+cuando ya existe un workspace y el multiworkspace está apagado).
+
+Por el mismo motivo, `EMAIL_DRIVER=LOGGER` escribe el correo completo (HTML y texto) en el
+log del servidor: cualquier invitación o reset deja su enlace en los logs técnicos. No se
+disparó ninguna invitación en este track y los logs no se copian a ningún artefacto.
+
+### Puerto y URL efectiva, ahora medidos en ejecución
+
+Además del chequeo estático, el camino E2E lee `GET /client-config` del servidor arrancado
+y comprueba que el `serverUrl` **efectivo** que la aplicación entrega al frontend usa el
+puerto publicado, y que `analyticsEnabled` es `false` y el DSN de Sentry está vacío en
+ejecución, no solo en `privacy.env`.
+
 ### Captura de destinos, lista antes del primer arranque
 
 `.aos/onboarding/bootstrap-2026-10-27/capture-crm-egress.py` registra solo **a dónde** van
