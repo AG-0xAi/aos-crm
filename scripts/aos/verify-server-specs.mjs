@@ -119,7 +119,13 @@ function run() {
     `cp -r ${SPEC_SOURCE_PACKAGES.map((p) => `/src/${p}`).join(' ')} /app/packages/`,
     'cd /app',
     'export NX_DAEMON=false NX_NO_CLOUD=true',
-    'npx nx run-many -t build -p twenty-shared twenty-client-sdk twenty-emails --skip-nx-cache >/tmp/build.log 2>&1',
+    // The build log stays in the container so jest's summary is the only thing
+    // on stdout, but a FAILING build must not be silent: without this, `set -e`
+    // aborts with an empty stdout and the gate can only say "the container
+    // exited 1", which is what happened on 2026-10-28 and left nothing to read.
+    'if ! npx nx run-many -t build -p twenty-shared twenty-client-sdk twenty-emails --skip-nx-cache >/tmp/build.log 2>&1; then',
+    '  echo "AOS_DEPS_BUILD_FAILED"; tail -n 40 /tmp/build.log; exit 11',
+    'fi',
     'cd /app/packages/twenty-server',
     `npx jest --config jest.config.mjs --runInBand ${SPECS.join(' ')}`,
   ].join('\n');
@@ -129,7 +135,9 @@ function run() {
     ...mounts, DEPS_IMAGE, 'sh', '-c', script]);
   const output = `${res.stdout || ''}\n${res.stderr || ''}`;
   if (res.status !== 0) {
-    console.error(output.split('\n').slice(-25).join('\n'));
+    const tail = output.split('\n').filter((l) => l.trim()).slice(-25);
+    console.error(tail.length ? tail.join('\n') : '(the container produced no output at all)');
+    if (res.error) console.error(`spawn error: ${res.error.code || res.error.message}`);
     fail(`the privacy specs container exited ${res.status}`);
   }
   const verdict = parseJestSummary(output);
