@@ -81,15 +81,29 @@ export const SPECS = [
 const EXPECTED_SUITES = SPECS.length;
 
 // The three components whose render these tests measure, and the state file
-// behind them. The self-test reads these paths, so a consumer that stops
-// reading the flag is a failure here too, not only in jest.
+// behind them, as paths inside twenty-front. The self-test reads these, so a
+// consumer that stops reading the flag is a failure here too, not only in jest.
 export const GUARDED_COMPONENTS = [
-  'packages/twenty-front/src/modules/sign-in-background-mock/components/BackgroundMockTableRow.tsx',
-  'packages/twenty-front/src/modules/onboarding/components/import-contacts/OnboardingImportPreviewCompanies.tsx',
-  'packages/twenty-front/src/modules/navigation-menu-item/display/link/components/LinkIconWithLinkOverlay.tsx',
+  'src/modules/sign-in-background-mock/components/BackgroundMockTableRow.tsx',
+  'src/modules/onboarding/components/import-contacts/OnboardingImportPreviewCompanies.tsx',
+  'src/modules/navigation-menu-item/display/link/components/LinkIconWithLinkOverlay.tsx',
 ];
 export const FLAG_STATE_FILE =
-  'packages/twenty-front/src/modules/client-config/states/allowRequestsToTwentyIcons.ts';
+  'src/modules/client-config/states/allowRequestsToTwentyIcons.ts';
+
+// WHAT THE TYPECHECK COVERS, and why it is not the whole twenty-front project.
+// Measured on 2026-10-29 in this same image: `tsgo -p tsconfig.json` over all
+// of twenty-front reports TS7016 in six untouched upstream files, because the
+// @types packages for lodash.groupby/isempty/omit/uniqby and pluralize are
+// declared only by twenty-server -- a phantom dependency a full-monorepo
+// install hides by hoisting. The sources image restores exactly those
+// declarations, and the program typechecked here is the four files this track
+// changes plus their tests and everything they import (which does include the
+// jotai/cookie-storage chain that TS7016 hit). The whole-project run, its
+// remaining diagnostics and their causes are reported in
+// docs/aos/bootstrap/FUNCTIONAL_EVIDENCE.md instead of silently dropped.
+export const TYPECHECK_INCLUDE = [FLAG_STATE_FILE, ...GUARDED_COMPONENTS];
+const SCOPED_TSCONFIG = 'tsconfig.aos-crm005.json';
 
 // Exactly what the official Dockerfile's `front-deps` stage COPYs, plus the
 // Dockerfile itself. Rebuilt from a tar of these paths on EVERY run: "the tag
@@ -129,6 +143,17 @@ export const FRONT_SOURCE_PACKAGES = [
   'twenty-client-sdk',
   'twenty-front-component-renderer',
   'twenty-front',
+];
+
+// Everything the source context carries, all of it from `git archive HEAD`:
+// those workspaces, the workspace-root jest preset twenty-front's jest config
+// extends (absent from the official front-deps stage, which never runs tests),
+// and twenty-server's manifest, read for the @types specs the sources image
+// restores -- see the Dockerfile.
+export const ARCHIVE_PATHS = [
+  ...FRONT_SOURCE_PACKAGES.map((p) => `packages/${p}`),
+  'jest.preset.js',
+  'packages/twenty-server/package.json',
 ];
 
 // Budgets, not "however long it takes". Their sum stays under the gate quota
@@ -259,21 +284,38 @@ function git(args) {
   return res.stdout;
 }
 
-// Run inside the container: jest, then tsgo on the real sources, then tsgo again
-// with a canary file that must be rejected. Every step prints its own exit code
-// as a marker and the script always exits 0, so the container's status means
-// "the three steps ran", and the verdict is read off the markers.
+// The scoped program: twenty-front's own tsconfig (same compilerOptions, same
+// strictness, same path aliases) with `include` narrowed to the files this
+// track changes, their tests and -- through the compiler's own resolution --
+// everything those import. The canary path is listed too: `include` is
+// glob-based, so it is simply absent on the first run and picked up on the
+// second, which is how one config serves both.
+export function scopedTsconfig(canaryPath) {
+  return {
+    extends: './tsconfig.json',
+    include: [...TYPECHECK_INCLUDE, ...SPECS, canaryPath],
+  };
+}
+
+// Run inside the container: jest, then tsgo over the scoped program, then tsgo
+// again with a deliberately mistyped canary file that it MUST reject. Every
+// step prints its own exit code as a marker and the script always exits 0, so
+// the container's status means "the three steps ran" and the verdict is read
+// off the markers. The config is written from base64 rather than a heredoc:
+// this whole script crosses wsl.exe as one argument.
 function containerScript() {
   const canary = `src/aos-crm-canary-${RUN_ID}.ts`;
+  const config = Buffer.from(JSON.stringify(scopedTsconfig(canary), null, 2)).toString('base64');
   return [
     'set -u',
     'cd /app/packages/twenty-front',
     `NODE_OPTIONS="--max-old-space-size=6144" npx jest --config jest.config.mjs --runInBand ${SPECS.join(' ')}; echo "${MARKERS.jest}=$?"`,
-    `npx tsgo -p tsconfig.json; echo "${MARKERS.tsgo}=$?"`,
+    `echo ${config} | base64 -d > ${SCOPED_TSCONFIG}`,
+    `npx tsgo -p ${SCOPED_TSCONFIG}; echo "${MARKERS.tsgo}=$?"`,
     `printf 'export const aosCanary: number = "not a number";\\n' > ${canary}`,
-    `npx tsgo -p tsconfig.json > /tmp/canary.log 2>&1; echo "${MARKERS.canary}=$?"`,
-    'tail -3 /tmp/canary.log',
-    `rm -f ${canary}`,
+    `npx tsgo -p ${SCOPED_TSCONFIG} > /tmp/canary.log 2>&1; echo "${MARKERS.canary}=$?"`,
+    'tail -2 /tmp/canary.log',
+    `rm -f ${canary} ${SCOPED_TSCONFIG}`,
     'exit 0',
   ].join('\n');
 }
@@ -297,7 +339,7 @@ function run() {
   // inputs fails closed instead. The list is the context list itself, never a
   // copy.
   const trackedInputs = [
-    ...FRONT_SOURCE_PACKAGES.map((p) => `packages/${p}`),
+    ...ARCHIVE_PATHS,
     ...WORKING_TREE_CONTEXT_PATHS,
   ];
   const dirty = git(['status', '--porcelain', '--', ...trackedInputs])
@@ -318,7 +360,7 @@ function run() {
   ownImages.push(DEPS_IMAGE);
 
   console.log('[INFO] building the source/library-build image from a clean git archive of HEAD');
-  const archivePaths = FRONT_SOURCE_PACKAGES.map((p) => JSON.stringify(`packages/${p}`)).join(' ');
+  const archivePaths = ARCHIVE_PATHS.map((p) => JSON.stringify(p)).join(' ');
   const sourcesBuild = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(root)}; rm -f ${SOURCE_TAR}; ` +
     `git archive --format=tar -o ${SOURCE_TAR} HEAD -- ${archivePaths}; ` +
@@ -449,8 +491,10 @@ function selfTest() {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     assert(WORKING_TREE_CONTEXT_PATHS.includes(SOURCES_DOCKERFILE),
       `${SOURCES_DOCKERFILE} enters the build context from the working tree but is not dirty-checked`);
-    assert(/const trackedInputs = \[\s*\.\.\.FRONT_SOURCE_PACKAGES\.map\(\(p\) => `packages\/\$\{p\}`\),\s*\.\.\.WORKING_TREE_CONTEXT_PATHS,\s*\]/.test(source),
-      'the uncommitted-change check no longer derives its inputs from the working-tree context list');
+    assert(/const trackedInputs = \[\s*\.\.\.ARCHIVE_PATHS,\s*\.\.\.WORKING_TREE_CONTEXT_PATHS,\s*\]/.test(source),
+      'the uncommitted-change check no longer derives its inputs from the archive and working-tree context lists');
+    assert(/const archivePaths = ARCHIVE_PATHS\.map/.test(source),
+      'the git archive no longer takes its paths from the same list the dirty check covers');
     const appended = [...source.matchAll(/tar --append -f \$\{SOURCE_TAR\} ([^;\s]+)/g)].map((m) => m[1]);
     assert(appended.length === 1 && appended[0] === '${SOURCES_DOCKERFILE}',
       `a working-tree path is appended to the source context outside the checked list: ${appended.join(', ')}`);
@@ -505,14 +549,46 @@ function selfTest() {
     assert(containerScript().includes(`aos-crm-canary-${RUN_ID}`), 'the typecheck canary is no longer named after this run');
   });
   record('the three guarded components read the official flag, and the initial state is fail-closed', () => {
+    const front = resolve(REPO_ROOT, 'packages', 'twenty-front');
     for (const relative of GUARDED_COMPONENTS) {
-      const source = readFileSync(resolve(REPO_ROOT, relative), 'utf8');
+      const source = readFileSync(resolve(front, relative), 'utf8');
       assert(/allowRequestsToTwentyIconsState/.test(source),
         `${relative} does not read allowRequestsToTwentyIconsState: it would request icons with the flag off`);
     }
-    const state = readFileSync(resolve(REPO_ROOT, FLAG_STATE_FILE), 'utf8');
+    const state = readFileSync(resolve(front, FLAG_STATE_FILE), 'utf8');
     assert(/defaultValue:\s*false/.test(state),
       `${FLAG_STATE_FILE} no longer defaults to false: the first render would request icons before /client-config answers`);
+  });
+  record('the typechecked program contains every file this track changes and every suite it runs', () => {
+    const config = scopedTsconfig('src/aos-crm-canary-x.ts');
+    assert(config.extends === './tsconfig.json',
+      "the scoped program no longer extends twenty-front's own tsconfig, so it is not the project's own strictness");
+    for (const relative of [FLAG_STATE_FILE, ...GUARDED_COMPONENTS, ...SPECS]) {
+      assert(config.include.includes(relative), `${relative} is not in the typechecked program`);
+      execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])',
+        resolve(REPO_ROOT, 'packages', 'twenty-front', relative)]);
+    }
+    assert(config.include.includes('src/aos-crm-canary-x.ts'),
+      'the canary is not in the typechecked program, so the compiler would never be asked to reject it');
+  });
+  record('the sources image carries the jest preset and restores the declarations twenty-front relies on', () => {
+    const instructions = readFileSync(resolve(REPO_ROOT, SOURCES_DOCKERFILE), 'utf8')
+      .split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+    assert(/COPY jest\.preset\.js \/app\/jest\.preset\.js/.test(instructions),
+      'the workspace-root jest preset is no longer copied in; jest would fail with "Preset ../../jest.preset.js not found"');
+    assert(ARCHIVE_PATHS.includes('jest.preset.js'), 'the jest preset is copied in the Dockerfile but not archived into the context');
+    assert(ARCHIVE_PATHS.includes('packages/twenty-server/package.json'),
+      "twenty-server's manifest is read for the @types specs but not archived into the context");
+    // Read from twenty-server's manifest, never written out here: a hand-kept
+    // copy would drift from the specs the full install hoists.
+    assert(/twenty-server-package\.json'\)\.devDependencies/.test(instructions),
+      'the restored @types specs are no longer read out of twenty-server/package.json');
+    assert(!/npm install[^\n]*--prefix \/app\b/.test(instructions),
+      'npm installs against /app again, which reconciles the whole yarn-installed tree');
+    const server = JSON.parse(readFileSync(resolve(REPO_ROOT, 'packages/twenty-server/package.json'), 'utf8'));
+    for (const name of ['@types/lodash.groupby', '@types/lodash.isempty', '@types/lodash.omit', '@types/lodash.uniqby', '@types/pluralize']) {
+      assert(server.devDependencies[name], `twenty-server no longer declares ${name}, so the sources image build would fail`);
+    }
   });
   record('the local profile pins the official flag off', () => {
     const profile = readFileSync(resolve(REPO_ROOT, 'deploy/local/privacy.env'), 'utf8');

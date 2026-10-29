@@ -44,4 +44,33 @@ RUN set -e; \
         { echo "no build output under packages/$workspace/dist"; exit 1; }; \
     done
 
+# MEASURED UPSTREAM PHANTOM DEPENDENCY. twenty-front imports lodash.groupby,
+# lodash.isempty, lodash.omit, lodash.uniqby and pluralize, but their @types
+# packages are declared ONLY by twenty-server (and twenty-website), so a focus
+# that installs the frontend workspaces alone resolves the modules and not
+# their declarations: tsgo then reports TS7016 for each one, in untouched
+# upstream files. A full-monorepo `yarn install` hides this by hoisting those
+# @types into the root node_modules. The declarations are restored here at the
+# EXACT specs twenty-server declares -- read out of its package.json, never
+# written by hand, and failing the build if one is gone -- so the compiler sees
+# what the full install hoists. Installed into a throwaway prefix and copied in,
+# never `npm install` against /app: npm would reconcile the whole yarn-installed
+# tree.
+COPY packages/twenty-server/package.json /aos/twenty-server-package.json
+RUN set -e; \
+    specs="$(node -e "const d=require('/aos/twenty-server-package.json').devDependencies; \
+      const names=['@types/lodash.groupby','@types/lodash.isempty','@types/lodash.omit','@types/lodash.uniqby','@types/pluralize']; \
+      const missing=names.filter((n)=>!d[n]); \
+      if (missing.length) { console.error('twenty-server no longer declares: '+missing.join(', ')); process.exit(1); } \
+      console.log(names.map((n)=>n+'@'+d[n]).join(' '));")"; \
+    echo "restoring hoisted declarations: $specs"; \
+    npm install --no-save --no-package-lock --no-fund --no-audit --prefix /tmp/aos-types $specs; \
+    cp -r /tmp/aos-types/node_modules/@types/. /app/node_modules/@types/; \
+    rm -rf /tmp/aos-types
+
+# The workspace-root jest preset twenty-front's jest.config.mjs extends. Not
+# part of the official front-deps stage (the image never runs tests), and
+# without it jest exits with "Preset ../../jest.preset.js not found".
+COPY jest.preset.js /app/jest.preset.js
+
 COPY packages/twenty-front /app/packages/twenty-front
