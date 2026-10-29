@@ -7,6 +7,15 @@ locals {
   # placeholders (METER_DRIVER, SENTRY_DSN, SENTRY_FRONT_DSN,
   # ENTERPRISE_KEY, ENTERPRISE_VALIDITY_TOKEN): stating "off" rather than
   # omitting the key, same reasoning as that file's own comments.
+  #
+  # The beta (CRM-013 R1) changes exactly one thing in that profile --
+  # multi-workspace is now on, with creation limited to server admins -- and
+  # adds the host/proxy/mail settings that mode needs. Everything privacy.env
+  # turns off stays off: an empty ENTERPRISE_KEY still means
+  # MAX_WORKSPACES_WITHOUT_ENTERPRISE_KEY (5, see
+  # max-workspaces-without-organization-key.constant.ts) caps how many
+  # workspaces this instance will ever create, which
+  # AWS_DEPLOYMENT_PLAN.md states as a beta limit rather than working around.
   privacy_env = {
     TELEMETRY_ENABLED                     = "false"
     ANALYTICS_ENABLED                     = "false"
@@ -23,17 +32,60 @@ locals {
     STORAGE_TYPE      = "s3"
     STORAGE_S3_NAME   = aws_s3_bucket.files.bucket
     STORAGE_S3_REGION = var.aws_region
-    # Closed signup (R2): same mechanism as LOCAL_SETUP.md, not a separate
-    # flag -- getSignUpWithoutWorkspaceDecision refuses once a workspace
-    # already exists and multiworkspace is off. The one-time first-admin
-    # signup remains a manual operational step, done once after the first
-    # LIVE deploy, same as local.
-    IS_MULTIWORKSPACE_ENABLED = "false"
+    # One workspace per beta user, created only by the operator (CRM-013 R1),
+    # replacing CRM-011's IS_MULTIWORKSPACE_ENABLED=false. These two flags are
+    # also what keeps public signup closed, so there is still no separate
+    # "signup disabled" switch:
+    #  - multi-workspace on makes the server resolve the workspace from the
+    #    request host (config-variables.ts:2184, read by
+    #    workspace-domains.service.ts's resolveWorkspaceAndPublicDomain);
+    #  - creation limited to server admins makes
+    #    sign-in-up.service.ts's assertWorkspaceCreationAllowed refuse a new
+    #    workspace unless the signed-in user has canAccessFullAdminPanel, and
+    #    assertSignUpWithoutWorkspaceAllowed refuse a signup that has no
+    #    pending invitation or approved access domain
+    #    (get-sign-up-without-workspace-decision.util.ts returns
+    #    'requiresDestination'). Both are bypassed only while zero workspaces
+    #    exist, which is the operator's one-time first signup.
+    # Upstream already defaults the second flag to true
+    # (config-variables.ts:588); stated here because the beta depends on it.
+    IS_MULTIWORKSPACE_ENABLED                      = "true"
+    IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS = "true"
+    # Host that serves sign-in and the OAuth /authorize screen when a request
+    # arrives on the API host: domain-server-config.service.ts's getBaseUrl()
+    # prefixes FRONTEND_URL's hostname with DEFAULT_SUBDOMAIN while
+    # multi-workspace is on, and
+    # get-subdomain-and-custom-domain-from-hostname.util.ts maps that same
+    # subdomain back to "no workspace" so it never collides with a user's
+    # workspace. Upstream default ('app', config-variables.ts:1225) stated
+    # rather than inherited.
+    DEFAULT_SUBDOMAIN = "app"
+    # Both URLs are the apex of var.domain_name: FRONTEND_URL is the
+    # `frontDomain` every workspace subdomain is resolved against (the util
+    # above), and SERVER_URL is the API host
+    # oauth-discovery.controller.ts's isApiHost() compares the request host
+    # against to decide whether /authorize lives on this host or on
+    # DEFAULT_SUBDOMAIN's.
+    SERVER_URL   = "https://${var.domain_name}"
+    FRONTEND_URL = "https://${var.domain_name}"
+    # The ALB terminates TLS, so X-Forwarded-Proto must be honoured or every
+    # getRequestBaseUrl() consumer would advertise http:// on an HTTPS-only
+    # stack: the OAuth issuer and authorization_servers
+    # (oauth-discovery.controller.ts) and the resource_metadata pointer the
+    # /mcp 401 returns (mcp-auth.guard.ts). Upstream's default already trusts
+    # RFC1918 peers (config-variables.ts:1667, applied in main.ts:69) and the
+    # ALB reaches the tasks from inside var.vpc_cidr (10.42.0.0/16), so this
+    # pins the behaviour the stack depends on instead of inheriting it.
+    TRUST_PROXY = "loopback, linklocal, uniquelocal"
+    # No outbound mail in the beta (founder decision, 29/10/2026): the
+    # operator passes invitation links by hand and runs password resets.
+    # LOGGER is upstream's default (config-variables.ts:531) and sends
+    # nothing: stated here so no SMTP driver can arrive by default change.
+    EMAIL_DRIVER = "LOGGER"
     # SEC-01 (SECURITY_AUDIT.md): forced regardless of any upstream
     # default, same as deploy/local/compose.yaml's x-aos-crm-env anchor.
     LOGIC_FUNCTION_TYPE   = "DISABLED"
     CODE_INTERPRETER_TYPE = "DISABLED"
-    SERVER_URL            = "https://${var.domain_name}"
   }
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through

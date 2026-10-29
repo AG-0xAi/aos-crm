@@ -1,10 +1,14 @@
-# Every variable in the four categories R1/R4 call out as founder decisions
-# -- region, domain, sizes and budget -- has NO default here on purpose
-# (CRM-011 R1/R3.1): a real value would either commit the founder to a
-# choice nobody approved yet, or (region/domain/account) identify the
-# business in a public fork. `terraform validate` only type-checks these;
-# it does not require a value. A real `plan`/`apply` does, via
-# terraform.tfvars (gitignored, see deploy/aws/.gitignore) or -var.
+# Sizes, domain and the alert address still have NO default here on purpose
+# (CRM-011 R1/R3.1): a real value would either commit the founder to a choice
+# nobody approved yet, or (domain/account/email) identify the business in a
+# public fork. `terraform validate` only type-checks these; it does not
+# require a value. A real `plan`/`apply` does, via terraform.tfvars
+# (gitignored, see deploy/aws/.gitignore) or -var.
+#
+# Region and budget DO have defaults now: the founder decided both on
+# 29/10/2026 for the beta (eu-west-1, 500 USD/month), and neither identifies
+# the business. A default that records a decision already made is the
+# opposite of a default that invents one.
 
 # ---------------------------------------------------------------------------
 # Founder decisions (AWS_DEPLOYMENT_PLAN.md R4)
@@ -12,12 +16,12 @@
 
 variable "aws_region" {
   description = <<-EOT
-    AWS region for every resource in this stack. The founder picks this
-    (data residency / latency trade-off); AWS_DEPLOYMENT_PLAN.md records the
-    EU-region recommendation under discussion. No default: a region choice
-    quietly defaulted is a region choice nobody made.
+    AWS region for every resource in this stack. Defaults to the region the
+    founder chose for the beta on 29/10/2026 (Ireland). Override only with a
+    deliberate decision: moving region moves where the data lives.
   EOT
   type        = string
+  default     = "eu-west-1"
 
   validation {
     condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.aws_region))
@@ -27,10 +31,14 @@ variable "aws_region" {
 
 variable "domain_name" {
   description = <<-EOT
-    Public domain (or subdomain) the ALB certificate and MCP SERVER_URL are
-    issued for, e.g. "staging.example.com". The founder owns this domain
-    decision; no placeholder default ships here so a real domain is never
-    accidentally committed to this public fork.
+    Public domain this stack serves. It is the apex of the beta's namespace,
+    not a host: the certificate covers it and "*.<domain>", SERVER_URL and
+    FRONTEND_URL point at it (ecs.tf), and every workspace lives at
+    "<workspace>.<domain>". A hosted zone for exactly this name must exist in
+    the account (data.tf looks it up), so passing a subdomain only works if
+    that subdomain is itself a delegated zone. The founder owns this decision;
+    no placeholder default ships here so a real domain is never accidentally
+    committed to this public fork.
   EOT
   type        = string
 
@@ -42,12 +50,14 @@ variable "domain_name" {
 
 variable "route53_zone_id" {
   description = <<-EOT
-    Optional Route 53 hosted zone ID for domain_name. When set, Terraform
-    creates the ACM DNS validation record and the ALB alias record
-    automatically. When null (default), the plan only outputs the
-    validation CNAME for the founder to add in whatever DNS provider
-    actually holds the domain -- this stack does not assume Route 53 is
-    the registrar.
+    Optional override for the Route 53 hosted zone that holds domain_name.
+    Left null (default), the stack looks the public zone up by name
+    (data.aws_route53_zone.this, data.tf), which is what the beta needs: the
+    domain is registered in this account and registration already created its
+    zone. Set it only when that lookup is ambiguous or wrong -- a private zone
+    with the same name, a delegated subdomain, a zone created by hand next to
+    the registrar's. It no longer switches DNS management on or off: ACM
+    validation and the ALB alias records are always managed here (CRM-013 R2).
   EOT
   type        = string
   default     = null
@@ -55,11 +65,13 @@ variable "route53_zone_id" {
 
 variable "budget_amount_usd" {
   description = <<-EOT
-    Monthly USD ceiling for the AWS Budgets alarm. The founder sets this
-    after reviewing the cost estimate in AWS_DEPLOYMENT_PLAN.md; no default
-    so an unapproved spend ceiling can never apply silently.
+    Monthly USD ceiling for the AWS Budgets alarm. Defaults to the ceiling the
+    founder set for the beta on 29/10/2026 (500 USD/month), which is well
+    above the estimate in AWS_DEPLOYMENT_PLAN.md: it is an alarm, not a cap --
+    AWS does not stop the stack when it fires.
   EOT
   type        = number
+  default     = 500
 
   validation {
     condition     = var.budget_amount_usd > 0

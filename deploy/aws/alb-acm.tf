@@ -1,9 +1,24 @@
 # HTTPS-only entry point (R1, R2: MCP only over HTTPS). No listener on 80
 # other than the redirect below: this stack never serves plaintext HTTP.
 
+locals {
+  # data.aws_route53_zone.this only exists when var.route53_zone_id is null
+  # (data.tf); everything below reads this instead of either one.
+  route53_zone_id = var.route53_zone_id != null ? var.route53_zone_id : data.aws_route53_zone.this[0].zone_id
+}
+
+# One certificate for the apex and every workspace subdomain (CRM-013 R2):
+# the beta gives each user their own `<workspace>.<domain>` host, so a
+# per-user certificate would mean a Terraform change (and a new validation)
+# every time the operator creates a workspace. The wildcard does NOT cover
+# the apex, hence both names: `*.betty.example` matches `app.betty.example`
+# but never `betty.example`, which is the API host SERVER_URL points at
+# (ecs.tf). It also does not cover a second label (`a.b.<domain>`), which
+# this stack never serves.
 resource "aws_acm_certificate" "this" {
-  domain_name       = var.domain_name
-  validation_method = "DNS"
+  domain_name               = var.domain_name
+  subject_alternative_names = ["*.${var.domain_name}"]
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
@@ -14,11 +29,18 @@ resource "aws_acm_certificate" "this" {
   }
 }
 
-# Automatic only when route53_zone_id is set (variables.tf); otherwise the
-# founder's DNS provider is unknown and outputs.tf prints the CNAME to add
-# by hand.
+# Always created now that the zone is resolved from var.domain_name: CRM-011's
+# "no Route 53, print the CNAME and add it by hand" mode is gone, because the
+# beta's domain is registered in this account's Route 53.
+#
+# ACM issues ONE validation CNAME covering both a name and its wildcard, so
+# these two for_each entries normally carry an identical record; allow_overwrite
+# keeps the second write idempotent instead of failing on a duplicate, and if
+# ACM ever returns distinct records both still get created. for_each is keyed by
+# dvo.domain_name (known at plan time from the certificate's own config) and not
+# by the record name, which is only known after the certificate exists.
 resource "aws_route53_record" "acm_validation" {
-  for_each = var.route53_zone_id == null ? {} : {
+  for_each = {
     for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
@@ -26,7 +48,7 @@ resource "aws_route53_record" "acm_validation" {
     }
   }
 
-  zone_id         = var.route53_zone_id
+  zone_id         = local.route53_zone_id
   name            = each.value.name
   type            = each.value.type
   records         = [each.value.record]
@@ -35,25 +57,18 @@ resource "aws_route53_record" "acm_validation" {
 }
 
 resource "aws_acm_certificate_validation" "this" {
-  count = var.route53_zone_id == null ? 0 : 1
-
   certificate_arn         = aws_acm_certificate.this.arn
   validation_record_fqdns = [for record in aws_route53_record.acm_validation : record.fqdn]
 }
 
 # aws_lb_listener.https below reads this instead of aws_acm_certificate.this.arn
-# directly. With route53_zone_id set, aws_acm_certificate_validation.this's
-# certificate_arn output only resolves once ACM reports the certificate
-# ISSUED, so Terraform cannot attach it to the listener while it is still
-# PENDING_VALIDATION on a first apply. Without route53_zone_id there is no
-# Terraform-tracked validation to wait on: the founder adds the
-# acm_validation_records CNAME at their own DNS provider by hand and confirms
-# ISSUED (`aws acm describe-certificate`) before traffic will actually
-# complete a TLS handshake; the first apply in that mode still attaches a
-# PENDING_VALIDATION certificate_arn (AWS allows this at the API level), and
-# AWS_DEPLOYMENT_PLAN.md documents applying once more after validation.
+# directly: aws_acm_certificate_validation.this's certificate_arn output only
+# resolves once ACM reports the certificate ISSUED, so a first apply cannot
+# attach it to the listener while it is still PENDING_VALIDATION. The apply
+# therefore waits for DNS validation to finish -- it has to be left to
+# complete, not just started (AWS_DEPLOYMENT_PLAN.md).
 locals {
-  certificate_arn = var.route53_zone_id == null ? aws_acm_certificate.this.arn : aws_acm_certificate_validation.this[0].certificate_arn
+  certificate_arn = aws_acm_certificate_validation.this.certificate_arn
 }
 
 resource "aws_lb" "this" {
@@ -65,6 +80,38 @@ resource "aws_lb" "this" {
 
   tags = {
     Name = "aos-crm-${var.environment}"
+  }
+}
+
+# Apex and wildcard both alias straight to the ALB (CRM-013 R2). One wildcard
+# record is what makes a new beta user reachable without touching Terraform:
+# the server picks the workspace from the request host
+# (workspace-domains.service.ts's resolveWorkspaceAndPublicDomain), so
+# `<workspace>.<domain>`, `app.<domain>` and the apex are the same ALB and the
+# same ECS service. Alias (not CNAME) because the apex of a zone cannot hold a
+# CNAME; evaluate_target_health stays false since the ALB's own target group
+# health check already decides what it serves.
+resource "aws_route53_record" "apex" {
+  zone_id = local.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "wildcard" {
+  zone_id = local.route53_zone_id
+  name    = "*.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
+    evaluate_target_health = false
   }
 }
 

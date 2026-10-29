@@ -1,5 +1,5 @@
 output "alb_dns_name" {
-  description = "ALB DNS name. Point domain_name at this (CNAME, or an alias record if route53_zone_id is set) once validated."
+  description = "ALB DNS name. domain_name and *.domain_name already alias to it (alb-acm.tf); this is for debugging the ALB directly, not a step the operator has to wire up."
   value       = aws_lb.this.dns_name
 }
 
@@ -8,7 +8,7 @@ output "acm_certificate_arn" {
 }
 
 output "acm_validation_records" {
-  description = "DNS validation records to add by hand when route53_zone_id is not set."
+  description = "The DNS validation records Terraform created in the hosted zone (aws_route53_record.acm_validation). Informative: for checking what ACM asked for, not a manual step."
   value = [
     for dvo in aws_acm_certificate.this.domain_validation_options : {
       name  = dvo.resource_record_name
@@ -29,6 +29,25 @@ output "ecs_cluster_name" {
 output "ecs_migrate_task_definition_arn" {
   description = "Run with `aws ecs run-task` before every deploy; see AWS_DEPLOYMENT_PLAN.md."
   value       = aws_ecs_task_definition.migrate.arn
+}
+
+output "ecs_server_task_definition_arn" {
+  description = "Server task definition. Also what the operator runs one-off commands from (`aws ecs run-task` with a container override): it boots with DISABLE_DB_MIGRATIONS=true, so the entrypoint execs the override instead of re-running migrations."
+  value       = aws_ecs_task_definition.server.arn
+}
+
+# Both of these exist so the run-task commands in AWS_DEPLOYMENT_PLAN.md are
+# copy-pasteable instead of ending in "...": awsvpcConfiguration needs the
+# subnet and security group ids, and reading them out of the console by hand
+# is how the wrong subnet ends up in a one-off task.
+output "private_subnet_ids" {
+  description = "Private subnets to run one-off Fargate tasks in (same as the services use)."
+  value       = aws_subnet.private[*].id
+}
+
+output "ecs_tasks_security_group_id" {
+  description = "Security group for one-off Fargate tasks (reaches RDS, Redis and the internet through NAT; not reachable from it)."
+  value       = aws_security_group.ecs_tasks.id
 }
 
 output "rds_endpoint" {
