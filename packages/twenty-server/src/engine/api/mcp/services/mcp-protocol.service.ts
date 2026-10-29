@@ -304,7 +304,7 @@ export class McpProtocolService {
     };
 
     const preloadToolNames = getMcpPreloadToolNames();
-    const preloadedTools =
+    const preloadedTools: ToolSet =
       preloadToolNames.length > 0
         ? await this.toolRegistry.getToolsByName(preloadToolNames, toolContext)
         : {};
