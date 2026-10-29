@@ -12,6 +12,9 @@ import { useTheme, themeCssVariables } from 'twenty-ui/theme';
 
 import { getLogoUrlFromDomainName } from 'twenty-shared/utils';
 
+import { allowRequestsToTwentyIconsState } from '@/client-config/states/allowRequestsToTwentyIcons';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+
 const StyledRow = styled.div`
   display: flex;
   height: ${BACKGROUND_MOCK_TABLE_DIMENSIONS.rowHeight}px;
@@ -97,8 +100,13 @@ export const BackgroundMockTableRow = ({
   company,
 }: BackgroundMockTableRowProps) => {
   const theme = useTheme();
+  const allowRequestsToTwentyIcons = useAtomStateValue(
+    allowRequestsToTwentyIconsState,
+  );
 
-  const logoUrl = getLogoUrlFromDomainName(company.domainName);
+  const logoUrl = allowRequestsToTwentyIcons
+    ? getLogoUrlFromDomainName(company.domainName)
+    : undefined;
 
   return (
     <StyledRow>

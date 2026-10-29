@@ -1,4 +1,6 @@
+import { allowRequestsToTwentyIconsState } from '@/client-config/states/allowRequestsToTwentyIcons';
 import { ColoredIcon } from '@/ui/icon/components/ColoredIcon';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { styled } from '@linaria/react';
 import { useState } from 'react';
 import { getLinkFaviconUrl, isDefined } from 'twenty-shared/utils';
@@ -56,7 +58,12 @@ export const LinkIconWithLinkOverlay = ({
 }: LinkIconWithLinkOverlayProps) => {
   const theme = useTheme();
   const [localFailedLink, setLocalFailedLink] = useState<string | null>(null);
-  const faviconUrl = getLinkFaviconUrl(link);
+  const allowRequestsToTwentyIcons = useAtomStateValue(
+    allowRequestsToTwentyIconsState,
+  );
+  const faviconUrl = allowRequestsToTwentyIcons
+    ? getLinkFaviconUrl(link)
+    : undefined;
   const linkKey = link ?? '';
   const isKnownFailed = failedFaviconUrls.has(linkKey);
   const showFavicon =

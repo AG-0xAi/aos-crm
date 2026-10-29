@@ -213,7 +213,11 @@ export function judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerSt
     return { ok: false, detail: `the container did not report all three markers (jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit})` };
   }
   const summary = parseJestSummary(output);
-  if (!summary.ok) return summary;
+  // The markers travel with the summary failure: the container's tail is what
+  // gets printed, and without them a jest failure hides whether tsgo ran at all.
+  if (!summary.ok) {
+    return { ok: false, detail: `${summary.detail} (markers: jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit})` };
+  }
   if (jestExit !== 0) {
     return { ok: false, detail: `jest exited ${jestExit} with a summary that reads clean; the exit code wins` };
   }
