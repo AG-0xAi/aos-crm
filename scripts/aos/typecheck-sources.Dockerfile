@@ -48,9 +48,31 @@ RUN set -e; \
     npx tsgo -p tsconfig.lib.json --declaration --emitDeclarationOnly --noEmit false --outDir dist --rootDir src; \
     npx tsc-alias -p tsconfig.lib.json --outDir dist
 
-# Fail the BUILD, not the gate's parser, if the artifact the server's typecheck
-# resolves is absent or empty: a cached layer that silently lost it would
+# Fail the BUILD, not the gate's parser, if an artifact the server's typecheck
+# resolves is absent or empty: a cached layer that silently lost one would
 # otherwise come back as "module not found" and look like a source error.
+#
+# CRM-004 fix5: one declaration per workspace this image BUILDS, not just the
+# two it used to name. The build above produces four (twenty-shared,
+# twenty-client-sdk, twenty-emails and twenty-sdk) and only twenty-sdk's and
+# twenty-shared's were proven, so a lost twenty-client-sdk or twenty-emails
+# declaration was exactly the failure this block exists to stop.
+#
+# Each path is the `exports[...].types` entry of a specifier
+# packages/twenty-server actually imports -- measured over its src/, scripts/
+# and test/ trees: twenty-shared/utils (2854 imports) and twenty-shared/types
+# (2321), twenty-client-sdk/core and twenty-client-sdk/generate (the only two
+# it imports), and twenty-emails as a bare specifier (14). The previous
+# twenty-shared/front-component-build is gone from this list for the same
+# reason it was a weak proof: no file under twenty-server imports it, so its
+# presence said nothing about what the compiler resolves. The self-test in
+# scripts/aos/verify-server-typecheck.mjs reads this block against each
+# package's own exports map and against the `nx run-many` line above, so a
+# workspace added to the build cannot stay unproven here.
 RUN set -e; \
     test -s /app/packages/twenty-sdk/dist/front-component-renderer/build/index.d.ts; \
-    test -s /app/packages/twenty-shared/dist/front-component-build/index.d.ts
+    test -s /app/packages/twenty-shared/dist/utils/index.d.ts; \
+    test -s /app/packages/twenty-shared/dist/types/index.d.ts; \
+    test -s /app/packages/twenty-client-sdk/dist/core/index.d.ts; \
+    test -s /app/packages/twenty-client-sdk/dist/generate/index.d.ts; \
+    test -s /app/packages/twenty-emails/dist/index.d.ts
