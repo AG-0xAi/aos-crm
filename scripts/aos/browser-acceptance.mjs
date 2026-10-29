@@ -21,7 +21,13 @@
 // deploy/local/.env) and are never printed: the result object below carries
 // checks, ids and request metadata, and nothing reads process.env except the
 // three lookups at the top.
-import { chromium } from 'playwright';
+// createRequire, not a bare import: the playwright package is installed
+// globally in the image (/usr/lib/node_modules, on NODE_PATH), and NODE_PATH is
+// a CommonJS resolution mechanism that ESM import does not consult.
+import { readFileSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+const { chromium } = createRequire(import.meta.url)('playwright');
 
 const BASE_URL = requireEnv('AOS_CRM_BROWSER_BASE_URL');
 const EMAIL = requireEnv('AOS_CRM_ADMIN_EMAIL');
@@ -38,6 +44,7 @@ const SHORT_WAIT_MS = 1_500;
 const LOCATOR_TIMEOUT_MS = 30_000;
 
 const checks = [];
+let sandbox = null;
 const externalRequests = [];
 const consoleErrors = [];
 const ids = { ...IDS };
@@ -50,6 +57,33 @@ function requireEnv(name) {
     process.exit(2);
   }
   return value;
+}
+
+// Measured, not asserted from the absence of a flag we did not pass: every
+// chromium process this container is running, read off /proc, so the host suite
+// can check that none of them carries --no-sandbox and that the sandboxed
+// zygote is there. Only the switches are collected, never a full command line
+// (it would carry the user-data dir).
+function sandboxEvidence() {
+  const switches = new Set();
+  let chromiumProcesses = 0;
+  let zygotes = 0;
+  for (const entry of readdirSync('/proc')) {
+    if (!/^\d+$/.test(entry)) continue;
+    let cmdline;
+    try { cmdline = readFileSync(`/proc/${entry}/cmdline`, 'utf8'); } catch { continue; }
+    const argv = cmdline.split('\0').filter(Boolean);
+    if (argv.length === 0 || !/chrom/i.test(argv[0])) continue;
+    chromiumProcesses += 1;
+    for (const arg of argv.slice(1)) {
+      if (!arg.startsWith('--')) continue;
+      const name = arg.split('=')[0];
+      switches.add(name);
+      if (name === '--type' && arg.includes('zygote')) zygotes += 1;
+    }
+    if (argv.some((a) => a === '--type=zygote')) zygotes += 1;
+  }
+  return { chromiumProcesses, zygotes, switches: [...switches].sort(), uid: process.getuid?.() ?? null };
 }
 
 function isLoopback(hostname) {
@@ -73,7 +107,7 @@ async function check(name, body) {
 async function dumpPage(page, label) {
   if (!DEBUG) return;
   try {
-    const text = (await page.locator('body').innerText()).replace(/\s+\n/g, '\n').slice(0, 2500);
+    const text = (await page.locator('body').innerText()).replace(/\s+\n/g, '\n').slice(0, 6000);
     const testIds = await page.locator('[data-testid]').evaluateAll((nodes) =>
       Array.from(new Set(nodes.map((n) => n.getAttribute('data-testid')))).slice(0, 60));
     const buttons = await page.getByRole('button').evaluateAll((nodes) =>
@@ -103,62 +137,172 @@ async function signIn(page) {
 
 async function openIndex(page, plural) {
   await page.goto(`${BASE_URL}/objects/${plural}`, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-testid^="row-id-"], [data-testid="record-index-empty-state"]')
-    .first().waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+  // A loaded index is one of three things: rows, the table's own add-new action
+  // row, or the empty state a filtered view shows. Waiting for rows alone hangs
+  // on a view whose filter matches nothing, which is how this suite first met
+  // the Opportunities default view.
+  await page.getByText('Add New', { exact: true })
+    .or(page.locator('[data-testid^="row-id-"]'))
+    .or(page.getByText(/No .* found/))
+    .first()
+    .waitFor({ timeout: LOCATOR_TIMEOUT_MS });
 }
 
 function rowForText(page, text) {
   return page.locator('[data-testid^="row-id-"]').filter({ hasText: text }).first();
 }
 
-// The UI's own creation path: the table's "Add New" action row creates the
-// record and leaves its first cell in edit mode, so the name is typed into the
-// real editor and committed with Enter. The id is then read off the row the
-// table rendered, which is what later phases address the record by.
-async function createRecordThroughTable(page, plural, text) {
+// The id of the record the UI just created, read off the side panel the UI
+// itself opens for it (/objects/people?panel=%2Fobject%2Fperson%2F<id>). The
+// panel is the reliable half: a filtered view does not render a row for the new
+// record at all, and then there is nothing to scrape.
+async function idFromPanel(page, singular) {
+  const pattern = new RegExp(`panel=%2Fobject%2F${singular}%2F([0-9a-f-]{36})`);
+  await page.waitForURL(pattern, { timeout: LOCATOR_TIMEOUT_MS });
+  return pattern.exec(page.url())?.[1] ?? null;
+}
+
+// The UI's own creation path: the table's "Add New" action row (or, on a view
+// whose filter matches nothing, the empty state's own create button) creates
+// the record and leaves its first cell in edit mode, so the name is typed into
+// the real editor and committed with Enter.
+async function createRecordThroughUi(page, { plural, singular, text }) {
   await openIndex(page, plural);
-  await page.getByText('Add New', { exact: true }).last().click();
+  // The action row lives at the BOTTOM of a virtualized table, so it is not
+  // rendered until the table is scrolled there: looking for it the moment the
+  // first row appears is how this step first failed on the People index.
+  await page.mouse.wheel(0, 20_000);
+  const addNew = page.getByText('Add New', { exact: true }).last();
+  try {
+    await addNew.waitFor({ timeout: 15_000 });
+    await addNew.click();
+  } catch {
+    // A view whose filter matches nothing renders no table at all, only its
+    // empty state and that state's own create button.
+    await page.getByRole('button', { name: /^Add a /i }).first().click();
+  }
   await page.waitForTimeout(SHORT_WAIT_MS);
   await page.keyboard.type(text, { delay: 15 });
   await page.keyboard.press('Enter');
-  const row = rowForText(page, text);
-  await row.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
-  const testId = await row.getAttribute('data-testid');
-  const id = (testId ?? '').replace('row-id-', '');
-  if (!/^[0-9a-f-]{36}$/.test(id)) {
-    throw new Error(`the created row carries no record id (data-testid=${testId})`);
-  }
+  await page.waitForTimeout(SHORT_WAIT_MS);
+  const id = await idFromPanel(page, singular);
+  if (!id) throw new Error('the UI opened no side panel for the record it created');
   return id;
 }
 
-// An empty relation cell renders the placeholder "Set <Field label>" (see
-// RecordTableCellDisplayContainer), which is the stable handle for it. Clicking
-// focuses the cell, Enter opens the editor, the search text filters the picker
-// and the option is clicked by its own text.
-async function setRelationThroughTable(page, { rowText, fieldLabel, searchText, optionText }) {
-  const row = rowForText(page, rowText);
-  await row.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
-  const cell = row.getByText(`Set ${fieldLabel}`, { exact: true }).first();
-  await cell.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
-  await cell.click();
-  await page.waitForTimeout(400);
-  const editor = page.locator('[data-testid="editable-cell-edit-mode-container"]');
-  if (await editor.count() === 0) {
-    await page.keyboard.press('Enter');
-    await editor.first().waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+// A relation set through the record page's own field cell. An empty field
+// renders its label as the placeholder of its value cell, so inside the fields
+// widget the LAST exact match for the label is the value and the first is the
+// label itself. Clicking it opens the relation picker, the search text filters
+// it and the option is clicked by the record's own name.
+async function setRelationOnRecordPage(page, { singular, id, fieldLabel, searchText, optionText }) {
+  await openRecord(page, singular, id);
+  const widget = page.getByTestId('record-fields-widget');
+  await widget.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+
+  // Which of the label's occurrences is the value cell is a rendering detail,
+  // so this tries them and keeps the one that actually opened an editor instead
+  // of assuming. The editor's own container is the evidence that it opened.
+  const editor = page.locator('[data-testid="inline-cell-edit-mode-container"]');
+  const candidates = widget.getByText(fieldLabel, { exact: true });
+  const total = await candidates.count();
+  // Measured: the value cell resolves but a plain click times out on
+  // actionability (it sits under the field row's own hover layer), so each
+  // candidate is tried normally and then forced, and the editor's own container
+  // is the evidence of which attempt actually opened it.
+  const attempts = [];
+  for (const index of [total - 1, 1, 0].filter((i, p, all) => i >= 0 && i < total && all.indexOf(i) === p)) {
+    for (const force of [false, true]) {
+      attempts.push({ index, force });
+    }
   }
-  await page.keyboard.type(searchText, { delay: 15 });
-  await page.waitForTimeout(SHORT_WAIT_MS);
-  const option = page.getByText(optionText, { exact: true }).last();
-  await option.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
-  await option.click();
+  let opened = null;
+  for (const attempt of attempts) {
+    try {
+      await candidates.nth(attempt.index).click({ force: attempt.force, timeout: 8_000 });
+    } catch {
+      continue;
+    }
+    await page.waitForTimeout(700);
+    if (await editor.count() > 0) { opened = attempt; break; }
+    await page.keyboard.press('Escape');
+  }
+  if (opened === null) {
+    throw new Error(`clicking the ${fieldLabel} field opened no editor in ${attempts.length} attempt(s) over ${total} matching node(s)`);
+  }
+
+  // The picker's search box, clicked and then typed into KEY BY KEY: measured,
+  // locator.fill() sets the value without the picker's query ever changing (the
+  // list came back unfiltered, missing the record this was looking for), and
+  // keystrokes sent to the page with no focus went nowhere.
+  const input = page.locator('input:visible');
+  const inputs = await input.count();
+  if (inputs === 0) throw new Error(`the ${fieldLabel} picker opened with no search box`);
+  await input.last().click();
+  await input.last().pressSequentially(searchText, { delay: 25 });
+  await page.waitForTimeout(2_500);
+
+  // Not exact: an option renders its record name inside a chip whose element
+  // text carries more than the name.
+  const option = page.getByText(optionText, { exact: false }).last();
+  if (await option.count() === 0) {
+    const offered = (await page.locator('body').innerText())
+      .split('\n').map((l) => l.trim()).filter(Boolean).slice(-12).join(' | ');
+    throw new Error(`the ${fieldLabel} picker (opened by ${JSON.stringify(opened)}, ${inputs} visible input(s)) offered no option matching the record; last lines on screen: ${offered}`);
+  }
+  await option.click({ timeout: LOCATOR_TIMEOUT_MS });
   await page.waitForTimeout(SHORT_WAIT_MS);
   await page.keyboard.press('Escape');
+  // Read back from a FRESH load, not from the DOM that was just mutated: what
+  // matters is that the relation was persisted, not that a chip appeared.
+  await openRecord(page, singular, id);
+  const body = await page.locator('body').innerText();
+  if (!body.includes(optionText)) {
+    throw new Error(`after reloading, the ${singular} page does not show "${optionText}" in its ${fieldLabel} field`);
+  }
 }
 
 async function openRecord(page, singular, id) {
   await page.goto(`${BASE_URL}/object/${singular}/${id}`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-testid="top-bar-title"]').first().waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+  await page.getByTestId('record-fields-widget').waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+}
+
+// The three relation steps, shared by the create phase and by the 'relate'
+// phase the relation work was iterated with (ids handed in, nothing created).
+async function runRelationSteps(page) {
+  await check('the person is related to the company through the UI, and the relation survives a reload', async () => {
+    await setRelationOnRecordPage(page, {
+      singular: 'person',
+      id: ids.personId,
+      fieldLabel: 'Company',
+      searchText: COMPANY_NAME,
+      optionText: COMPANY_NAME,
+    });
+    return 'the person page shows the company after a fresh load';
+  }) || await dumpPage(page, 'relate-person');
+
+  await check('the opportunity is related to the company through the UI, and the relation survives a reload', async () => {
+    await setRelationOnRecordPage(page, {
+      singular: 'opportunity',
+      id: ids.opportunityId,
+      fieldLabel: 'Company',
+      searchText: COMPANY_NAME,
+      optionText: COMPANY_NAME,
+    });
+    return 'the opportunity page shows the company after a fresh load';
+  }) || await dumpPage(page, 'relate-opportunity');
+
+  await check('the opportunity point of contact is the synthetic person, set through the UI', async () => {
+    await setRelationOnRecordPage(page, {
+      singular: 'opportunity',
+      id: ids.opportunityId,
+      fieldLabel: 'Point of Contact',
+      searchText: PERSON_FIRST_NAME,
+      optionText: PERSON_FIRST_NAME,
+    });
+    return 'the opportunity page shows the point of contact after a fresh load';
+  }) || await dumpPage(page, 'relate-point-of-contact');
 }
 
 async function runCreatePhase(page) {
@@ -168,64 +312,21 @@ async function runCreatePhase(page) {
   }) || await dumpPage(page, 'sign-in');
 
   await check('a synthetic company is created through the UI', async () => {
-    ids.companyId = await createRecordThroughTable(page, 'companies', COMPANY_NAME);
+    ids.companyId = await createRecordThroughUi(page, { plural: 'companies', singular: 'company', text: COMPANY_NAME });
     return `company ${ids.companyId}`;
   }) || await dumpPage(page, 'create-company');
 
   await check('a synthetic person is created through the UI', async () => {
-    ids.personId = await createRecordThroughTable(page, 'people', PERSON_FIRST_NAME);
+    ids.personId = await createRecordThroughUi(page, { plural: 'people', singular: 'person', text: PERSON_FIRST_NAME });
     return `person ${ids.personId}`;
   }) || await dumpPage(page, 'create-person');
 
-  await check('the person is related to the company through the UI', async () => {
-    await setRelationThroughTable(page, {
-      rowText: PERSON_FIRST_NAME,
-      fieldLabel: 'Company',
-      searchText: COMPANY_NAME,
-      optionText: COMPANY_NAME,
-    });
-    const row = rowForText(page, PERSON_FIRST_NAME);
-    const text = await row.innerText();
-    if (!text.includes(COMPANY_NAME)) {
-      throw new Error('the person row does not show the company after setting the relation');
-    }
-    return 'the person row shows the company chip';
-  }) || await dumpPage(page, 'relate-person');
-
   await check('a synthetic opportunity is created through the UI', async () => {
-    ids.opportunityId = await createRecordThroughTable(page, 'opportunities', OPPORTUNITY_NAME);
+    ids.opportunityId = await createRecordThroughUi(page, { plural: 'opportunities', singular: 'opportunity', text: OPPORTUNITY_NAME });
     return `opportunity ${ids.opportunityId}`;
   }) || await dumpPage(page, 'create-opportunity');
 
-  await check('the opportunity is related to the company through the UI', async () => {
-    await setRelationThroughTable(page, {
-      rowText: OPPORTUNITY_NAME,
-      fieldLabel: 'Company',
-      searchText: COMPANY_NAME,
-      optionText: COMPANY_NAME,
-    });
-    const row = rowForText(page, OPPORTUNITY_NAME);
-    const text = await row.innerText();
-    if (!text.includes(COMPANY_NAME)) {
-      throw new Error('the opportunity row does not show the company after setting the relation');
-    }
-    return 'the opportunity row shows the company chip';
-  }) || await dumpPage(page, 'relate-opportunity');
-
-  await check('the opportunity point of contact is the synthetic person, set through the UI', async () => {
-    await setRelationThroughTable(page, {
-      rowText: OPPORTUNITY_NAME,
-      fieldLabel: 'Point of Contact',
-      searchText: PERSON_FIRST_NAME,
-      optionText: PERSON_FIRST_NAME,
-    });
-    const row = rowForText(page, OPPORTUNITY_NAME);
-    const text = await row.innerText();
-    if (!text.includes(PERSON_FIRST_NAME)) {
-      throw new Error('the opportunity row does not show the point of contact after setting the relation');
-    }
-    return 'the opportunity row shows the person chip';
-  }) || await dumpPage(page, 'relate-point-of-contact');
+  await runRelationSteps(page);
 }
 
 async function runVerifyPhase(page) {
@@ -268,25 +369,27 @@ async function runVerifyPhase(page) {
   // The worker's own output, read in the browser: the timeline entries for
   // these records are written by upsert-timeline-activity-from-internal-event
   // in the worker process, not by the request that created the record.
-  await check('the timeline the WORKER wrote for the company is rendered in the browser', async () => {
+  await check('the timeline entry the WORKER wrote for the company is rendered in the browser', async () => {
+    // The record page's own Timeline section, not a tab: the entries come from
+    // the workspace's timelineActivity table, which the worker fills through
+    // upsert-timeline-activity-from-internal-event -- the request that created
+    // the record does not write them.
     await openRecord(page, 'company', ids.companyId);
-    const timelineTab = page.getByRole('tab', { name: /timeline/i }).first();
-    if (await timelineTab.count() > 0) {
-      await timelineTab.click();
-    } else {
-      await page.getByText('Timeline', { exact: true }).first().click();
-    }
     await page.waitForTimeout(SHORT_WAIT_MS);
     const body = await page.locator('body').innerText();
-    if (!/created|creó|record/i.test(body)) {
-      throw new Error('the timeline tab shows no creation event');
+    if (!body.includes('was created by')) {
+      throw new Error('the record page shows no timeline creation entry');
     }
-    return 'the timeline tab shows a creation event';
+    return 'the record page shows the creation entry the worker wrote';
   }) || await dumpPage(page, 'verify-timeline');
 }
 
 async function main() {
-  const browser = await chromium.launch();
+  // chromiumSandbox: true EXPLICITLY. Playwright's own default for
+  // chromium.launch() is FALSE -- measured on 2026-10-29, the process tree came
+  // back carrying --no-sandbox without anyone asking for it -- and a browser
+  // with its sandbox off is not the browser this acceptance is about.
+  const browser = await chromium.launch({ chromiumSandbox: true });
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
   context.on('request', (request) => {
     let url;
@@ -297,6 +400,7 @@ async function main() {
     if (!externalRequests.includes(metadata)) externalRequests.push(metadata);
   });
   const page = await context.newPage();
+  sandbox = sandboxEvidence();
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
     const text = message.text().slice(0, 200);
@@ -312,8 +416,29 @@ async function main() {
         const sandbox = await page.evaluate(() => navigator.userAgent);
         return `healthz 200, user agent ${sandbox.slice(0, 60)}`;
       });
+    } else if (PHASE === 'explore') {
+      // Not part of the gate: a one-off structural dump (text, test ids,
+      // buttons -- never a screenshot) used while writing the UI steps below.
+      await check('explore', async () => {
+        await signIn(page);
+        for (const [singular, id] of Object.entries({ company: IDS.companyId, person: IDS.personId })) {
+          if (!id) continue;
+          await openRecord(page, singular, id);
+          await page.waitForTimeout(SHORT_WAIT_MS);
+          await dumpPage(page, `record-${singular}`);
+        }
+        return 'dumped';
+      });
     } else if (PHASE === 'create') {
       await runCreatePhase(page);
+    } else if (PHASE === 'relate') {
+      // The relation steps alone, over records handed in: how the UI relation
+      // path was iterated without creating a new record for every attempt.
+      await check('the administrator signs in through the browser form', async () => {
+        await signIn(page);
+        return `landed on ${new URL(page.url()).pathname}`;
+      });
+      await runRelationSteps(page);
     } else if (PHASE === 'verify') {
       await runVerifyPhase(page);
     } else {
@@ -329,6 +454,7 @@ async function main() {
     marker: MARKER,
     names: { company: COMPANY_NAME, person: PERSON_FIRST_NAME, opportunity: OPPORTUNITY_NAME },
     ids,
+    sandbox,
     checks,
     externalRequests,
     consoleErrors,
@@ -348,6 +474,7 @@ main().catch((error) => {
     phase: PHASE,
     marker: MARKER,
     ids,
+    sandbox,
     checks: [...checks, { name: 'the browser run completed', ok: false, detail: String(error?.message ?? error).slice(0, 300) }],
     externalRequests,
     consoleErrors,

@@ -193,15 +193,21 @@ after(async () => {
 });
 
 test('REST refuses an anonymous call, and a malformed credential, on read AND on write', async () => {
+  // Measured on this deployment, 2026-10-29: no credential at all is 401, a
+  // malformed bearer is 403. Both are refusals by the deployment, which is what
+  // this asserts -- pinning one code would make the suite fail on a change that
+  // is not a weakening, and pinning "any 4xx" would accept a 404 that hid a
+  // route rather than refusing it.
+  const REFUSALS = [401, 403];
   for (const [name, call] of [
     ['GET /rest/companies', () => rest('/companies')],
     ['POST /rest/people', () => rest('/people', { method: 'POST', body: { name: { firstName: RUN_MARKER, lastName: 'Anonima' } } })],
     ['GET /rest/companies with a malformed bearer', () => rest('/companies', { token: randomBytes(24).toString('base64url') })],
   ]) {
     const res = await call();
-    assert.equal(res.status, 401, `${name} answered ${res.status} without a valid credential`);
-    // A 401 that still carried records would be a leak, not a refusal.
-    assert.equal(res.body?.data ?? null, null, `${name} returned a data payload with its 401`);
+    assert.ok(REFUSALS.includes(res.status), `${name} answered ${res.status} without a valid credential`);
+    // A refusal that still carried records would be a leak.
+    assert.equal(res.body?.data ?? null, null, `${name} returned a data payload with its ${res.status}`);
   }
   // And nothing was written by the refused POST.
   const written = Number(psql(`select count(*) from "${workspaceSchema}".person where "nameFirstName" = '${RUN_MARKER}'`));
@@ -224,7 +230,7 @@ test('the least-privilege team key does real REST CRUD, and every effect is visi
   const created = await rest('/people', {
     method: 'POST',
     token: teamKeyToken,
-    body: { name: { firstName: RUN_MARKER, lastName: 'Ensayo' }, city: 'Loopback' },
+    body: { name: { firstName: RUN_MARKER, lastName: 'Ensayo' }, jobTitle: 'Ensayo de API' },
   });
   assert.equal(created.status, 201, `REST create answered ${created.status}: ${created.raw.slice(0, 200)}`);
   createdPersonId = created.body?.data?.createPerson?.id ?? null;
@@ -240,16 +246,30 @@ test('the least-privilege team key does real REST CRUD, and every effect is visi
   const updated = await rest(`/people/${createdPersonId}`, {
     method: 'PATCH',
     token: teamKeyToken,
-    body: { city: 'Loopback Actualizado' },
+    body: { jobTitle: 'Ensayo de API actualizado' },
   });
   assert.equal(updated.status, 200, `REST update answered ${updated.status}: ${updated.raw.slice(0, 200)}`);
-  assert.equal(psql(`select city from "${workspaceSchema}".person where id = '${createdPersonId}'`), 'Loopback Actualizado',
+  assert.equal(psql(`select "jobTitle" from "${workspaceSchema}".person where id = '${createdPersonId}'`), 'Ensayo de API actualizado',
     'the REST update answered 200 but the row still carries the old value');
 
-  const softDeleted = await rest(`/people/${createdPersonId}`, { method: 'DELETE', token: teamKeyToken });
-  assert.equal(softDeleted.status, 200, `REST delete answered ${softDeleted.status}: ${softDeleted.raw.slice(0, 200)}`);
+  // MEASURED, and not what the role's switches suggest: DELETE /rest/people/<id>
+  // is refused for this role with PERMISSION_DENIED even though it carries
+  // canSoftDeleteAllObjectRecords: true. The ORM maps the 'delete' operation to
+  // canDestroyObjectRecords (is-object-operation-permitted.util.ts), which this
+  // role deliberately does not have, so the REST route needs the permanent-purge
+  // privilege. The soft delete this role CAN do is the record API's own
+  // deleteOne, asserted right after -- see docs/aos/bootstrap/SECURITY_AUDIT.md.
+  const restDelete = await rest(`/people/${createdPersonId}`, { method: 'DELETE', token: teamKeyToken });
+  assert.equal(refusalKind({ errors: [{ message: restDelete.body?.messages?.[0], extensions: { code: 'FORBIDDEN', subCode: restDelete.body?.code } }] }), 'permission',
+    `REST delete answered ${restDelete.status} (${restDelete.raw.slice(0, 160)}): expected the permission refusal this role's switches imply for a permanent delete`);
+  assert.equal(psql(`select "deletedAt" is null from "${workspaceSchema}".person where id = '${createdPersonId}'`), 't',
+    'the refused REST delete still touched the row');
+
+  const softDeleted = await gql(CORE, 'mutation($id: UUID!) { deletePerson(id: $id) { id deletedAt } }', { id: createdPersonId }, teamKeyToken);
+  assert.equal(refusalKind(softDeleted), 'allowed',
+    `the team key could not soft delete through the record API: ${gqlErrors(softDeleted).slice(0, 160)}`);
   assert.equal(psql(`select "deletedAt" is not null from "${workspaceSchema}".person where id = '${createdPersonId}'`), 't',
-    'the REST delete answered 200 but the row is not soft deleted');
+    'the soft delete answered without an error but the row is not soft deleted');
 });
 
 test('the team key cannot destroy a record permanently, and an Admin key can: the refusal is about permission', async () => {
