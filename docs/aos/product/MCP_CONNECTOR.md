@@ -192,18 +192,25 @@ Medido con una API key ligada a ese rol:
 - leer la lista de roles del workspace: **rechazado**
 
 Cada rechazo se mide **dos veces**, con la misma consulta y los mismos argumentos: con la key de
-equipo tiene que ser rechazado *por permiso* (`FORBIDDEN` / `PERMISSION_DENIED`), y con una
-credencial Admin la misma llamada tiene que **pasar**. Sin esa segunda mitad un rechazo puede ser la
-petición mal formada y no el permiso — es lo que pasaba con un `roleId` inexistente, que el servidor
-rechaza con `NOT_FOUND` incluso para el administrador. Lo que crea la mitad Admin se deshace (la key
-se revoca, el rol se borra).
+equipo tiene que ser rechazado **del tipo que esa operación declara** (las tres declaran
+`permission`: `FORBIDDEN` / `PERMISSION_DENIED`), y con una credencial Admin la misma llamada tiene
+que **pasar**. El tipo esperado va en la propia operación (`teamKeyRefusedAs`) y la comprobación
+compara contra ese valor, no contra uno fijo: dos operaciones no se rechazan necesariamente por lo
+mismo. Sin la segunda mitad un rechazo puede ser la petición mal formada y no el permiso — es lo que
+pasaba con un `roleId` inexistente, que el servidor rechaza con `NOT_FOUND` incluso para el
+administrador. Lo que crea la mitad Admin se deshace (la key se revoca, el rol se borra).
 
 Dos matices medidos:
 
-- **ninguna** API key acuña API keys, tampoco una Admin: `createApiKey` lleva su propio guardia de
-  tipo de llamante (`This endpoint is not available to this caller`), así que ahí lo que rechaza es
-  el tipo de credencial y no el rol. La mitad permitida de esa comprobación corre con la sesión del
-  administrador;
+- **ninguna** API key acuña API keys, tampoco una Admin, pero cada una se topa con un guardia
+  distinto y **en este orden** (medido el 29/10/2026 11:58 UTC): el guardia de permisos de ajustes
+  responde **primero**, así que una key cuyo rol no tiene `canUpdateAllSettings` —la de equipo— se
+  queda ahí y es rechazada *por permiso* (`Entity performing the request does not have permission`);
+  sólo una key que lo pasa —la Admin— llega al guardia de tipo de llamante propio de `createApiKey`
+  (`apiKey:false`), que rechaza a **toda** API key (`This endpoint is not available to this
+  caller`). Es decir: el rechazo de la key de equipo es por su rol, el de la key Admin es por ser
+  una API key. La mitad permitida de esa comprobación corre con la sesión del administrador, porque
+  ninguna key puede hacerlo;
 - la **administración de miembros** (`updateWorkspaceMemberRole`) queda fuera del alcance de
   cualquier API key por ese mismo guardia, y su mitad permitida reescribiría el rol del único
   miembro de este workspace, así que no se sondea. Lo que se mide es la lista de roles.
@@ -294,6 +301,11 @@ node --test scripts/aos/test/crm-mcp-e2e.test.mjs
 node scripts/aos/mcp/oauth-pkce-probe.mjs
 node scripts/aos/mcp/team-role.mjs
 node scripts/aos/mcp/claude-client-probe.mjs
+
+# el self-test de la sonda de mínimo privilegio: sin servidor ni red, comprueba que cada
+# operación de escalada declara su rechazo esperado y que es ese valor el que se compara.
+# Lo ejecuta también `verify-mcp-specs.mjs --self-test`, que sí está en el gate.
+node scripts/aos/mcp/team-role.mjs --self-test
 ```
 
 Las tres sondas leen las credenciales del administrador local de `deploy/local/.env`, que está
