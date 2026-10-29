@@ -41,6 +41,21 @@ resource "aws_acm_certificate_validation" "this" {
   validation_record_fqdns = [for record in aws_route53_record.acm_validation : record.fqdn]
 }
 
+# aws_lb_listener.https below reads this instead of aws_acm_certificate.this.arn
+# directly. With route53_zone_id set, aws_acm_certificate_validation.this's
+# certificate_arn output only resolves once ACM reports the certificate
+# ISSUED, so Terraform cannot attach it to the listener while it is still
+# PENDING_VALIDATION on a first apply. Without route53_zone_id there is no
+# Terraform-tracked validation to wait on: the founder adds the
+# acm_validation_records CNAME at their own DNS provider by hand and confirms
+# ISSUED (`aws acm describe-certificate`) before traffic will actually
+# complete a TLS handshake; the first apply in that mode still attaches a
+# PENDING_VALIDATION certificate_arn (AWS allows this at the API level), and
+# AWS_DEPLOYMENT_PLAN.md documents applying once more after validation.
+locals {
+  certificate_arn = var.route53_zone_id == null ? aws_acm_certificate.this.arn : aws_acm_certificate_validation.this[0].certificate_arn
+}
+
 resource "aws_lb" "this" {
   name               = "aos-crm-${var.environment}"
   internal           = false
@@ -86,7 +101,7 @@ resource "aws_lb_listener" "https" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate.this.arn
+  certificate_arn   = local.certificate_arn
 
   default_action {
     type             = "forward"
