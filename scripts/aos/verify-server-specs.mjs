@@ -201,9 +201,11 @@ function wsl(args, opts = {}) {
 }
 
 // Every exit path tears down what this run created first: an early failure used
-// to leave the source tar and the image tags behind for nobody to collect.
+// to leave the source tar behind for nobody to collect. The image tags this run
+// built are KEPT on a failure -- a failed gate is the one time those bytes are
+// evidence -- and named, so they can be inspected and then removed by hand.
 function fail(message) {
-  removeOwnResources();
+  removeOwnResources({ keepImages: true });
   console.error(`[FAIL] ${message}`);
   process.exit(1);
 }
@@ -215,7 +217,7 @@ function fail(message) {
 // deadline, so a Docker daemon that stopped answering cannot turn teardown into
 // a hang. A teardown step that could not be completed is reported, never
 // assumed.
-function removeOwnResources() {
+function removeOwnResources({ keepImages = false } = {}) {
   const deadline = Date.now() + CLEANUP_TIMEOUT_MS;
   const bounded = (args) => {
     const remaining = deadline - Date.now();
@@ -239,6 +241,10 @@ function removeOwnResources() {
   // Child tag before its parent: with the classic image store a tagged parent
   // cannot be untagged while an image derived from it still references it.
   for (const image of [...ownImages].reverse()) {
+    if (keepImages) {
+      console.error(`[INFO] kept this run's own image tag ${image} for inspection; remove it with: docker image rm ${image}`);
+      continue;
+    }
     const removed = bounded(['docker', 'image', 'rm', image]);
     console.error(`[INFO] removed this run's own image tag ${image} (${describe(removed)})`);
   }
@@ -532,8 +538,12 @@ function selfTest() {
   });
   record('the teardown names only the resources this run created, inside one bounded deadline', () => {
     const production = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('function selfTest()')[0];
-    const teardown = (production.split('function removeOwnResources()')[1] || '').split('\nfunction ')[0];
+    const teardown = (production.split('function removeOwnResources(')[1] || '').split('\nfunction ')[0];
     assert(teardown, 'there is no teardown function left to inspect');
+    // A failed gate is the one time those image bytes are evidence, so they are
+    // kept and named instead of deleted.
+    assert(/removeOwnResources\(\{ keepImages: true \}\)/.test(production), 'a failing run no longer keeps its own image for inspection');
+    assert(/kept this run's own image tag/.test(teardown), 'the kept image is no longer named, so nobody can inspect or remove it');
     assert(!/\bdocker.*(prune|kill \$\(|rm -f \$\(|--filter)/.test(production), 'cleanup matches resources by pattern instead of by name');
     assert(/ownImages\.push\(DEPS_IMAGE\)/.test(production) && /ownImages\.push\(SOURCES_IMAGE\)/.test(production),
       'a build no longer registers the image tag it created, so that tag would outlive the run');
