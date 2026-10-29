@@ -107,9 +107,27 @@ function serverProcessIdentity() {
 // would hide it and would risk replaying a mutation; measuring the application
 // over a connection it actually has is the fix. The responses this suite reads
 // are small, so per-request connections cost nothing here.
+// CRM-004 fix5: timeoutMs is a TOTAL deadline for the request, not only
+// node:http's `timeout`, which measures socket INACTIVITY. The fetch()-based
+// shape this replaced used AbortSignal.timeout, which does bound the whole
+// request; the move to node:http quietly dropped that, so a server answering
+// and then trickling bytes forever could keep an assertion waiting with no
+// budget at all. Measured with a server that writes one byte every 400 ms: the
+// inactivity-only shape was still running 6013 ms into a 2000 ms budget, the
+// deadline below gave up at 2005 ms. Both bounds are kept -- the deadline is
+// the guarantee, the socket timeout is the earlier, more specific diagnostic.
 function httpRequest(path, { method = 'GET', headers = {}, body = null, timeoutMs = 60_000 } = {}) {
   return new Promise((resolve, reject) => {
-    const req = request({
+    let req;
+    const deadline = setTimeout(() => {
+      req.destroy(Object.assign(new Error(`request to ${path} exceeded its ${timeoutMs} ms deadline`), { code: 'ETIMEDOUT' }));
+    }, timeoutMs);
+    // Cleared on every settle path: a pending deadline would hold the test
+    // process open for its whole budget after the suite is done.
+    const settled = (fn) => (value) => { clearTimeout(deadline); fn(value); };
+    const succeed = settled(resolve);
+    const failed = settled(reject);
+    req = request({
       host: '127.0.0.1',
       port: WEB_PORT,
       path,
@@ -122,7 +140,7 @@ function httpRequest(path, { method = 'GET', headers = {}, body = null, timeoutM
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const buffer = Buffer.concat(chunks);
-        resolve({
+        succeed({
           status: res.statusCode,
           headers: res.headers,
           text: async () => buffer.toString('utf8'),
@@ -130,10 +148,10 @@ function httpRequest(path, { method = 'GET', headers = {}, body = null, timeoutM
           arrayBuffer: async () => buffer,
         });
       });
-      res.on('error', reject);
+      res.on('error', failed);
     });
-    req.on('timeout', () => req.destroy(Object.assign(new Error(`request to ${path} timed out`), { code: 'ETIMEDOUT' })));
-    req.on('error', reject);
+    req.on('timeout', () => req.destroy(Object.assign(new Error(`request to ${path} went quiet for ${timeoutMs} ms`), { code: 'ETIMEDOUT' })));
+    req.on('error', failed);
     if (body) req.write(body);
     req.end();
   });
