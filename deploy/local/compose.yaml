@@ -56,7 +56,18 @@ x-aos-crm-app: &aos-crm-app
 x-aos-crm-env: &aos-crm-env
   PG_DATABASE_URL: postgres://${AOS_CRM_PG_USER:-aos_crm}:${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}@db:5432/${AOS_CRM_PG_DB:-aos_crm_local}
   REDIS_URL: redis://redis:6379
-  SERVER_URL: ${AOS_CRM_SERVER_URL:-http://127.0.0.1:43000}
+  # `localhost`, not `127.0.0.1`: with multi-workspace on (below) every
+  # workspace lives at its OWN subdomain of this hostname, and the workspace a
+  # request belongs to is resolved from that subdomain
+  # (domain/domain-server-config/utils/get-subdomain-and-custom-domain-from-hostname.util.ts,
+  # domain/workspace-domains/services/workspace-domains.service.ts
+  # resolveWorkspaceAndPublicDomain). An IP literal cannot carry one that a
+  # browser will resolve, so the base host has to be a name whose subdomains
+  # reach loopback -- `*.localhost` does, by RFC 6761, without DNS or a hosts
+  # entry. The published port stays bound to 127.0.0.1 (see server.ports).
+  # scripts/aos/local.ps1 blocks a start whose effective SERVER_URL is not
+  # http://localhost:<AOS_CRM_WEB_PORT> for exactly this reason.
+  SERVER_URL: ${AOS_CRM_SERVER_URL:-http://localhost:43000}
   STORAGE_TYPE: local
   ENCRYPTION_KEY: ${AOS_CRM_ENCRYPTION_KEY:?set AOS_CRM_ENCRYPTION_KEY in deploy/local/.env}
   # Forced regardless of privacy.env content: SEC-01 (SECURITY_AUDIT.md).
@@ -65,9 +76,30 @@ x-aos-crm-env: &aos-crm-env
   # upstream Dockerfile change.
   LOGIC_FUNCTION_TYPE: DISABLED
   CODE_INTERPRETER_TYPE: DISABLED
-  # Single local workspace: no second workspace openable after the first
-  # admin signs up (LOCAL_SETUP.md).
-  IS_MULTIWORKSPACE_ENABLED: "false"
+  # BETA PROFILE (CRM-014), the same shape the AWS beta runs (CRM-013): one
+  # isolated workspace per person, each at its own subdomain of SERVER_URL, and
+  # workspaces opened by the operator only.
+  #
+  # IS_MULTIWORKSPACE_ENABLED (config-variables.ts:2184, default false) is what
+  # makes a second workspace possible at all and what makes the workspace be
+  # resolved per request from the subdomain instead of "the only one there is"
+  # (workspace-domains.service.ts getDefaultWorkspace throws when it is on).
+  IS_MULTIWORKSPACE_ENABLED: "true"
+  # ...and this is what keeps that from being open registration
+  # (config-variables.ts:588, default true -- pinned here so the profile states
+  # it instead of inheriting it). sign-in-up.service.ts enforces it twice:
+  # assertWorkspaceCreationAllowed refuses signUpInNewWorkspace to anyone whose
+  # user row does not carry canAccessFullAdminPanel (user.entity.ts:77), and
+  # assertSignUpWithoutWorkspaceAllowed refuses a bare signUp that has no
+  # pending invitation. Only the FIRST user of the server is granted that flag
+  # (sign-in-up.service.ts:842-850, hasServerAdmin), so on this deployment the
+  # operator is that first user and every friend invited afterwards is not.
+  IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS: "true"
+  # The subdomain of the bare-domain landing host. It is deliberately NOT any
+  # workspace's subdomain: get-subdomain-and-custom-domain-from-hostname.util.ts
+  # maps it back to "no workspace", which is what makes
+  # http://app.localhost:<port> the sign-in/picker host rather than a tenant.
+  DEFAULT_SUBDOMAIN: ${AOS_CRM_DEFAULT_SUBDOMAIN:-app}
 
 services:
   server:

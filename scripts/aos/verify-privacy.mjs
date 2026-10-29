@@ -185,6 +185,35 @@ function checkPrivacyEnvCarriesNoSecretsOrDsn(text) {
   };
 }
 
+// The beta profile's two workspace switches (CRM-014) belong to
+// deploy/local/compose.yaml, where scripts/aos/verify-local-config.mjs measures
+// them on the merged environment of BOTH services. They must not also appear
+// here, and this is not tidiness: privacy.env advertises itself as a complete,
+// portable profile for a run that does NOT go through compose.yaml's
+// `environment:` override, so a copy of these keys in this file would be the
+// authority in exactly that case while losing to compose in the Docker one --
+// two places to read, opposite answers, and a single-workspace beta that still
+// looks configured. One source, measured where it is effective.
+const WORKSPACE_KEYS_OWNED_BY_COMPOSE = new Set([
+  'IS_MULTIWORKSPACE_ENABLED',
+  'IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS',
+  'DEFAULT_SUBDOMAIN',
+  'SERVER_URL',
+  'FRONTEND_URL',
+]);
+
+function checkPrivacyEnvLeavesWorkspaceProfileToCompose(text) {
+  const found = parseEnvFile(text);
+  const present = [...found.keys()].filter((key) => WORKSPACE_KEYS_OWNED_BY_COMPOSE.has(key));
+  const ok = present.length === 0;
+  return {
+    ok,
+    detail: ok
+      ? `privacy.env declares none of the ${WORKSPACE_KEYS_OWNED_BY_COMPOSE.size} workspace/URL keys the beta profile owns in compose.yaml, so there is exactly one place that decides them`
+      : `workspace/URL key(s) duplicated in privacy.env: ${present.join(', ')} -- they belong only in deploy/local/compose.yaml (CRM-014), where the config verifier measures them effective`,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Source-inspection checks: real pinned twenty/v2.51.0 text, string/order
 // matches only, never imported/executed.
@@ -388,6 +417,7 @@ function main() {
   } else {
     results.push({ name: 'privacy-env:required-contract', ...checkPrivacyEnvContract(privacyEnvText) });
     results.push({ name: 'privacy-env:no-secrets-or-dsn', ...checkPrivacyEnvCarriesNoSecretsOrDsn(privacyEnvText) });
+    results.push({ name: 'privacy-env:workspace-profile-left-to-compose', ...checkPrivacyEnvLeavesWorkspaceProfileToCompose(privacyEnvText) });
   }
 
   const configVariablesText = readRepoFile(SOURCE_INSPECTION_FILES.configVariables);
@@ -525,6 +555,16 @@ function selfTest() {
   record('checkPrivacyEnvCarriesNoSecretsOrDsn: an OTLP_COLLECTOR_METRICS_ENDPOINT_URL entry left empty is accepted (it is optional, not required, but must be empty if present)', () => {
     const ok = GOOD_PRIVACY_ENV + '\nOTLP_COLLECTOR_METRICS_ENDPOINT_URL=\n';
     assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(ok), true);
+  });
+
+  record('checkPrivacyEnvLeavesWorkspaceProfileToCompose: positive (this file carries none of the beta workspace keys)', () => assertOk(checkPrivacyEnvLeavesWorkspaceProfileToCompose(GOOD_PRIVACY_ENV), true));
+  record('checkPrivacyEnvLeavesWorkspaceProfileToCompose: a copy of IS_MULTIWORKSPACE_ENABLED here is rejected (it would win for a non-compose run and lose for the Docker one)', () => {
+    const bad = GOOD_PRIVACY_ENV + '\nIS_MULTIWORKSPACE_ENABLED=false\n';
+    assertOk(checkPrivacyEnvLeavesWorkspaceProfileToCompose(bad), false);
+  });
+  record('checkPrivacyEnvLeavesWorkspaceProfileToCompose: a SERVER_URL here is rejected too (the host is what carries the workspace subdomain)', () => {
+    const bad = GOOD_PRIVACY_ENV + '\nSERVER_URL=http://127.0.0.1:43000\n';
+    assertOk(checkPrivacyEnvLeavesWorkspaceProfileToCompose(bad), false);
   });
 
   const GOOD_CONFIG_VARIABLES = [

@@ -193,11 +193,20 @@ function Get-EffectiveServerUrl {
 # with the resolved loopback port. A custom AOS_CRM_WEB_PORT with no
 # AOS_CRM_SERVER_URL is a real mismatch: the app would build links on the
 # fallback port while being published on another one.
+#
+# The host half is just as load-bearing since CRM-014. On the beta profile the
+# workspace a request belongs to is resolved from the SUBDOMAIN of this
+# hostname (compose.yaml's IS_MULTIWORKSPACE_ENABLED), and an IP literal has no
+# subdomains a browser can resolve: with http://127.0.0.1:<port> the stack
+# comes up healthy and then NOBODY can sign in, because every origin maps to
+# "no workspace". `localhost` is the one loopback name whose subdomains reach
+# 127.0.0.1 without DNS or a hosts entry (RFC 6761), so it is the only accepted
+# host -- requiring it is what keeps that silent dead end from starting.
 function Test-WebPortUrlCoherent {
   param([int] $Port, [string] $ServerUrl, [string] $ComposeDefaultUrl)
   $effective = Get-EffectiveServerUrl -ServerUrl $ServerUrl -ComposeDefaultUrl $ComposeDefaultUrl
   if ($null -eq $effective) { return $false }
-  return $effective -eq "http://127.0.0.1:$Port"
+  return $effective -eq "http://localhost:$Port"
 }
 
 # Pure: rewrites KEY=value lines, replacing the keys in $Values in place and
@@ -472,7 +481,7 @@ function Get-StartGateVerdict {
     if ($PrivacyCheck.WrongValueKeys.Count -gt 0) { $blockers.Add("privacy: deploy/local/privacy.env key(s) not at the required value: $($PrivacyCheck.WrongValueKeys -join ', ')") }
   }
   if ($PortOccupancy -eq 'OccupiedByOther') { $blockers.Add('port: the configured loopback web port is occupied by a process outside this project') }
-  if (-not $WebPortUrlCoherent) { $blockers.Add('port: the effective SERVER_URL (AOS_CRM_SERVER_URL, or compose.yaml fallback when unset) does not match http://127.0.0.1:<AOS_CRM_WEB_PORT>') }
+  if (-not $WebPortUrlCoherent) { $blockers.Add('port: the effective SERVER_URL (AOS_CRM_SERVER_URL, or compose.yaml fallback when unset) does not match http://localhost:<AOS_CRM_WEB_PORT>; the beta profile resolves each workspace from a subdomain of that host, so an IP literal or a mismatched port starts a stack nobody can sign in to') }
   if (-not $ConfigVerifierOk) { $blockers.Add('config: node scripts/aos/verify-local-config.mjs did not pass') }
   switch ($PrivacyVerifierStatus) {
     'Missing' { $blockers.Add('privacy-verifier: scripts/aos/verify-privacy.mjs (CRM-003) is not delivered yet; blocking honestly until it exists') }
@@ -829,7 +838,9 @@ function Invoke-Prepare {
     # semver.parse() at boot and rejects anything else (see compose.yaml).
     'AOS_CRM_APP_VERSION=2.51.0+15e4826d3b',
     "AOS_CRM_WEB_PORT=$WebPort",
-    "AOS_CRM_SERVER_URL=http://127.0.0.1:$WebPort",
+    # localhost, not 127.0.0.1: the beta profile resolves each workspace from a
+    # subdomain of this host (see compose.yaml and Test-WebPortUrlCoherent).
+    "AOS_CRM_SERVER_URL=http://localhost:$WebPort",
     'AOS_CRM_PG_USER=aos_crm',
     'AOS_CRM_PG_DB=aos_crm_local',
     "AOS_CRM_PG_PASSWORD=$pgPassword",
@@ -1223,20 +1234,25 @@ function Invoke-SelfTest {
     }
 
     Record 'Test-WebPortUrlCoherent: an explicit URL must match the resolved port' {
-      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:43000' -ComposeDefaultUrl 'http://127.0.0.1:43000')) { throw 'expected a matching URL to be coherent' }
-      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:9999' -ComposeDefaultUrl 'http://127.0.0.1:43000') { throw 'expected a mismatched URL to be incoherent' }
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://localhost:43000' -ComposeDefaultUrl 'http://localhost:43000')) { throw 'expected a matching URL to be coherent' }
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://localhost:9999' -ComposeDefaultUrl 'http://localhost:43000') { throw 'expected a mismatched URL to be incoherent' }
+    }
+
+    Record 'Test-WebPortUrlCoherent: the beta profile needs a host that can carry workspace subdomains, so an IP literal on the right port is still incoherent (CRM-014)' {
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://127.0.0.1:43000' -ComposeDefaultUrl 'http://localhost:43000') { throw 'expected an IP-literal SERVER_URL to be incoherent: no browser-resolvable subdomain exists under it, so every origin would map to no workspace' }
+      if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl 'http://[::1]:43000' -ComposeDefaultUrl 'http://localhost:43000') { throw 'expected an IPv6-literal SERVER_URL to be incoherent for the same reason' }
     }
 
     Record "Test-WebPortUrlCoherent: an unset URL resolves to compose.yaml's fixed fallback, so a custom port without a URL is incoherent (the exact gap carried over from CRM-002)" {
-      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '' -ComposeDefaultUrl 'http://127.0.0.1:43000')) { throw 'expected an unset URL on the default port to be coherent' }
-      if (Test-WebPortUrlCoherent -Port 51234 -ServerUrl '' -ComposeDefaultUrl 'http://127.0.0.1:43000') { throw 'expected an unset URL on a custom port to be incoherent: compose would hand the app the 43000 fallback while publishing 51234' }
+      if (-not (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '' -ComposeDefaultUrl 'http://localhost:43000')) { throw 'expected an unset URL on the default port to be coherent' }
+      if (Test-WebPortUrlCoherent -Port 51234 -ServerUrl '' -ComposeDefaultUrl 'http://localhost:43000') { throw 'expected an unset URL on a custom port to be incoherent: compose would hand the app the 43000 fallback while publishing 51234' }
       if (Test-WebPortUrlCoherent -Port 43000 -ServerUrl '' -ComposeDefaultUrl '') { throw 'expected an undeterminable compose fallback to fail closed, not pass' }
     }
 
     Record 'Get-ComposeServerUrlDefault: reads the real fallback out of the real compose.yaml, and fails closed on a file without one' {
       $realCompose = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path $ComposeRelPath
       $realDefault = Get-ComposeServerUrlDefault -ComposePath $realCompose
-      if ($realDefault -notmatch '^http://127\.0\.0\.1:\d+$') { throw "expected a loopback fallback URL from the real compose.yaml, got '$realDefault'" }
+      if ($realDefault -notmatch '^http://localhost:\d+$') { throw "expected a localhost fallback URL from the real compose.yaml (the beta profile resolves workspaces from subdomains of it), got '$realDefault'" }
 
       $p = Join-Path $tmpRoot 'compose-no-default.yaml'
       Set-Content -LiteralPath $p -Value @('services:', '  server:', '    environment:', '      SERVER_URL: ${AOS_CRM_SERVER_URL}')

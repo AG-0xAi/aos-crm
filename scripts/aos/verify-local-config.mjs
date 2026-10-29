@@ -394,6 +394,74 @@ function checkJsonDriversDisabledEffective(model) {
   return { ok, detail: ok ? 'server and worker both have the effective (merged) LOGIC_FUNCTION_TYPE=DISABLED, CODE_INTERPRETER_TYPE=DISABLED' : `effective driver override on: ${bad.join(', ')}` };
 }
 
+// `docker compose config` is read with --no-interpolate --no-env-resolution, so
+// a value can still be a `${VAR:-default}` expression. Returns the value the
+// stack would actually get when VAR is unset, or null when that cannot be
+// determined from the file alone (a bare `${VAR}`, or a nested expression):
+// null is a blocker for the caller, never a pass.
+function composeFallbackValue(raw) {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim();
+  if (!value.includes('${')) return value;
+  const simple = /^\$\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:-([^${}]*)\}$/.exec(value);
+  return simple ? simple[1].trim() : null;
+}
+
+// The BETA profile (CRM-014), on the effective merged environment of both
+// services and not on the YAML text: one isolated workspace per person, each
+// resolved from its own subdomain, and workspaces opened by server admins only.
+//
+// The two flags are measured together on purpose. Multi-workspace alone is open
+// registration: sign-in-up.service.ts only consults
+// IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS to decide whether a
+// non-admin's signUp/signUpInNewWorkspace is refused, so a profile with the
+// first flag on and the second off hands a workspace to anyone who can reach
+// the port. The host is measured too: with multi-workspace on, an IP-literal
+// SERVER_URL has no subdomain a browser can resolve
+// (get-subdomain-and-custom-domain-from-hostname.util.ts maps every origin
+// under it to "no workspace"), which starts a healthy stack nobody can sign in
+// to -- the failure mode this check exists to refuse.
+function checkJsonBetaWorkspaceProfile(model) {
+  const bad = [];
+  const serverUrls = new Set();
+  for (const name of ['server', 'worker']) {
+    const env = model.services?.[name]?.environment || {};
+    if (env.IS_MULTIWORKSPACE_ENABLED !== 'true') {
+      bad.push(`${name}(IS_MULTIWORKSPACE_ENABLED=${env.IS_MULTIWORKSPACE_ENABLED})`);
+    }
+    if (env.IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS !== 'true') {
+      bad.push(`${name}(IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS=${env.IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS})`);
+    }
+    const subdomain = composeFallbackValue(env.DEFAULT_SUBDOMAIN);
+    if (!subdomain) {
+      bad.push(`${name}(DEFAULT_SUBDOMAIN=${env.DEFAULT_SUBDOMAIN ?? 'unset'})`);
+    }
+    const serverUrl = composeFallbackValue(env.SERVER_URL);
+    if (!serverUrl) {
+      bad.push(`${name}(SERVER_URL fallback undeterminable: ${env.SERVER_URL ?? 'unset'})`);
+      continue;
+    }
+    serverUrls.add(serverUrl);
+    let hostname = null;
+    try { hostname = new URL(serverUrl).hostname; } catch { /* reported below */ }
+    if (hostname === null) {
+      bad.push(`${name}(SERVER_URL is not a URL)`);
+    } else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.startsWith('[')) {
+      bad.push(`${name}(SERVER_URL host ${hostname} is an IP literal, which cannot carry a workspace subdomain)`);
+    }
+  }
+  if (serverUrls.size > 1) {
+    bad.push(`server and worker disagree on SERVER_URL (${[...serverUrls].join(' vs ')}), so they would build different workspace links`);
+  }
+  const ok = bad.length === 0;
+  return {
+    ok,
+    detail: ok
+      ? `beta profile effective on server and worker: multi-workspace on, creation limited to server admins, default subdomain set, SERVER_URL host carries subdomains (${[...serverUrls][0]})`
+      : `beta profile not effective: ${bad.join(', ')}`,
+  };
+}
+
 function checkJsonNoPrivilegedOrSocket(model) {
   const bad = [];
   for (const [name, svc] of Object.entries(model.services || {})) {
@@ -462,6 +530,7 @@ const COMPOSE_JSON_CHECKS = [
   ['builds-from-source', checkJsonBuildsFromSource],
   ['consumes-privacy-env', checkJsonConsumesPrivacyEnv],
   ['drivers-disabled-effective', checkJsonDriversDisabledEffective],
+  ['beta-workspace-profile-effective', checkJsonBetaWorkspaceProfile],
   ['no-privileged-or-socket', checkJsonNoPrivilegedOrSocket],
   ['only-server-publishes-loopback-port', checkJsonOnlyServerPublishesLoopbackPort],
   ['dedicated-network-and-volumes', checkJsonDedicatedNetworkAndVolumes],
@@ -655,7 +724,14 @@ function cloneGoodComposeModel() {
         image: '${AOS_CRM_IMAGE_TAG:?set in deploy/local/.env to aos-crm-local/twenty:v2.51.0-15e4826d3b}',
         build: { dockerfile: 'packages/twenty-docker/twenty/Dockerfile', target: 'twenty' },
         env_file: [{ path: '/repo/deploy/local/privacy.env', required: true }],
-        environment: { LOGIC_FUNCTION_TYPE: 'DISABLED', CODE_INTERPRETER_TYPE: 'DISABLED' },
+        environment: {
+          LOGIC_FUNCTION_TYPE: 'DISABLED',
+          CODE_INTERPRETER_TYPE: 'DISABLED',
+          SERVER_URL: '${AOS_CRM_SERVER_URL:-http://localhost:43000}',
+          IS_MULTIWORKSPACE_ENABLED: 'true',
+          IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS: 'true',
+          DEFAULT_SUBDOMAIN: '${AOS_CRM_DEFAULT_SUBDOMAIN:-app}',
+        },
         networks: { 'aos-crm-local': null },
         ports: ['127.0.0.1:${AOS_CRM_WEB_PORT:-43000}:3000'],
         healthcheck: { test: ['CMD', 'curl'] },
@@ -666,7 +742,14 @@ function cloneGoodComposeModel() {
         image: '${AOS_CRM_IMAGE_TAG:?set in deploy/local/.env}',
         build: { dockerfile: 'packages/twenty-docker/twenty/Dockerfile', target: 'twenty' },
         env_file: [{ path: '/repo/deploy/local/privacy.env', required: true }],
-        environment: { LOGIC_FUNCTION_TYPE: 'DISABLED', CODE_INTERPRETER_TYPE: 'DISABLED' },
+        environment: {
+          LOGIC_FUNCTION_TYPE: 'DISABLED',
+          CODE_INTERPRETER_TYPE: 'DISABLED',
+          SERVER_URL: '${AOS_CRM_SERVER_URL:-http://localhost:43000}',
+          IS_MULTIWORKSPACE_ENABLED: 'true',
+          IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS: 'true',
+          DEFAULT_SUBDOMAIN: '${AOS_CRM_DEFAULT_SUBDOMAIN:-app}',
+        },
         networks: { 'aos-crm-local': null },
         security_opt: ['no-new-privileges:true'],
         volumes: [{ source: 'aos-crm-local-storage', target: '/app/x', type: 'volume' }],
@@ -880,6 +963,43 @@ function selfTest() {
     const m = cloneGoodComposeModel();
     m.services.worker.environment.LOGIC_FUNCTION_TYPE = 'LOCAL';
     assertOk(checkJsonDriversDisabledEffective(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: positive', () => assertOk(checkJsonBetaWorkspaceProfile(cloneGoodComposeModel()), true));
+  record('checkJsonBetaWorkspaceProfile: multi-workspace off on worker ONLY is caught (the worker would resolve workspaces the other way round)', () => {
+    const m = cloneGoodComposeModel();
+    m.services.worker.environment.IS_MULTIWORKSPACE_ENABLED = 'false';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: multi-workspace on with creation NOT limited to server admins is rejected (that profile is open registration)', () => {
+    const m = cloneGoodComposeModel();
+    for (const s of ['server', 'worker']) m.services[s].environment.IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS = 'false';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: an IP-literal SERVER_URL is rejected (healthy stack, nobody can sign in)', () => {
+    const m = cloneGoodComposeModel();
+    for (const s of ['server', 'worker']) m.services[s].environment.SERVER_URL = '${AOS_CRM_SERVER_URL:-http://127.0.0.1:43000}';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: a SERVER_URL whose fallback cannot be read fails closed instead of passing', () => {
+    const m = cloneGoodComposeModel();
+    for (const s of ['server', 'worker']) m.services[s].environment.SERVER_URL = '${AOS_CRM_SERVER_URL}';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: an empty DEFAULT_SUBDOMAIN fallback is rejected', () => {
+    const m = cloneGoodComposeModel();
+    for (const s of ['server', 'worker']) m.services[s].environment.DEFAULT_SUBDOMAIN = '${AOS_CRM_DEFAULT_SUBDOMAIN:-}';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('checkJsonBetaWorkspaceProfile: server and worker on different SERVER_URLs is rejected', () => {
+    const m = cloneGoodComposeModel();
+    m.services.worker.environment.SERVER_URL = '${AOS_CRM_SERVER_URL:-http://localhost:43001}';
+    assertOk(checkJsonBetaWorkspaceProfile(m), false);
+  });
+  record('composeFallbackValue: reads a ${VAR:-default}, keeps a plain literal, and refuses a bare ${VAR}', () => {
+    if (composeFallbackValue('${A:-http://localhost:43000}') !== 'http://localhost:43000') throw new Error('expected the :- default to be read');
+    if (composeFallbackValue('app') !== 'app') throw new Error('expected a plain literal to pass through');
+    if (composeFallbackValue('${A}') !== null) throw new Error('expected a bare ${VAR} to be undeterminable');
+    if (composeFallbackValue(undefined) !== null) throw new Error('expected an absent value to be undeterminable');
   });
   record('checkJsonNoPrivilegedOrSocket: positive', () => assertOk(checkJsonNoPrivilegedOrSocket(cloneGoodComposeModel()), true));
   record('checkJsonNoPrivilegedOrSocket: privileged:true on db is rejected', () => {
