@@ -1,0 +1,28 @@
+# Copy to terraform.tfvars (gitignored, see .gitignore in this directory)
+# and fill in real values before `terraform plan`/`apply`. Every value
+# below is a placeholder, not a real one -- see variables.tf for why each
+# of these has no default.
+
+aws_region         = "REPLACE_ME"       # e.g. eu-west-1 -- founder decision
+domain_name        = "REPLACE_ME"       # e.g. staging.yourdomain.tld -- founder decision
+budget_amount_usd  = 0                  # founder decision, see AWS_DEPLOYMENT_PLAN.md
+budget_alert_email = "REPLACE_ME"       # who AWS Budgets notifies
+
+server_cpu            = 512
+server_memory          = 1024
+worker_cpu             = 512
+worker_memory          = 1024
+server_desired_count  = 1
+worker_desired_count  = 1
+
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage_gb = 20
+
+redis_node_type = "cache.t4g.micro"
+
+# Digest of the image already pushed to the ECR repository this stack
+# creates (chicken-and-egg: push after the first apply, then set this and
+# apply again, or push to a pre-created repository -- see
+# AWS_DEPLOYMENT_PLAN.md's deploy sequence). This is a placeholder, not a
+# real digest.
+image_digest = "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
