@@ -179,9 +179,20 @@ test('initialize answers as the Twenty MCP server, and its instructions name no 
   assert.ok(res.result.protocolVersion, 'initialize returned no protocol version');
   const instructions = res.result.instructions ?? '';
   assert.ok(instructions.length > 0, 'initialize returned empty instructions');
+
+  // The ACTION line is the list of action tools the server tells the model it
+  // can run. Asserting on this line and not on the whole text on purpose: two
+  // other tools' descriptions mention `code_interpreter.files` as the shape of
+  // a FILES value, which is documentation and not an offer, and a substring
+  // search over the whole string cannot tell those apart.
+  const actionLine = instructions.split('\n').find((line) => /^\s*ACTION:/.test(line));
+  assert.ok(actionLine, `the server instructions carry no ACTION tool line:\n${instructions.slice(0, 400)}`);
+  const offered = actionLine.replace(/^\s*ACTION:\s*/, '').split('|').map((name) => name.trim());
   for (const name of THIRD_PARTY_TOOLS) {
-    assert.ok(!instructions.includes(name), `the server instructions still name ${name}`);
+    assert.ok(!offered.includes(name), `the server instructions still offer ${name}: ${actionLine.trim()}`);
   }
+  assert.ok(!instructions.includes('search_help_center'),
+    'the server instructions still mention search_help_center anywhere');
 });
 
 test('tools/list offers exactly the entry tools, and no tool that posts workspace content to a third party', async () => {
@@ -203,9 +214,14 @@ test('the tool catalog offers no tool that posts workspace content to a third pa
       { token: adminToken },
     );
     assert.equal(res.status, 200, `get_tool_catalog ${category} answered ${res.status}`);
-    const text = JSON.stringify(res.result);
+    const catalog = unwrapToolResult(res);
+    // The names the catalog OFFERS, not every occurrence of the string in it:
+    // other tools' descriptions legitimately mention `code_interpreter.files`.
+    const entries = catalog.payload?.catalog?.[category] ?? [];
+    assert.ok(Array.isArray(entries), `get_tool_catalog ${category} returned no catalog array: ${JSON.stringify(catalog.payload).slice(0, 200)}`);
+    const names = entries.map((entry) => entry.name);
     for (const name of THIRD_PARTY_TOOLS) {
-      assert.ok(!text.includes(name), `${name} appears in the ${category} tool catalog`);
+      assert.ok(!names.includes(name), `${name} is offered in the ${category} tool catalog`);
     }
   }
 
@@ -224,9 +240,13 @@ test('execute_tool refuses every tool that posts workspace content to a third pa
     const res = await callTool(name, { query: RUN_MARKER, url: 'https://example.com', code: 'print(1)' }, { token: adminToken });
     const result = unwrapToolResult(res);
     assert.equal(result.ok, false, `execute_tool ran ${name}`);
+    // Two refusal wordings, both from the exclusion: a name the registry does
+    // not know at all comes back "not found", and one it knows but MCP
+    // withholds comes back "not available in this context". Anything else
+    // would be a different failure wearing the same exit.
     assert.match(
       String(result.payload?.error ?? result.raw),
-      /not found/i,
+      /not found|not available in this context/i,
       `execute_tool refused ${name} for an unexpected reason: ${String(result.payload?.error ?? result.raw).slice(0, 200)}`,
     );
   }
