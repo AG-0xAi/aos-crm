@@ -91,6 +91,14 @@ const REQUIRED_PRIVACY_KEYS = new Map([
   ['ENTERPRISE_VALIDITY_TOKEN', ''],
   ['LOGIC_FUNCTION_TYPE', 'DISABLED'],
   ['CODE_INTERPRETER_TYPE', 'DISABLED'],
+  // CRM-005 (R3): the browser-side icon fetch from twenty-icons.com. Upstream
+  // defaults it to true (config-variables.ts:280) and client-config.service.ts
+  // hands it to the frontend; an optional functional vendor dependency, not
+  // analytics, but an unapproved external destination for this profile, and it
+  // travels with the workspace's own domain names. Required here (not merely
+  // absent) so a future edit that drops the line is rejected instead of
+  // silently inheriting the upstream default.
+  ['ALLOW_REQUESTS_TO_TWENTY_ICONS', 'false'],
 ]);
 
 function checkPrivacyEnvContract(text) {
@@ -188,13 +196,14 @@ function checkConfigVariablesPrivacyDefaults(text) {
     ['ANALYTICS_ENABLED', /ANALYTICS_ENABLED\s*=\s*false;/],
     ['MARKETPLACE_CATALOG_SYNC_CRON_ENABLED', /MARKETPLACE_CATALOG_SYNC_CRON_ENABLED\s*=\s*true;/],
     ['IS_CONFIG_VARIABLES_IN_DB_ENABLED', /IS_CONFIG_VARIABLES_IN_DB_ENABLED\s*=\s*true;/],
+    ['ALLOW_REQUESTS_TO_TWENTY_ICONS', /ALLOW_REQUESTS_TO_TWENTY_ICONS\s*=\s*true;/],
   ];
   const missing = expectations.filter(([, re]) => !re.test(text)).map(([name]) => name);
   const ok = missing.length === 0;
   return {
     ok,
     detail: ok
-      ? 'config-variables.ts still declares TELEMETRY_ENABLED/ANALYTICS_ENABLED/MARKETPLACE_CATALOG_SYNC_CRON_ENABLED/IS_CONFIG_VARIABLES_IN_DB_ENABLED with the upstream defaults this profile explicitly overrides'
+      ? 'config-variables.ts still declares TELEMETRY_ENABLED/ANALYTICS_ENABLED/MARKETPLACE_CATALOG_SYNC_CRON_ENABLED/IS_CONFIG_VARIABLES_IN_DB_ENABLED/ALLOW_REQUESTS_TO_TWENTY_ICONS with the upstream defaults this profile explicitly overrides'
       : `upstream declaration/default no longer matches for: ${missing.join(', ')} (variable renamed, removed, or default changed -- re-inspect before trusting this profile)`,
   };
 }
@@ -458,6 +467,7 @@ function selfTest() {
     'ENTERPRISE_VALIDITY_TOKEN=',
     'LOGIC_FUNCTION_TYPE=DISABLED',
     'CODE_INTERPRETER_TYPE=DISABLED',
+    'ALLOW_REQUESTS_TO_TWENTY_ICONS=false',
     '',
   ].join('\n');
   record('checkPrivacyEnvContract: positive', () => assertOk(checkPrivacyEnvContract(GOOD_PRIVACY_ENV), true));
@@ -491,6 +501,18 @@ function selfTest() {
     assertOk(checkPrivacyEnvContract(bad), false);
   });
 
+  // CRM-005 (R3): the icon flag left at its upstream default is the exact
+  // drift this entry exists to catch -- the browser then asks
+  // twenty-icons.com for every company domain.
+  record('checkPrivacyEnvContract: ALLOW_REQUESTS_TO_TWENTY_ICONS=true is rejected', () => {
+    const bad = GOOD_PRIVACY_ENV.replace('ALLOW_REQUESTS_TO_TWENTY_ICONS=false', 'ALLOW_REQUESTS_TO_TWENTY_ICONS=true');
+    assertOk(checkPrivacyEnvContract(bad), false);
+  });
+  record('checkPrivacyEnvContract: dropping ALLOW_REQUESTS_TO_TWENTY_ICONS is rejected, not treated as off', () => {
+    const bad = GOOD_PRIVACY_ENV.replace('ALLOW_REQUESTS_TO_TWENTY_ICONS=false\n', '');
+    assertOk(checkPrivacyEnvContract(bad), false);
+  });
+
   record('checkPrivacyEnvCarriesNoSecretsOrDsn: positive (empty SENTRY_DSN/SENTRY_FRONT_DSN/ENTERPRISE_KEY/ENTERPRISE_VALIDITY_TOKEN placeholders are accepted, not forbidden by name)', () => assertOk(checkPrivacyEnvCarriesNoSecretsOrDsn(GOOD_PRIVACY_ENV), true));
   record('checkPrivacyEnvCarriesNoSecretsOrDsn: a *_API_KEY-suffixed key is rejected', () => {
     const bad = GOOD_PRIVACY_ENV + '\nSOME_SERVICE_API_KEY=whatever\n';
@@ -510,6 +532,7 @@ function selfTest() {
     "  ANALYTICS_ENABLED = false;",
     "  MARKETPLACE_CATALOG_SYNC_CRON_ENABLED = true;",
     "  IS_CONFIG_VARIABLES_IN_DB_ENABLED = true;",
+    "  ALLOW_REQUESTS_TO_TWENTY_ICONS = true;",
     "  @ConfigVariablesMetadata({",
     "    isEnvOnly: true,",
     "  })",
