@@ -238,10 +238,17 @@ test('the administrator signs in and creates a related company, person and oppor
   }
 });
 
-test('what the browser created is in this project own PostgreSQL, with the relations it set', () => {
+test('what the browser created is in this project own PostgreSQL, with the names it typed and the relations it set', () => {
   assert.ok(ids.companyId, 'no record ids: the create phase did not complete');
-  assert.equal(psql(`select count(*) from "${workspaceSchema}".company where id = '${ids.companyId}'`), '1',
-    'the company the browser created is not in the database');
+  // The NAME and not only the row: the UI's editor dropped the first keystrokes
+  // of a name typed too early (measured 2026-10-29), and a row whose name is a
+  // truncation of what the browser typed is not the record this created.
+  assert.equal(psql(`select name from "${workspaceSchema}".company where id = '${ids.companyId}'`), createPhase.names.company,
+    'the company row carries a different name than the browser typed');
+  assert.equal(psql(`select "nameFirstName" from "${workspaceSchema}".person where id = '${ids.personId}'`), createPhase.names.person,
+    'the person row carries a different name than the browser typed');
+  assert.equal(psql(`select name from "${workspaceSchema}".opportunity where id = '${ids.opportunityId}'`), createPhase.names.opportunity,
+    'the opportunity row carries a different name than the browser typed');
   assert.equal(psql(`select "companyId" from "${workspaceSchema}".person where id = '${ids.personId}'`), ids.companyId,
     'the person row does not carry the company the browser related it to');
   assert.equal(psql(`select "companyId" from "${workspaceSchema}".opportunity where id = '${ids.opportunityId}'`), ids.companyId,

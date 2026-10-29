@@ -181,8 +181,24 @@ async function createRecordThroughUi(page, { plural, singular, text }) {
     // empty state and that state's own create button.
     await page.getByRole('button', { name: /^Add a /i }).first().click();
   }
-  await page.waitForTimeout(SHORT_WAIT_MS);
-  await page.keyboard.type(text, { delay: 15 });
+  // Wait for the cell editor the UI opens for the new row, then type INTO ITS
+  // INPUT and read the value back before committing. Measured: typing on the
+  // page after a fixed pause lost the first characters ("Marta probe4" was
+  // saved as "a probe4"), because the editor had not mounted yet -- and a
+  // record created under a truncated name would then fail the relation step for
+  // a reason that has nothing to do with relations.
+  await page.waitForFunction(() => {
+    const active = document.activeElement;
+    return Boolean(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  }, { timeout: LOCATOR_TIMEOUT_MS });
+  const input = page.locator('input:focus, textarea:focus, [contenteditable="true"]:focus').first();
+  await input.pressSequentially(text, { delay: 25 });
+  const readBack = async () => input.evaluate((el) => ('value' in el ? el.value : el.textContent) ?? '');
+  if (await readBack() !== text) {
+    await input.fill(text);
+    const refilled = await readBack();
+    if (refilled !== text) throw new Error(`the editor holds "${refilled}" instead of the name this run meant to type`);
+  }
   await page.keyboard.press('Enter');
   await page.waitForTimeout(SHORT_WAIT_MS);
   const id = await idFromPanel(page, singular);
@@ -270,13 +286,19 @@ async function openRecord(page, singular, id) {
 
 // The three relation steps, shared by the create phase and by the 'relate'
 // phase the relation work was iterated with (ids handed in, nothing created).
+//
+// The picker is searched by this run's own MARKER and not by the full record
+// name: measured, the dropdown returns a BOUNDED list, so searching
+// "Ensayos Sinteticos" while four companies shared that prefix pushed the one
+// this run had just created off the end of the list and the step failed with
+// the picker showing four other records.
 async function runRelationSteps(page) {
   await check('the person is related to the company through the UI, and the relation survives a reload', async () => {
     await setRelationOnRecordPage(page, {
       singular: 'person',
       id: ids.personId,
       fieldLabel: 'Company',
-      searchText: COMPANY_NAME,
+      searchText: MARKER,
       optionText: COMPANY_NAME,
     });
     return 'the person page shows the company after a fresh load';
@@ -287,7 +309,7 @@ async function runRelationSteps(page) {
       singular: 'opportunity',
       id: ids.opportunityId,
       fieldLabel: 'Company',
-      searchText: COMPANY_NAME,
+      searchText: MARKER,
       optionText: COMPANY_NAME,
     });
     return 'the opportunity page shows the company after a fresh load';
@@ -298,7 +320,7 @@ async function runRelationSteps(page) {
       singular: 'opportunity',
       id: ids.opportunityId,
       fieldLabel: 'Point of Contact',
-      searchText: PERSON_FIRST_NAME,
+      searchText: MARKER,
       optionText: PERSON_FIRST_NAME,
     });
     return 'the opportunity page shows the point of contact after a fresh load';
