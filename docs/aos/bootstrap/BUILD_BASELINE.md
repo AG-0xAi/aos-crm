@@ -1,4 +1,4 @@
-# Línea base de build (CRM-004, fix1, fix2 y fix3)
+# Línea base de build (CRM-004, fix1 a fix5)
 
 > **CRM-004-fix1, 28 de octubre de 2026 — el bloqueo está resuelto.** El coordinador amplió
 > el Scope (spec canónico y registro) a **una** variable del Dockerfile oficial y se aplicó:
@@ -389,3 +389,62 @@ nombrando `verify-image-build.mjs`.
 - Las medidas de la corrida final (tiempos, ImageID, capas) están en
   [.aos/reports/CRM-004-fix4.md](../../../.aos/reports/CRM-004-fix4.md); este fichero no las
   duplica.
+
+## CRM-004-fix5: cada corrida con sus propios recursos temporales
+
+### Lo que estaba mal
+
+Los dos verificadores que construyen imágenes intermedias nombraban sus recursos temporales
+con un nombre **fijo por distro**, no por corrida: el tar de fuentes
+(`/tmp/aos-crm-typecheck-sources.tar`, `/tmp/aos-crm-server-specs-sources.tar`) y las dos
+etiquetas de imagen de cada uno (`...:gate`). Dos gates a la vez -- un worker por worktree,
+que es la forma soportada de paralelizar -- se pisan: el segundo sobrescribe el tar del
+primero y mueve su etiqueta, así que un compilador puede leer las fuentes de **otro** árbol,
+y el `rm` de limpieza de uno borra la entrada del otro. Choca de frente con R3, que exige que
+la limpieza toque solo los recursos de prueba de la propia corrida.
+
+Tres defectos menores del mismo review: `removeOwnContainer()` lanzaba `docker inspect`/`rm`
+**sin plazo** (un daemon que deja de responder cuelga el gate); el comentario de presupuesto
+citaba una cota que `.aos/verify.json` ya no declaraba; y `typecheck-sources.Dockerfile`
+probaba artefactos de dos de los **cuatro** workspaces que construye.
+
+### El arreglo
+
+- Cada recurso temporal se deriva de un identificador de corrida (`pid` + uuid): tar,
+  etiquetas intermedias y nombre de contenedor. El uuid está porque los pid se reutilizan. La
+  caché de capas de BuildKit se indexa por **contenido** del contexto y por el digest de la
+  imagen base, no por el nombre de la etiqueta de salida, así que cambia lo que se **nombra**,
+  no lo que se reconstruye -- y por eso se sigue compartiendo con
+  `scripts/aos/mcp/verify-mcp-specs.mjs`.
+- La limpieza nombra **solo** lo que creó esa corrida (contenedor por su nombre, etiquetas que
+  registró cada build, su propio tar), nunca por patrón, por imagen ni por antigüedad, y toda
+  ella comparte **un** plazo acotado que cabe dentro de la cota del comando: un daemon mudo ya
+  no puede colgar el gate, y un paso de limpieza que no se pudo completar se informa.
+  Si la corrida **falló**, sus etiquetas de imagen se **conservan** y se imprimen (son la
+  evidencia de ese fallo); el tar se borra siempre. Las imágenes de aplicación (`twenty`,
+  `twenty-gate`) no se tocan nunca.
+- El comentario de presupuesto ya no repite un número: apunta a `.aos/verify.json`, que es lo
+  que el self-test compara contra la suma de los plazos internos.
+- `typecheck-sources.Dockerfile` prueba ahora una declaración por workspace que construye
+  (twenty-shared, twenty-client-sdk, twenty-emails y twenty-sdk), y cada ruta es la entrada
+  `exports[...].types` de un especificador que `twenty-server` importa de verdad. El self-test
+  lee ese bloque contra la línea `nx run-many` y contra el `package.json` de cada paquete, así
+  que un workspace añadido al build no puede quedarse sin prueba.
+- `crm-runtime-e2e.test.mjs`: `timeoutMs` vuelve a ser un plazo **total** de la petición. La
+  opción `timeout` de `node:http` mide **inactividad** del socket, así que el cambio desde
+  `AbortSignal.timeout` había dejado la suite sin cota: un servidor que responde y luego
+  gotea bytes mantenía una aserción esperando sin presupuesto.
+- `verify-image-build.mjs` decide si es el punto de entrada por **ruta real resuelta**, no por
+  el nombre con que se le invoca, y una `argv[1]` que no se puede resolver **falla cerrado**.
+  La guarda anterior salía 0 sin construir cuando se le llamaba por un enlace con otro nombre.
+
+### Lo que no cambia
+
+- Qué mide cada gate: los mismos specs, el mismo `tsgo -p tsconfig.json` con su canario, el
+  mismo target oficial, el mismo camino E2E. Solo cambia cómo se nombran y se recogen los
+  recursos temporales.
+- `scripts/aos/mcp/verify-mcp-specs.mjs` (CRM-007) **sigue** usando las etiquetas fijas
+  `server-deps:gate` / `server-specs:gate`: está fuera del alcance de este track y queda
+  reportado para su dueño. Dos gates simultáneos seguirían pisándose **ahí**.
+- Las medidas de esta corrida (comandos, exits, tiempos, ImageID) están en
+  [.aos/reports/CRM-004-fix5.md](../../../.aos/reports/CRM-004-fix5.md).
