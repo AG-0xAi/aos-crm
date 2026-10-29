@@ -36,6 +36,7 @@ import { type McpToolCallResult } from 'src/engine/api/mcp/types/mcp-tool-call-r
 import { type McpToolSet } from 'src/engine/api/mcp/types/mcp-tool-set.type';
 import { type McpToolsListResult } from 'src/engine/api/mcp/types/mcp-tools-list-result.type';
 import { buildJsonRpcError } from 'src/engine/api/mcp/utils/build-json-rpc-error.util';
+import { getMcpPreloadToolNames } from 'src/engine/api/mcp/utils/get-mcp-preload-tool-names.util';
 import { getMcpRegistryToolAnnotations } from 'src/engine/api/mcp/utils/get-mcp-registry-tool-annotations.util';
 import { isMcpMethod } from 'src/engine/api/mcp/utils/is-mcp-method.util';
 import { parseMcpToolCallParams } from 'src/engine/api/mcp/utils/parse-mcp-tool-call-params.util';
@@ -45,7 +46,6 @@ import { type FlatApiKey } from 'src/engine/core-modules/api-key/types/flat-api-
 import { type FlatApplication } from 'src/engine/core-modules/application/types/flat-application.type';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { ExceptionHandlerService } from 'src/engine/core-modules/exception-handler/exception-handler.service';
-import { COMMON_PRELOAD_TOOLS } from 'src/engine/core-modules/tool-provider/constants/common-preload-tools.const';
 import { type ToolProviderContext } from 'src/engine/core-modules/tool-provider/interfaces/tool-provider-context.type';
 import { ToolRegistryService } from 'src/engine/core-modules/tool-provider/services/tool-registry.service';
 import {
@@ -303,10 +303,11 @@ export class McpProtocolService {
       actorContext,
     };
 
-    const preloadedTools = await this.toolRegistry.getToolsByName(
-      COMMON_PRELOAD_TOOLS,
-      toolContext,
-    );
+    const preloadToolNames = getMcpPreloadToolNames();
+    const preloadedTools =
+      preloadToolNames.length > 0
+        ? await this.toolRegistry.getToolsByName(preloadToolNames, toolContext)
+        : {};
 
     const toolSet: McpToolSet = {
       ...annotatePreloadedMcpTools(preloadedTools),
