@@ -111,8 +111,11 @@ Ningún valor es un literal escrito a mano: los tres se generan con `random_pass
 de aplicar y no existen en el repo (el escaneo R3 de abajo lo comprueba). El acceso a S3
 (`STORAGE_TYPE=s3`) tampoco lleva `STORAGE_S3_ACCESS_KEY_ID`/`SECRET`: dejarlas sin definir hace
 que `file-storage-driver.factory.ts` caiga a `fromNodeProviderChain()`, que en ECS resuelve al rol
-de tarea (`aws_iam_role.ecs_task`, con permisos solo sobre el bucket propio) sin ninguna clave AWS
-estática -- la misma razón de fondo detrás del pedido de R1 de "IAM... sin claves estáticas".
+de tarea de cada servicio (`aws_iam_role.ecs_task_server` / `ecs_task_worker`, con permisos solo
+sobre el bucket propio) sin ninguna clave AWS estática -- la misma razón de fondo detrás del
+pedido de R1 de "IAM... sin claves estáticas". La tarea `migrate` tiene su propio rol
+(`aws_iam_role.ecs_task_migrate`) sin ese permiso: nunca llama al driver de almacenamiento, solo
+corre migraciones y registro de cron (`ecs.tf`).
 
 DB y Redis nunca públicos: `aws_db_instance.this.publicly_accessible = false` fijo, y
 `aws_elasticache_replication_group.this` solo acepta tráfico de `aws_security_group.ecs_tasks`
@@ -203,15 +206,24 @@ está en esta tabla: corre minutos por despliegue, no 730 h/mes.
    trae uno fijado a propósito).
 3. `terraform plan -var-file=terraform.tfvars` y revisión humana del plan antes de cualquier
    `apply`.
-4. `terraform apply` crea la infraestructura, incluido el ECR vacío.
+4. `terraform apply` crea la infraestructura, incluido el ECR vacío. Si `route53_zone_id` está
+   puesto, este mismo apply espera a que ACM valide el certificado por DNS antes de terminar
+   (`aws_acm_certificate_validation`, de la que ahora depende el listener HTTPS) -- no basta con
+   que el comando empiece, hay que dejarlo terminar. Sin `route53_zone_id`, el apply adjunta el
+   certificado al listener en estado `PENDING_VALIDATION`; no hace falta un segundo apply, pero
+   el HTTPS real no funciona hasta el paso 7.
 5. Construir y publicar la imagen por digest en `terraform output ecr_repository_url`; fijar
    `image_digest` a ese digest y volver a aplicar (o pasar `-var image_digest=...`).
 6. Migrar una sola vez, antes de que el servicio sirva tráfico real:
    `aws ecs run-task --cluster <cluster> --task-definition $(terraform output -raw ecs_migrate_task_definition_arn) --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[...],securityGroups=[...]}"`
    y esperar a que el task termine con `exitCode: 0` (`aws ecs describe-tasks`) antes de
    continuar.
-7. DNS: `terraform output acm_validation_records` para validar el certificado (automático si
-   `route53_zone_id` está puesto) y `terraform output alb_dns_name` para el CNAME/alias final de
+7. DNS: si `route53_zone_id` está puesto, el certificado ya quedó validado durante el paso 4 (no
+   hay nada más que hacer aquí para el certificado). Si no, usar
+   `terraform output acm_validation_records` para crear la CNAME a mano en el proveedor de DNS
+   real y esperar a que ACM la confirme (`aws acm describe-certificate`, estado `ISSUED`) -- el
+   listener ya tiene el ARN del certificado desde el paso 4, así que no hace falta volver a
+   aplicar. En ambos casos, `terraform output alb_dns_name` da el CNAME/alias final de
    `domain_name`.
 
 **Redeploy con una imagen nueva:** repetir los pasos 5 y 6 (migrar primero), luego
