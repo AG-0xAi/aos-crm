@@ -11,6 +11,7 @@
 // prints what that key can and cannot do.
 //
 //   node scripts/aos/mcp/team-role.mjs
+//   node scripts/aos/mcp/team-role.mjs --self-test   (no server, no network)
 //
 // Every key it mints is printed as a length, never as a value. The team key is
 // revoked before the script exits unless --keep is passed; the Admin reference
@@ -53,6 +54,11 @@ const ROLE_FIELDS = `id label description ${Object.keys(TEAM_ROLE_PERMISSIONS).j
 // as opposed to the permission guard answering that this caller's role is not
 // enough. Both arrive as FORBIDDEN; only the message tells them apart.
 const PRINCIPAL_REFUSED_MESSAGE = 'This endpoint is not available to this caller';
+
+// The only two refusals that prove anything about this deployment, and so the
+// only two an escalation operation may declare as expected: `invalid-input` is
+// the server rejecting the request, which says nothing about privilege.
+export const REFUSAL_KINDS = ['permission', 'principal'];
 
 export function gqlErrors(body) {
   return (body.errors || []).map((e) => e.message).join(' | ');
@@ -207,11 +213,16 @@ export async function findAdminRoleId(adminToken) {
 // the whole point -- the Admin half is what makes the refusal evidence about
 // permission instead of evidence that the request was malformed.
 //
+// Each operation declares WHICH refusal it expects from each credential
+// (`teamKeyRefusedAs`, and `adminKeyRefusedAs` where an Admin key is probed
+// too), because that is not the same answer for every operation: the check
+// below compares against the declared value, never against a fixed one.
+//
 // `roleId` has to be a real, API-key-assignable role: measured, the all-zero id
 // this probe used to send is refused as NOT_FOUND even for the administrator,
 // so the refusal said nothing about permission. Same for the role input, which
 // needs a target switch or the server rejects it as having no assignable target.
-function escalationOperations(roleId) {
+export function escalationOperations(roleId) {
   const stamp = new Date().toISOString();
   return [
     {
@@ -224,9 +235,17 @@ function escalationOperations(roleId) {
           expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
         },
       },
-      // createApiKey carries its own principal guard with apiKey:false, so NO
-      // API key mints a key, Admin included. That is asserted below as its own
-      // check, and the allowed half runs with the administrator's session.
+      // TWO guards, in this order, measured 2026-10-29 11:58 UTC: the settings
+      // permission guard answers FIRST, so a key whose role lacks
+      // canUpdateAllSettings never reaches the second one and is refused as
+      // permission ("Entity performing the request does not have permission",
+      // FORBIDDEN/PERMISSION_DENIED). Only a key that passes it -- Admin --
+      // reaches createApiKey's own principal guard (apiKey:false), which
+      // refuses every API key ("This endpoint is not available to this
+      // caller"). So the team key's refusal here is about its role, the Admin
+      // key's is about being an API key at all, and the allowed half has to run
+      // with the administrator's session because no key can do it.
+      teamKeyRefusedAs: 'permission',
       adminKeyRefusedAs: 'principal',
       allowedWith: 'session',
       cleanup: (adminToken, body) => revokeApiKey(adminToken, body.data.createApiKey.id),
@@ -241,6 +260,9 @@ function escalationOperations(roleId) {
           canBeAssignedToApiKeys: true,
         },
       },
+      // Measured: the settings permission guard is the only one in the way, and
+      // an Admin API key goes through, so this is refused by role.
+      teamKeyRefusedAs: 'permission',
       allowedWith: 'key',
       cleanup: async (adminToken, body) => {
         const deleted = await graphql(METADATA, 'mutation($roleId: UUID!) { deleteOneRole(roleId: $roleId) }', { roleId: body.data.createOneRole.id }, adminToken);
@@ -255,6 +277,7 @@ function escalationOperations(roleId) {
       name: 'read the workspace role list',
       query: '{ getRoles { id label canUpdateAllSettings } }',
       variables: {},
+      teamKeyRefusedAs: 'permission',
       allowedWith: 'key',
       cleanup: null,
     },
@@ -262,41 +285,61 @@ function escalationOperations(roleId) {
 }
 
 // Each refusal above, measured twice so it is falsifiable: with the team key it
-// must be refused for permission, and with an Admin credential the same call
-// with the same arguments must go through. Whatever the Admin half creates is
-// removed again before returning.
-export async function probeEscalationRefusals({ teamToken, adminToken, adminKeyToken, assignableRoleId }) {
-  if (!assignableRoleId) {
+// must be refused exactly as that operation declares, and with an Admin
+// credential the same call with the same arguments must go through. Whatever
+// the Admin half creates is removed again before returning.
+//
+// `operations` and `gql` are seams for the offline self-test below, which is
+// how "the declared kind is the one compared" is checked without a server.
+export async function probeEscalationRefusals({
+  teamToken,
+  adminToken,
+  adminKeyToken,
+  assignableRoleId,
+  operations,
+  gql = graphql,
+}) {
+  if (!operations && !assignableRoleId) {
     throw new Error('probeEscalationRefusals needs a real API-key-assignable roleId; a nonexistent one is refused as invalid input and proves nothing');
   }
   const results = [];
   const add = (name, ok, detail) => results.push({ name, ok, detail });
 
-  for (const op of escalationOperations(assignableRoleId)) {
-    const refused = await graphql(METADATA, op.query, op.variables, teamToken);
+  for (const op of operations ?? escalationOperations(assignableRoleId)) {
+    // An operation that does not say how it expects to be refused cannot be
+    // checked: assuming one kind is how the measured order of two guards ended
+    // up contradicted by the comment next to it.
+    if (!REFUSAL_KINDS.includes(op.teamKeyRefusedAs)) {
+      throw new Error(`escalation operation "${op.name}" declares no teamKeyRefusedAs (one of ${REFUSAL_KINDS.join(', ')})`);
+    }
+    if (op.adminKeyRefusedAs !== undefined && !REFUSAL_KINDS.includes(op.adminKeyRefusedAs)) {
+      throw new Error(`escalation operation "${op.name}" declares an adminKeyRefusedAs that proves nothing: ${op.adminKeyRefusedAs}`);
+    }
+
+    const refused = await gql(METADATA, op.query, op.variables, teamToken);
     const kind = refusalKind(refused);
     add(
-      `the team key cannot ${op.name}`,
-      kind === 'permission',
+      `the team key cannot ${op.name}, and is refused as ${op.teamKeyRefusedAs}`,
+      kind === op.teamKeyRefusedAs,
       kind === 'allowed'
         ? 'IT SUCCEEDED, which is an escalation'
-        : `refused as ${kind}: ${gqlErrors(refused).slice(0, 120)}`,
+        : `refused as ${kind} (expected ${op.teamKeyRefusedAs}): ${gqlErrors(refused).slice(0, 120)}`,
     );
     if (kind === 'allowed' && op.cleanup) await op.cleanup(adminToken, refused);
 
     if (op.adminKeyRefusedAs) {
-      const adminKeyAttempt = await graphql(METADATA, op.query, op.variables, adminKeyToken);
+      const adminKeyAttempt = await gql(METADATA, op.query, op.variables, adminKeyToken);
       const adminKeyKind = refusalKind(adminKeyAttempt);
       add(
-        `no API key can ${op.name}, not even an Admin one: the caller type is refused, not the role`,
+        `an Admin key is refused as ${op.adminKeyRefusedAs} when it tries to ${op.name}, which the team key's refusal is not`,
         adminKeyKind === op.adminKeyRefusedAs,
-        `refused as ${adminKeyKind}: ${gqlErrors(adminKeyAttempt).slice(0, 120)}`,
+        `refused as ${adminKeyKind} (expected ${op.adminKeyRefusedAs}): ${gqlErrors(adminKeyAttempt).slice(0, 120)}`,
       );
       if (adminKeyKind === 'allowed' && op.cleanup) await op.cleanup(adminToken, adminKeyAttempt);
     }
 
     const credential = op.allowedWith === 'session' ? adminToken : adminKeyToken;
-    const allowed = await graphql(METADATA, op.query, op.variables, credential);
+    const allowed = await gql(METADATA, op.query, op.variables, credential);
     const allowedKind = refusalKind(allowed);
     add(
       `an Admin ${op.allowedWith === 'session' ? 'session' : 'API key'} CAN ${op.name}, so the refusal above is about permission`,
@@ -418,11 +461,100 @@ async function main() {
   process.exit(failed.length === 0 ? 0 : 1);
 }
 
+// The two refusals as the server actually words them, measured 2026-10-29
+// 11:58 UTC against the local CRM: these are the fixtures the offline self-test
+// drives the check with, so a refusal that stops being told apart from the
+// other one fails here and not only against a running server.
+const MEASURED_PERMISSION_REFUSAL = {
+  errors: [{ message: 'Entity performing the request does not have permission', extensions: { code: 'FORBIDDEN', subCode: 'PERMISSION_DENIED' } }],
+};
+const MEASURED_PRINCIPAL_REFUSAL = {
+  errors: [{ message: PRINCIPAL_REFUSED_MESSAGE, extensions: { code: 'FORBIDDEN' } }],
+};
+
+// No server, no network: every call goes through the `gql` seam and the
+// operations come from the `operations` seam, so this runs anywhere.
+async function selfTest() {
+  let failures = 0;
+  const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+  const record = async (name, body) => {
+    try { await body(); console.log(`[PASS] ${name}`); } catch (error) { console.log(`[FAIL] ${name}: ${error.message}`); failures++; }
+  };
+
+  const SAMPLE_ROLE_ID = '00000000-0000-4000-8000-000000000001';
+  const syntheticOp = (expected) => ({
+    name: 'a synthetic escalation',
+    query: '{ selfTest }',
+    variables: {},
+    ...(expected === undefined ? {} : { teamKeyRefusedAs: expected }),
+    allowedWith: 'key',
+    cleanup: null,
+  });
+  const teamCheck = async (op, body) => (await probeEscalationRefusals({
+    teamToken: 'team', adminToken: 'session', adminKeyToken: 'admin-key',
+    operations: [op], gql: async () => body,
+  }))[0];
+
+  await record('the two measured refusals are told apart by kind', () => {
+    assert(refusalKind(MEASURED_PERMISSION_REFUSAL) === 'permission', 'the measured settings-permission refusal is no longer read as permission');
+    assert(refusalKind(MEASURED_PRINCIPAL_REFUSAL) === 'principal', 'the measured principal refusal is no longer read as principal');
+  });
+
+  await record('every escalation operation declares how the team key is refused', () => {
+    for (const op of escalationOperations(SAMPLE_ROLE_ID)) {
+      assert(REFUSAL_KINDS.includes(op.teamKeyRefusedAs), `"${op.name}" declares no expected team-key refusal`);
+    }
+  });
+
+  await record('minting an API key declares the measured order of its two guards', () => {
+    const op = escalationOperations(SAMPLE_ROLE_ID).find((o) => o.name === 'mint an API key');
+    assert(op, 'the API-key escalation operation is gone');
+    assert(op.teamKeyRefusedAs === 'permission', `the settings guard answers first, so the team key is refused as permission, not ${op.teamKeyRefusedAs}`);
+    assert(op.adminKeyRefusedAs === 'principal', `a key that passes the settings guard reaches the principal guard, not ${op.adminKeyRefusedAs}`);
+  });
+
+  await record('an operation that declares no expected refusal is rejected, not defaulted', async () => {
+    let thrown = null;
+    try { await teamCheck(syntheticOp(undefined), MEASURED_PERMISSION_REFUSAL); } catch (error) { thrown = error; }
+    assert(thrown, 'an undeclared operation was checked anyway, so some kind was assumed for it');
+    assert(/teamKeyRefusedAs/.test(thrown.message), `the refusal to guess is not about the missing declaration: ${thrown.message}`);
+  });
+
+  await record('a declared refusal that is not one of the two that prove anything is rejected', async () => {
+    let thrown = null;
+    try { await teamCheck(syntheticOp('invalid-input'), { errors: [{ extensions: { code: 'BAD_USER_INPUT' } }] }); } catch (error) { thrown = error; }
+    assert(thrown, 'an operation expecting invalid input was accepted, which proves nothing about privilege');
+  });
+
+  await record('the refusal the operation declares is the one compared', async () => {
+    const check = await teamCheck(syntheticOp('principal'), MEASURED_PRINCIPAL_REFUSAL);
+    assert(check.ok, `a principal refusal failed a check that declares principal: ${check.detail}`);
+  });
+
+  await record('a refusal of a DIFFERENT kind fails, even when it is the common one', async () => {
+    const check = await teamCheck(syntheticOp('principal'), MEASURED_PERMISSION_REFUSAL);
+    assert(!check.ok, 'a permission refusal passed a check that declares principal: the compared kind is pinned again');
+    assert(/expected principal/.test(check.detail), `the failure does not say which kind was expected: ${check.detail}`);
+  });
+
+  await record('a call that goes through is an escalation whatever kind was declared', async () => {
+    for (const expected of REFUSAL_KINDS) {
+      const check = await teamCheck(syntheticOp(expected), { data: { selfTest: true } });
+      assert(!check.ok, `an operation that succeeded passed its ${expected} check`);
+      assert(/ESCALATION|SUCCEEDED/i.test(check.detail), `a success is not reported as an escalation: ${check.detail}`);
+    }
+  });
+
+  console.log(failures === 0 ? 'self-test: ALL PASSED' : `self-test: ${failures} FAILED`);
+  process.exit(failures === 0 ? 0 : 1);
+}
+
 // pathToFileURL, not a hand-built file:/// string: this checkout's path holds a
 // non-ASCII character, which import.meta.url percent-encodes and a naive
 // comparison then misses, silently skipping main() with exit 0.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  const entry = process.argv.includes('--self-test') ? selfTest : main;
+  entry().catch((error) => {
     console.error(`[FAIL] ${error.stack || error.message}`);
     process.exit(1);
   });

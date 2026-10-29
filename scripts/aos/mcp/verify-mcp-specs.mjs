@@ -232,6 +232,17 @@ function selfTest() {
     assert(/docker', 'rm', '-f', CONTAINER_NAME/.test(source), 'cleanup no longer targets this run\'s own container by name');
     assert(!/\bdocker.*(prune|kill \$\(|rm -f \$\()/.test(source), 'cleanup matches containers by pattern instead of by name');
   });
+  // The least-privilege probe's own offline self-test, run here because this is
+  // the gate command that already covers the MCP probes without Docker: the
+  // only other thing that exercises team-role.mjs is the e2e suite, which needs
+  // the stack up, so an undeclared refusal would otherwise be caught by nothing.
+  record('the least-privilege probe\'s offline self-test passes', () => {
+    const probe = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/aos/mcp/team-role.mjs'), '--self-test'],
+      { encoding: 'utf8', timeout: 60_000 });
+    assert(probe.status === 0,
+      `node scripts/aos/mcp/team-role.mjs --self-test exited ${probe.status ?? probe.error?.code ?? 'unmeasured'}: ` +
+      `${`${probe.stdout || ''}${probe.stderr || ''}`.split('\n').filter((l) => /FAIL/.test(l)).join(' | ').slice(0, 300)}`);
+  });
   record('the two builds plus the run fit inside the gate budget this command is given', () => {
     const verify = JSON.parse(readFileSync(resolve(REPO_ROOT, '.aos/verify.json'), 'utf8'));
     const budget = verify.timeoutsMs['verify-mcp-specs.mjs'];
