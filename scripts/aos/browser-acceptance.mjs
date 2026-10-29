@@ -24,7 +24,7 @@
 // createRequire, not a bare import: the playwright package is installed
 // globally in the image (/usr/lib/node_modules, on NODE_PATH), and NODE_PATH is
 // a CommonJS resolution mechanism that ESM import does not consult.
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -284,6 +284,26 @@ async function openRecord(page, singular, id) {
   await page.getByTestId('record-fields-widget').waitFor({ timeout: LOCATOR_TIMEOUT_MS });
 }
 
+// The record page renders its frame -- title bar and fields widget -- BEFORE
+// the record itself arrives, and shows "Untitled (0/0)" in the meantime.
+// Measured right after a server restart: the first load came back with that
+// placeholder and an assertion on the body text failed on a record that was
+// perfectly fine. So the wait is for the record's own text, with reloads.
+async function openRecordAndWaitFor(page, singular, id, text) {
+  let last = 'never loaded';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await openRecord(page, singular, id);
+    try {
+      await page.getByText(text, { exact: false }).first().waitFor({ timeout: 20_000 });
+      return;
+    } catch {
+      last = (await page.locator('[data-testid="top-bar-title"]').first().innerText()).slice(0, 60);
+      await page.waitForTimeout(2_000);
+    }
+  }
+  throw new Error(`the ${singular} page never showed "${text}" in 3 loads (last title: "${last}")`);
+}
+
 // The three relation steps, shared by the create phase and by the 'relate'
 // phase the relation work was iterated with (ids handed in, nothing created).
 //
@@ -351,6 +371,99 @@ async function runCreatePhase(page) {
   await runRelationSteps(page);
 }
 
+// CRM-005 point 5: the document viewer, if it is reachable at all from a
+// record's Files tab. Two things are measured here and nowhere else:
+//
+//  - a synthetic MS Office attachment must NOT make the page load
+//    view.officeapps.live.com (upstream's DocumentViewer offers a download
+//    instead when the file URL is private -- see .aos/reports/
+//    DOCUMENT-VIEWER-triage.md). The externalRequests recorder is what proves
+//    it: every request to a non-loopback host is reported.
+//  - a TXT attachment whose content LOOKS like HTML must be displayed escaped.
+//    GHSA-fvhg-p4hf-79x3 / CVE-2026-30691 claims the TXTRenderer casts text to
+//    a ReactNode; the triage found JSX interpolation and a non-reproducibility
+//    objection, and said to settle it with a real browser and synthetic text
+//    that looks like markup. The file below carries an onerror payload that
+//    would set a flag on window if the markup were ever parsed as HTML, and the
+//    check reads that flag.
+const XSS_FLAG = '__aosCrm005ViewerMarkupExecuted';
+const VIEWER_TXT_MARKER = 'AOS-CRM-005 texto sintetico con markup';
+const VIEWER_TXT_PAYLOAD =
+  `${VIEWER_TXT_MARKER}\n<img src=x onerror="window.${XSS_FLAG}=true">\n<script>window.${XSS_FLAG}=true</script>\n`;
+
+async function runViewerPhase(page) {
+  await check('the administrator signs in through the browser form', async () => {
+    await signIn(page);
+    return `landed on ${new URL(page.url()).pathname}`;
+  }) || await dumpPage(page, 'viewer-sign-in');
+
+  await check('a synthetic company is created to hold the attachments', async () => {
+    ids.companyId = ids.companyId || await createRecordThroughUi(page, { plural: 'companies', singular: 'company', text: COMPANY_NAME });
+    return `company ${ids.companyId}`;
+  }) || await dumpPage(page, 'viewer-company');
+
+  const txtPath = `/tmp/aos-crm-005-${MARKER}.txt`;
+  const officePath = `/tmp/aos-crm-005-${MARKER}.docx`;
+  writeFileSync(txtPath, VIEWER_TXT_PAYLOAD, 'utf8');
+  // Not a real document: the viewer picks its renderer from the EXTENSION (see
+  // the triage), so these bytes are enough to exercise the MS Office branch
+  // without shipping a binary fixture.
+  writeFileSync(officePath, `${VIEWER_TXT_MARKER} (office sintetico)\n`, 'utf8');
+
+  await check('both synthetic attachments are uploaded through the record Files tab', async () => {
+    await openRecord(page, 'company', ids.companyId);
+    const filesTab = page.getByText('Files', { exact: true }).first();
+    await filesTab.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+    await filesTab.click();
+    await page.waitForTimeout(SHORT_WAIT_MS);
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.waitFor({ state: 'attached', timeout: LOCATOR_TIMEOUT_MS });
+    await fileInput.setInputFiles([txtPath, officePath]);
+    await page.waitForTimeout(4_000);
+    const body = await page.locator('body').innerText();
+    if (!body.includes(`aos-crm-005-${MARKER}`)) {
+      throw new Error('neither attachment appears in the Files tab after the upload');
+    }
+    return 'both attachments are listed';
+  }) || await dumpPage(page, 'viewer-upload');
+
+  await check('a TXT attachment that looks like HTML is displayed escaped, and its markup never executes', async () => {
+    await page.getByText(`aos-crm-005-${MARKER}.txt`, { exact: false }).first().click();
+    await page.waitForTimeout(4_000);
+    const body = await page.locator('body').innerText();
+    if (!body.includes(VIEWER_TXT_MARKER)) {
+      throw new Error('the TXT preview does not show the file content at all');
+    }
+    if (!body.includes('<img src=x onerror=')) {
+      throw new Error('the TXT preview shows the content but not the markup as text: it may have been parsed as HTML');
+    }
+    const executed = await page.evaluate((flag) => Boolean(window[flag]), XSS_FLAG);
+    if (executed) throw new Error('the markup in the TXT file EXECUTED in the browser');
+    return 'the markup is rendered as text and nothing executed';
+  }) || await dumpPage(page, 'viewer-txt');
+
+  await check('a synthetic MS Office attachment is not sent to view.officeapps.live.com', async () => {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1_000);
+    await openRecord(page, 'company', ids.companyId);
+    await page.getByText('Files', { exact: true }).first().click();
+    await page.waitForTimeout(SHORT_WAIT_MS);
+    await page.getByText(`aos-crm-005-${MARKER}.docx`, { exact: false }).first().click();
+    await page.waitForTimeout(5_000);
+    const microsoft = externalRequests.filter((r) => r.includes('officeapps.live.com') || r.includes('office.com'));
+    if (microsoft.length > 0) {
+      throw new Error(`the office preview reached Microsoft: ${microsoft.join(' | ')}`);
+    }
+    const body = await page.locator('body').innerText();
+    // Upstream's own fallback for a private URL: a download affordance instead
+    // of the external iframe.
+    const offersDownload = /download|descargar/i.test(body);
+    return offersDownload
+      ? 'no request to Microsoft, and the viewer offers a download instead'
+      : 'no request to Microsoft (no download affordance was found on screen)';
+  }) || await dumpPage(page, 'viewer-office');
+}
+
 async function runVerifyPhase(page) {
   await check('the administrator signs in again after the restart', async () => {
     await signIn(page);
@@ -359,7 +472,7 @@ async function runVerifyPhase(page) {
 
   await check('the company created before the restart is still there, with its people and opportunity', async () => {
     if (!ids.companyId) throw new Error('no company id was handed to this phase');
-    await openRecord(page, 'company', ids.companyId);
+    await openRecordAndWaitFor(page, 'company', ids.companyId, COMPANY_NAME);
     const title = await page.locator('[data-testid="top-bar-title"]').first().innerText();
     if (!title.includes(COMPANY_NAME)) throw new Error(`the company page shows "${title}"`);
     const body = await page.locator('body').innerText();
@@ -371,7 +484,7 @@ async function runVerifyPhase(page) {
 
   await check('the person created before the restart is still there, still related to the company', async () => {
     if (!ids.personId) throw new Error('no person id was handed to this phase');
-    await openRecord(page, 'person', ids.personId);
+    await openRecordAndWaitFor(page, 'person', ids.personId, PERSON_FIRST_NAME);
     const body = await page.locator('body').innerText();
     if (!body.includes(PERSON_FIRST_NAME)) throw new Error('the person page does not show the person');
     if (!body.includes(COMPANY_NAME)) throw new Error('the person page does not show the company relation');
@@ -380,7 +493,7 @@ async function runVerifyPhase(page) {
 
   await check('the opportunity created before the restart is still there, with both relations', async () => {
     if (!ids.opportunityId) throw new Error('no opportunity id was handed to this phase');
-    await openRecord(page, 'opportunity', ids.opportunityId);
+    await openRecordAndWaitFor(page, 'opportunity', ids.opportunityId, OPPORTUNITY_NAME);
     const body = await page.locator('body').innerText();
     for (const expected of [OPPORTUNITY_NAME, COMPANY_NAME, PERSON_FIRST_NAME]) {
       if (!body.includes(expected)) throw new Error(`the opportunity page does not show "${expected}"`);
@@ -396,7 +509,7 @@ async function runVerifyPhase(page) {
     // the workspace's timelineActivity table, which the worker fills through
     // upsert-timeline-activity-from-internal-event -- the request that created
     // the record does not write them.
-    await openRecord(page, 'company', ids.companyId);
+    await openRecordAndWaitFor(page, 'company', ids.companyId, COMPANY_NAME);
     await page.waitForTimeout(SHORT_WAIT_MS);
     const body = await page.locator('body').innerText();
     if (!body.includes('was created by')) {
@@ -461,6 +574,8 @@ async function main() {
         return `landed on ${new URL(page.url()).pathname}`;
       });
       await runRelationSteps(page);
+    } else if (PHASE === 'viewer') {
+      await runViewerPhase(page);
     } else if (PHASE === 'verify') {
       await runVerifyPhase(page);
     } else {
@@ -495,6 +610,7 @@ main().catch((error) => {
   console.log(JSON.stringify({
     phase: PHASE,
     marker: MARKER,
+    names: { company: COMPANY_NAME, person: PERSON_FIRST_NAME, opportunity: OPPORTUNITY_NAME },
     ids,
     sandbox,
     checks: [...checks, { name: 'the browser run completed', ok: false, detail: String(error?.message ?? error).slice(0, 300) }],

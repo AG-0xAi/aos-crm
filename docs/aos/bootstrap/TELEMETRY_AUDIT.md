@@ -53,6 +53,38 @@ Re-probado contra las funciones puras actuales con el mismo fixture sintético d
 
 Ver `.aos/reports/DOCUMENT-VIEWER-triage.md` (triage previo, no tocado por CRM-003). Resumen para no confundir con telemetría: `DocumentViewer.tsx` usa `@cyntler/react-doc-viewer@1.17.1`; para archivos MS Office con URL privada (`127.0.0.1`/`localhost`/IP privada/`.local`/`.internal`, función `isPrivateUrl`), Twenty ya evita el iframe de `view.officeapps.live.com` y ofrece descarga en su lugar — confirmado por lectura de `packages/twenty-front/src/modules/activities/files/components/DocumentViewer.tsx:118-150,277-283`. Esto es una integración funcional condicional existente, no un mecanismo de tracking, y no se ha modificado ni se debe modificar sin motivo. La verificación en navegador de que el caso MS Office con URL privada efectivamente no contacta a Microsoft, y la decisión sobre el CVE disputado del `TXTRenderer` (interpolación JSX, no `dangerouslySetInnerHTML`, pendiente de prueba React/browser con texto sintético), quedan para CRM-005 según el triage ya registrado.
 
+## CRM-005: destinos observados en ejecución (navegador, servidor y worker)
+
+Fecha de medición: 29 de octubre de 2026. Esto ya **no** es inspección estática: son peticiones observadas, con la herramienta que las observó indicada en cada caso. Sigue sin declararse "cero telemetría": lo que hay es un inventario de los destinos vistos en ventanas concretas, y los límites de esas ventanas están escritos abajo.
+
+### Lo que el navegador pidió de verdad (antes del arreglo de CRM-005)
+
+Medido con el navegador del propio arnés (Chromium headless con su sandbox activo, imagen oficial de Playwright fijada por digest, `scripts/aos/browser-acceptance.mjs`), que registra **cada** petición a un host que no sea loopback como metadato (método, esquema, host, ruta — nunca query string, cuerpo ni cabeceras). Una sesión completa de login + alta de empresa/persona/oportunidad sobre la imagen construida **antes** del arreglo pidió:
+
+| Destino observado | Origen en el código | Clasificación | Autorización |
+| --- | --- | --- | --- |
+| `GET https://twenty-icons.com/ensayos-sinteticos.invalid`, `/airbnb.com`, `/anthropic.com`, `/stripe.com`, `/figma.com`, `/notion.com`, `/aos-mcp-probe.invalid` | el identificador de imagen de los campos LINKS (`getImageIdentifierFieldValue` → `getLinkFaviconUrl`), con el **dominio de cada empresa de la tabla** en la ruta. Este camino **sí** lee el flag: lo que estaba en `true` era el valor efectivo, porque la imagen en ejecución no tenía `ALLOW_REQUESTS_TO_TWENTY_ICONS` fijado y el default upstream es `true` | Dependencia funcional de terceros (iconos), **con el dominio del registro en la ruta** | **No autorizada** en este perfil: cerrada con `ALLOW_REQUESTS_TO_TWENTY_ICONS=false` en `privacy.env` |
+| *(no observado en esta sesión, probado por render)* | `BackgroundMockTableRow`, `OnboardingImportPreviewCompanies` y `LinkIconWithLinkOverlay` construían la URL **sin leer el flag**, y el estado inicial del frontend defaultaba a `true`. La sesión de navegador de esta medición no llegó a renderizar esos tres sitios (fondo de la pantalla de acceso, vista previa de onboarding y favicon de enlace del menú), así que su bypass se demuestra renderizando los componentes reales en `scripts/aos/verify-front-icons.mjs`, no con esta captura | Igual que la anterior, pero **inmune al flag**: apagarlo en el perfil no los habría detenido | Cerrada con las tres guardas y el estado inicial fail-closed de CRM-005 |
+| `GET https://twentyhq.github.io/placeholder-images/workspaces/twenty-logo.png` | constante upstream `twenty-front/.../navigation-drawer/constants/DefaultWorkspaceLogo.ts` | Activo decorativo servido por GitHub Pages; se pide en **cada carga** mientras el workspace no tenga logo propio | **Fuera del Scope registrado de CRM-005** (cuatro ficheros de frontend). Se reporta aquí, no se parchea en silencio. Opciones para su dueño: subir un logo propio al workspace, o servir el placeholder desde el propio servidor |
+
+La petición de iconos es la que motivó el arreglo: no es analítica, pero envía el **nombre de dominio del cliente** a un tercero en cada render, y el perfil local no lo había autorizado. El estado inicial del frontend defaultaba a `true`, así que la primera petición salía incluso antes de que `/client-config` respondiera (medido por render en `scripts/aos/verify-front-icons.mjs`, no deducido).
+
+### Destinos de herramientas de construcción y pruebas (inventariados aparte)
+
+No son tráfico de la aplicación: son descargas de herramientas, y por eso van en su propia lista.
+
+| Destino | Qué se trae | Cuándo |
+| --- | --- | --- |
+| `mcr.microsoft.com` | imagen oficial de Playwright `v1.60.0-noble`, fijada por digest `sha256:9bd26ad9…b948` | una vez, al preparar el navegador del arnés |
+| `registry.npmjs.org` | el paquete `playwright@1.60.0` dentro de esa imagen; los `@types/*` que `twenty-front` necesita y solo `twenty-server` declara; `npx rimraf` dentro de los builds de librerías | en los `docker build` del arnés |
+| `raw.githubusercontent.com` | el perfil seccomp oficial de Playwright (`utils/docker/seccomp_profile.json`, tag `v1.60.0`), sha256 `cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849`, versionado en `scripts/aos/playwright-seccomp-profile.json` | una vez |
+
+### Captura de red (tcpdump) de servidor, worker y navegador
+
+`scripts/aos/capture-traffic.mjs` levanta `tcpdump` dentro de la distro que ejecuta el stack — el servidor, el worker y el contenedor del navegador comparten ese espacio de red — con filtro `port 53 or (ip and (src pública o dst pública))`, snaplen 128 y **sin fichero pcap**: lo que queda en disco son marcas de tiempo, direcciones, puertos, flags TCP y nombres de consulta DNS. Nunca cuerpos, cabeceras de autorización, cookies ni HAR. El propio comando tiene un `--self-test` que falla si alguien le añade `-w`, `-A`/`-X` o un snaplen de paquete completo.
+
+Resultados por ventana en `docs/aos/bootstrap/FUNCTIONAL_EVIDENCE.md` (comandos, códigos de salida y destinos observados). Límites de esta técnica, que no se compensan con más capturas: una captura prueba lo que pasó **en su ventana**, nunca la ausencia de tráfico fuera de ella; TLS no se descifra, así que un destino se clasifica por nombre y puerto, no por lo que se envió; y el navegador del founder en Windows **no** cruza este espacio de red, así que su tráfico no está en estas capturas (el navegador del arnés sí).
+
 ## Prueba requerida antes de aceptar
 
 1. Comprobar valores efectivos y configuración del cliente en la instancia limpia.

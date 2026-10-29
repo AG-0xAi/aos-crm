@@ -1,0 +1,126 @@
+# CRM-005 (R3): a THROWAWAY stack whose only purpose is to let the traffic of a
+# FIRST startup be captured -- migrations, cron registration and the first
+# administrator's registration -- which the stack the founder uses already went
+# through weeks ago and cannot show again without destroying its data.
+#
+# It is NOT a second deployment of the CRM and it is NOT a second bus: it is
+# created, observed and destroyed by scripts/aos/firstboot-capture.mjs in one
+# command, with `down -v` removing the three volumes declared here and nothing
+# else. Everything that could collide with the real stack is deliberately
+# different -- project name, network name, volume names and published port --
+# and nothing here is ever started by scripts/aos/local.ps1.
+#
+# What it shares with deploy/local/compose.yaml, on purpose, so the traffic it
+# shows is the traffic the real profile would produce on a first boot: the same
+# application image (built from this commit), the same deploy/local/privacy.env,
+# the same image digests for PostgreSQL and Redis, the same DISABLED switches
+# and the same single-workspace setting. What it does NOT share: its data.
+#
+# Differences from the real profile, stated because the capture is evidence:
+# `restart: "no"` (a throwaway stack must not come back by itself) and no
+# `depends_on: service_healthy` chain for the worker (it is brought up with the
+# rest and its own retry loop handles the wait), so a first boot here is a
+# server boot and a worker boot racing the same cold database -- which is what a
+# first boot looks like anyway.
+
+name: aos-crm-firstboot
+
+x-aos-crm-firstboot-app: &app
+  image: ${AOS_CRM_IMAGE_TAG:?set AOS_CRM_IMAGE_TAG in deploy/local/.env (scripts/aos/local.ps1 stamps it)}
+  pull_policy: never
+  env_file:
+    - ../../deploy/local/privacy.env
+  networks:
+    - aos-crm-firstboot
+  volumes:
+    - aos-crm-firstboot-storage:/app/packages/twenty-server/.local-storage
+  security_opt:
+    - no-new-privileges:true
+  restart: "no"
+
+x-aos-crm-firstboot-env: &env
+  PG_DATABASE_URL: postgres://${AOS_CRM_PG_USER:-aos_crm}:${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}@db:5432/${AOS_CRM_PG_DB:-aos_crm_local}
+  REDIS_URL: redis://redis:6379
+  SERVER_URL: http://127.0.0.1:${AOS_CRM_FIRSTBOOT_PORT:-43010}
+  STORAGE_TYPE: local
+  ENCRYPTION_KEY: ${AOS_CRM_ENCRYPTION_KEY:?set AOS_CRM_ENCRYPTION_KEY in deploy/local/.env}
+  LOGIC_FUNCTION_TYPE: DISABLED
+  CODE_INTERPRETER_TYPE: DISABLED
+  IS_MULTIWORKSPACE_ENABLED: "false"
+
+services:
+  server:
+    <<: *app
+    environment:
+      <<: *env
+      NODE_PORT: "3000"
+      DISABLE_DB_MIGRATIONS: "false"
+      DISABLE_CRON_JOBS_REGISTRATION: "false"
+    ports:
+      - "127.0.0.1:${AOS_CRM_FIRSTBOOT_PORT:-43010}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 900s
+
+  worker:
+    <<: *app
+    environment:
+      <<: *env
+      DISABLE_DB_MIGRATIONS: "true"
+      DISABLE_CRON_JOBS_REGISTRATION: "true"
+    command: ["yarn", "worker:prod"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16.15@sha256:9e2cf6287f25c3151f4c9421ccce2b17f3e60061c111a29165e0d2cdd9ff0a97
+    environment:
+      POSTGRES_DB: ${AOS_CRM_PG_DB:-aos_crm_local}
+      POSTGRES_USER: ${AOS_CRM_PG_USER:-aos_crm}
+      POSTGRES_PASSWORD: ${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}
+    volumes:
+      - aos-crm-firstboot-db:/var/lib/postgresql/data
+    networks:
+      - aos-crm-firstboot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AOS_CRM_PG_USER:-aos_crm} -h localhost -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+  redis:
+    image: redis:7.4.12@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039
+    command: ["--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes:
+      - aos-crm-firstboot-redis:/data
+    networks:
+      - aos-crm-firstboot
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+networks:
+  aos-crm-firstboot:
+    name: aos-crm-firstboot
+    driver: bridge
+
+volumes:
+  aos-crm-firstboot-db:
+    name: aos-crm-firstboot-db
+  aos-crm-firstboot-storage:
+    name: aos-crm-firstboot-storage
+  aos-crm-firstboot-redis:
+    name: aos-crm-firstboot-redis
