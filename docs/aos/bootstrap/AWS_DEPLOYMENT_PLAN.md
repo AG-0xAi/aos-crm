@@ -303,3 +303,441 @@ verificado" en vez de inventar una cifra o asumir que la región US East aplica 
 **Regla:** para un presupuesto que alguien va a aprobar, un número "no verificado" con la fuente
 que falló documentada es más honesto y más útil que una cifra inventada con apariencia de
 precisión.
+
+## CRM-013 — entorno beta multi-espacio, validado sin aplicar (29-30 de octubre de 2026)
+
+Orden del founder del 29/10: un entorno beta en AWS para que unos amigos tengan al día siguiente
+cada uno su propio espacio y conecten su ChatGPT. Decisiones suyas: región **eu-west-1**
+(Irlanda), alarma de presupuesto **500 USD/mes**, dominio comprado en Route 53 dentro de la cuenta
+del CRM (el registro ya creó su zona alojada). **Este track tampoco crea nada en AWS**: no usó
+ninguna credencial de AWS y no ejecutó `plan` ni `apply`. Lo aplica el coordinador con credenciales
+SSO temporales siguiendo el procedimiento de R4.
+
+Sobre CRM-011 cambia exactamente esto: multi-espacio activo con creación limitada a
+administradores del servidor, certificado y DNS para el dominio y su comodín, estado remoto con
+bloqueo, y región/presupuesto con valor por defecto. El resto del stack (RDS privada, Valkey, S3
+privado, Secrets Manager, IAM por servicio, retención de logs, tarea de migración separada) no se
+toca.
+
+### R1 — Multi-espacio: qué variables son y de dónde sale cada una
+
+Todo lo de abajo está leído del código de Twenty incorporado en este repo, no de la documentación
+del fabricante. Las rutas son relativas a la raíz del repo.
+
+| Variable (valor en `ecs.tf`) | Qué hace, según el código |
+| --- | --- |
+| `IS_MULTIWORKSPACE_ENABLED = "true"` | Por defecto `false` (`packages/twenty-server/src/engine/core-modules/twenty-config/config-variables.ts:2184`). Con `true`, `resolveWorkspaceAndPublicDomain` resuelve el espacio a partir del host de la petición (`.../domain/workspace-domains/services/workspace-domains.service.ts:112`); con `false` ese mismo método devuelve el único espacio existente. |
+| `IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS = "true"` | Ya es el valor por defecto (`config-variables.ts:588`); se declara porque la beta depende de él. `assertWorkspaceCreationAllowed` (`.../auth/services/sign-in-up.service.ts:496`) rechaza crear espacio salvo que el usuario autenticado tenga `canAccessFullAdminPanel`, y solo se salta esa comprobación cuando hay **cero** espacios (`:503`). |
+| `DEFAULT_SUBDOMAIN = "app"` | Valor por defecto de upstream (`config-variables.ts:1225`, exigido por `@ValidateIf` solo en multi-espacio, `:1224`). `getBaseUrl()` antepone este subdominio al host de `FRONTEND_URL` (`.../domain/domain-server-config/services/domain-server-config.service.ts:19-30`), y `get-subdomain-and-custom-domain-from-hostname.util.ts` mapea ese mismo subdominio de vuelta a "sin espacio", así que `app.<dominio>` nunca choca con el espacio de nadie. |
+| `FRONTEND_URL = "https://<dominio>"` | `config-variables.ts:1200`. Es el `frontDomain` contra el que se resuelve cada subdominio: en el util anterior, `hostname.endsWith(".<frontDomain>")` da el subdominio, y ese subdominio se busca en `workspace.subdomain` (`workspace-domains.service.ts:173`). Por eso va el **ápex**, no `app.<dominio>`. |
+| `SERVER_URL = "https://<dominio>"` | `config-variables.ts:1650`. Es el host de API con el que `isApiHost()` compara el host de la petición (`.../application/application-oauth/controllers/oauth-discovery.controller.ts:91-95`). |
+| `TRUST_PROXY = "loopback, linklocal, uniquelocal"` | Valor por defecto de upstream (`config-variables.ts:1667`), aplicado en `packages/twenty-server/src/main.ts:64-69`. Sin él, `getRequestBaseUrl` (`packages/twenty-server/src/utils/get-request-base-url.util.ts:4-5`) devolvería `http://` detrás del ALB y el `issuer` de OAuth y el puntero de `resource_metadata` anunciarían HTTP en un stack que solo sirve HTTPS. El ALB alcanza las tareas desde dentro de `var.vpc_cidr` (10.42.0.0/16), que es RFC1918 y por tanto `uniquelocal`. |
+| `EMAIL_DRIVER = "LOGGER"` | Valor por defecto de upstream (`config-variables.ts:531`). No sale correo de la cuenta; ver "correo" más abajo. |
+
+**Dónde vive `/mcp`:** en el mismo servidor y por tanto en **cualquiera** de esos hosts.
+`@Controller(ApiPath.Mcp)` (`packages/twenty-server/src/engine/api/mcp/controllers/mcp-core.controller.ts:44`)
+con `ApiPath.Mcp = 'mcp'` (`packages/twenty-shared/src/types/ApiPath.ts:17`), registrado para todos
+los métodos en `packages/twenty-server/src/app.module.ts:133`. Solo acepta **POST**
+(`mcp-core.controller.ts:65`), así que una comprobación con GET da 404 y no prueba nada. Sin
+credencial válida, `McpAuthGuard` pone
+`WWW-Authenticate: Bearer resource_metadata="<base>/.well-known/oauth-protected-resource/mcp"` y
+lanza 401 (`.../api/mcp/guards/mcp-auth.guard.ts:27-40`), donde `<base>` es el host de la petición.
+
+**Dónde se publica la pantalla de autorización OAuth:** es una ruta del frontend,
+`AppPath.Authorize = '/authorize'` (`packages/twenty-shared/src/types/AppPath.ts:36`, página
+`packages/twenty-front/src/pages/auth/Authorize.tsx`, montada en
+`packages/twenty-front/src/modules/app/hooks/useCreateWorkspaceAppRouter.tsx:243`), servida por el
+mismo contenedor que la API porque la imagen `twenty` incluye el frontend compilado
+(`packages/twenty-docker/twenty/Dockerfile:206`). Qué host anuncia el descubrimiento depende de por
+dónde entre la petición (`oauth-discovery.controller.ts:23-63`):
+
+- en el ápex (= `SERVER_URL`, host de API): `issuer` es el ápex y `authorization_endpoint` apunta a
+  `https://app.<dominio>/authorize?iss=https://<dominio>`, porque el host de API no tiene frontend
+  de espacio;
+- en un subdominio de espacio: `issuer` y `authorization_endpoint` son ese mismo subdominio
+  (`https://alice.<dominio>/authorize`), que es donde el usuario tiene su sesión y sus datos.
+
+### R2 — Dominio, subdominios y certificado
+
+- La zona alojada se **busca** por `var.domain_name` (`data.aws_route53_zone.this`, `data.tf`); no se
+  crea. El registro del dominio en Route 53 ya creó la zona pública, y una segunda zona con el mismo
+  nombre respondería con otros servidores de nombres sin avisar. `var.route53_zone_id` sigue
+  existiendo como anulación explícita (zona privada homónima, subdominio delegado), ya no como
+  interruptor de "gestiono DNS o no".
+- Un solo certificado ACM cubre el dominio **y** `*.<dominio>` (`subject_alternative_names` en
+  `alb-acm.tf`), validado por DNS con los registros que Terraform crea en esa zona. El comodín no
+  cubre el ápex: hacen falta los dos nombres. Tampoco cubre dos niveles (`a.b.<dominio>`), que este
+  stack no sirve.
+- El ápex y el comodín son registros **alias A** al ALB. Ese comodín es lo que hace que un espacio
+  nuevo sea alcanzable sin tocar Terraform: el servidor saca el espacio del host, así que
+  `alice.<dominio>`, `app.<dominio>` y el ápex son el mismo ALB y el mismo servicio ECS.
+- Solo HTTPS: el único listener de aplicación sigue siendo el 443 con TLS 1.3
+  (`ELBSecurityPolicy-TLS13-1-2-2021-06`); el 80 solo redirige con 301. El listener lee
+  `aws_acm_certificate_validation.this.certificate_arn`, que no resuelve hasta que ACM da el
+  certificado por `ISSUED`: el primer `apply` espera a la validación DNS, hay que dejarlo terminar.
+
+### R3 — Región, presupuesto, estado remoto, permiso de despliegue y correo
+
+**Región y presupuesto** ya tienen valor por defecto en `variables.tf` (`eu-west-1`, `500`) porque
+son decisiones tomadas, no suposiciones; `terraform.tfvars.example` fija además
+`environment = "beta"`. El presupuesto es una **alarma, no un tope**: AWS no apaga nada cuando se
+cruza (aviso al 80% real y al 100% pronosticado, `budgets.tf`). AWS Budgets necesita además que la
+cuenta tenga activado el acceso de IAM a la información de facturación; sin eso, el `apply` falla al
+crear el presupuesto aunque el permission set esté bien.
+
+**Estado remoto con bloqueo.** `versions.tf` declara `backend "s3"` con configuración parcial:
+`encrypt` y `dynamodb_table` en el repo, y `bucket`/`key`/`region` por `-backend-config` (el nombre
+del bucket es específico de la cuenta y no va a un fork público). `terraform init -backend=false`
+ignora el bloque entero, así que la validación estática sigue corriendo sin bucket, sin credenciales
+y sin estado — comprobado en R4 después de añadirlo.
+
+El bloqueo es **DynamoDB y no el lockfile nativo de S3**: `use_lockfile` llegó en Terraform 1.10 y
+el contenedor fijado con el que se valida este stack es 1.9.8, que lo rechaza. Medido, no supuesto:
+
+```
+$ docker run --rm -v /tmp/tfprobe:/w -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    init
+Initializing the backend...
+Error: Unsupported argument
+  on main.tf line 6, in terraform:
+   6:     use_lockfile = true
+An argument named "use_lockfile" is not expected here.
+```
+
+`required_version` sigue admitiendo 1.9.x, así que el atributo no se puede usar hasta subir ese
+suelo. Camino de subida, escrito también en `versions.tf`: subir `required_version` a `>= 1.11`,
+re-fijar el contenedor, cambiar `dynamodb_table` por `use_lockfile = true` y borrar la tabla.
+
+**Crear el backend antes del primer `init`** (una sola vez, con credenciales SSO):
+
+```sh
+aws s3api create-bucket --bucket <bucket-de-estado> --region eu-west-1 \
+  --create-bucket-configuration LocationConstraint=eu-west-1
+aws s3api put-bucket-versioning --bucket <bucket-de-estado> \
+  --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket <bucket-de-estado> \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-public-access-block --bucket <bucket-de-estado> \
+  --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+aws dynamodb create-table --table-name aos-crm-tfstate-lock --region eu-west-1 \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+```
+
+El versionado del bucket no es decorativo: es la única forma de recuperar un estado que se escriba
+a medias. `LockID` es el nombre de clave que exige el backend S3, no una elección.
+
+**Permission set de despliegue (IAM Identity Center).** `PowerUserAccess` cubre todo lo que este
+stack crea salvo IAM, porque su `NotAction` excluye `iam:*` (solo deja
+`CreateServiceLinkedRole`/`DeleteServiceLinkedRole`/`ListRoles`), y este stack crea cuatro roles de
+tarea (`iam.tf`) y los pasa a ECS. La política en línea que se añade al permission set, limitada a
+los roles del proyecto:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageAosCrmRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::*:role/aos-crm-*"
+    },
+    {
+      "Sid": "PassAosCrmRolesToEcsOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/aos-crm-*",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "ReadIamForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRoleTags",
+        "iam:ListInstanceProfilesForRole",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+`PassRole` va en su propia sentencia con la condición `iam:PassedToService`: metido en la primera,
+la condición también se evaluaría para `CreateRole` —que no aporta esa clave— y denegaría la
+creación de roles. La lectura de IAM va sin recorrer `Resource` porque `plan` refresca roles y
+políticas que no creó él (la política gestionada `AmazonECSTaskExecutionRolePolicy`, por ejemplo).
+Nada de claves estáticas: `aws sso login` por sesión, igual que en CRM-011.
+
+**Correo saliente: no hay driver** (decisión del founder, 29/10). `EMAIL_DRIVER=LOGGER` es el valor
+por defecto de upstream y no envía nada: `LoggerDriver.send` escribe el correo entero —asunto, texto
+y HTML— en el log del servidor
+(`packages/twenty-server/src/engine/core-modules/email/drivers/logger.driver.ts`). Consecuencias que
+el operador tiene que asumir, no descubrir:
+
+- Las invitaciones y los restablecimientos de contraseña **no llegan al buzón de nadie**: el enlace
+  queda en el grupo de logs del servidor en CloudWatch, y el operador lo pasa por su cuenta. El
+  operador *es* el mecanismo de restablecimiento.
+- Ese enlace es una credencial de un solo uso: quien pueda leer los logs puede usarla. El grupo de
+  logs tiene 30 días de retención por defecto (`var.log_retention_days`); tratar el acceso de
+  lectura a CloudWatch como acceso a cuentas de la beta.
+
+### R4 — Validación (sin credenciales) y procedimiento del coordinador
+
+Comandos reales del 30 de octubre de 2026, en la distro WSL dedicada
+(`AOS-CRM-Ubuntu-24.04`), en el contenedor de `hashicorp/terraform` fijado por digest (Terraform
+v1.9.8, confirmado con `version`), sin ninguna variable `AWS_*` y sin montar `~/.aws` — ningún
+`-e`, ningún `--env-file`, así que el contenedor no vio el `AWS_BEARER_TOKEN_BEDROCK` del host. El
+montaje va con la **ruta absoluta** del directorio, no con `$PWD` tras un `cd`, por la razón de la
+segunda lección de abajo.
+
+```
+$ docker run --rm -v "<ruta>/deploy/aws:/w" -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    fmt -check -recursive
+exit 0 (sin salida: todo canónico)
+
+$ docker run --rm -v "<ruta>/deploy/aws:/w" -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    init -backend=false
+exit 0 ("Terraform has been successfully initialized!"; reutilizó hashicorp/aws 5.100.0 y
+hashicorp/random 3.9.1 del lock file -- y lo hizo con el bloque `backend "s3"` ya declarado, que es
+lo que R3 pedía comprobar)
+
+$ docker run --rm -v "<ruta>/deploy/aws:/w" -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    validate
+exit 0 ("Success! The configuration is valid.")
+
+$ sh <ruta>/deploy/aws/scripts/scan-secrets.sh
+exit 0 (sin coincidencias)
+```
+
+El `exit 0` del escaneo no se dio por bueno sin más: con un fichero de control sembrado a propósito
+en `deploy/aws` (un literal con pinta de contraseña y un número de 12 dígitos) el mismo comando
+devolvió `exit 1` listando las dos coincidencias, y volvió a dar `exit 0` al borrarlo. Un escaneo
+que no se ha visto fallar nunca no es un escaneo, es un `exit 0`.
+
+`validate` no llama a AWS: no resuelve `data.aws_route53_zone.this` ni comprueba que la zona exista.
+Que el dominio tenga zona en la cuenta es lo primero que descubre el `plan`.
+
+**Procedimiento, en este orden.** Lo corre el coordinador con credenciales SSO temporales, desde
+`deploy/aws`, tras `aws sso login --profile <perfil>`. Cada paso dice qué se espera ver; un paso que
+no da eso se para ahí.
+
+1. **Requisitos previos:** permission set asignado, acceso de IAM a facturación activado en la
+   cuenta, y `terraform.tfvars` copiado del `.example` con `domain_name` y `budget_alert_email`
+   reales. Comprobar que la zona existe:
+   `aws route53 list-hosted-zones-by-name --dns-name <dominio> --query 'HostedZones[0].[Name,Id]'`.
+2. **Backend:** los comandos de R3 (bucket + tabla), una sola vez por cuenta.
+3. **Init:**
+   `terraform init -backend-config="bucket=<bucket-de-estado>" -backend-config="key=aos-crm/beta/terraform.tfstate" -backend-config="region=eu-west-1"`.
+4. **Crear solo el ECR** para poder subir la imagen antes de que existan los servicios que la
+   necesitan:
+   `terraform apply -target=aws_ecr_repository.app -var="image_digest=sha256:0000000000000000000000000000000000000000000000000000000000000000"`,
+   revisando el plan antes de confirmar. Ese digest de relleno solo pasa la validación de formato de
+   la variable; en un apply con `-target` nadie lo lee. Deja `terraform output -raw ecr_repository_url`.
+5. **Construir la imagen desde un commit concreto y subirla por digest** (desde la raíz del repo,
+   sobre el commit que se quiera desplegar, sin cambios sin commitear):
+
+   ```sh
+   git rev-parse HEAD                      # anotar este SHA: es lo que queda desplegado
+   aws ecr get-login-password --region eu-west-1 \
+     | docker login --username AWS --password-stdin <id-cuenta>.dkr.ecr.eu-west-1.amazonaws.com
+   docker build --target twenty -f packages/twenty-docker/twenty/Dockerfile \
+     -t <ecr_repository_url>:$(git rev-parse --short HEAD) .
+   docker push <ecr_repository_url>:$(git rev-parse --short HEAD)
+   aws ecr describe-images --repository-name aos-crm-beta \
+     --image-ids imageTag=$(git rev-parse --short HEAD) \
+     --query 'imageDetails[0].imageDigest' --output text
+   ```
+
+   El target es `twenty` (servidor **más** frontend compilado, `Dockerfile:206`): el ALB sirve la
+   aplicación y la API por el mismo contenedor. El digest que imprime el último comando es el que
+   va en `image_digest` — nunca una etiqueta, que se puede mover.
+6. **Apply completo:** `terraform plan -var="image_digest=sha256:<digest del paso 5>"`, revisión
+   humana, y `terraform apply` con la misma variable. Este apply espera a que ACM valide por DNS;
+   hay que dejarlo terminar (minutos), no basta con arrancarlo.
+7. **Migrar una sola vez, antes de servir tráfico real:**
+
+   ```sh
+   aws ecs run-task --cluster $(terraform output -raw ecs_cluster_name) \
+     --task-definition $(terraform output -raw ecs_migrate_task_definition_arn) \
+     --launch-type FARGATE \
+     --network-configuration "awsvpcConfiguration={subnets=[$(terraform output -json private_subnet_ids | tr -d '[]\" ' )],securityGroups=[$(terraform output -raw ecs_tasks_security_group_id)],assignPublicIp=DISABLED}"
+   ```
+
+   Esperar a que la tarea termine con `exitCode: 0` (`aws ecs describe-tasks --cluster ... --tasks <arn>`)
+   antes de seguir. Si sale distinto de 0, el log está en el grupo `migrate`; no continuar.
+8. **Comprobaciones de humo** (todas desde fuera, con el dominio real):
+
+   ```sh
+   curl -sS -o /dev/null -w '%{http_code}\n' https://<dominio>/healthz            # 200
+   curl -sS -o /dev/null -w '%{http_code}\n' http://<dominio>/                    # 301 al 443
+   curl -sS -D - -o /dev/null -X POST https://<dominio>/mcp \
+     -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'                          # 401 + WWW-Authenticate
+   curl -sS https://<dominio>/.well-known/oauth-authorization-server | jq .issuer # "https://<dominio>"
+   curl -sS https://<dominio>/.well-known/oauth-protected-resource/mcp | jq .resource
+   curl -sS -o /dev/null -w '%{http_code}\n' https://app.<dominio>/               # 200
+   ```
+
+   Lo que tiene que cumplirse, no solo "responder": el 401 de `/mcp` trae
+   `WWW-Authenticate: Bearer resource_metadata="https://<dominio>/.well-known/oauth-protected-resource/mcp"`;
+   el `issuer` del descubrimiento es `https://<dominio>` (si sale `http://`, `TRUST_PROXY` no está
+   llegando y hay que pararse ahí); y `resource` es `https://<dominio>/mcp`. Un subdominio de espacio
+   solo responde 200 **después** del paso 9: antes, el espacio no existe y el servidor contesta
+   workspace-not-found, que a cambio ya prueba que el comodín de DNS y el certificado funcionan.
+9. **Primer espacio y primer administrador del servidor.** El primer alta es la única que no exige
+   nada: con cero espacios, `assertWorkspaceCreationAllowed` se salta la restricción
+   (`sign-in-up.service.ts:503`) y `getSignUpWithoutWorkspaceDecision` devuelve `allowed`
+   (`.../auth/utils/get-sign-up-without-workspace-decision.util.ts`). El operador entra en
+   `https://app.<dominio>`, se registra con su correo y crea su espacio.
+
+   Ese usuario **no es** administrador del servidor todavía: el alta siempre escribe
+   `canAccessFullAdminPanel: false` (`sign-in-up.service.ts:300`) y la única vía de código para
+   cambiarlo (`updateServerAdminAccess`, `.../admin-panel/admin-panel.resolver.ts:227-230`) exige ya
+   ser administrador (`AdminPanelGuard`). Fuera del sembrador de desarrollo nada lo concede, así que
+   el primero se marca en la base de datos, con una tarea única que usa la definición del
+   **servidor** (arranca con `DISABLE_DB_MIGRATIONS=true`, así que `entrypoint.sh:5` se salta las
+   migraciones y hace `exec` del comando que se le pasa) y el `psql` que ya trae la imagen
+   (`Dockerfile:117-124`):
+
+   ```json
+   { "containerOverrides": [ { "name": "server", "command": ["sh","-c",
+     "psql \"$PG_DATABASE_URL\" -v ON_ERROR_STOP=1 -c \"UPDATE core.\\\"user\\\" SET \\\"canAccessFullAdminPanel\\\" = true WHERE email = 'OPERADOR@DOMINIO'\""
+   ] } ] }
+   ```
+
+   ```sh
+   aws ecs run-task --cluster $(terraform output -raw ecs_cluster_name) \
+     --task-definition $(terraform output -raw ecs_server_task_definition_arn) \
+     --launch-type FARGATE --network-configuration "<el mismo del paso 7>" \
+     --overrides file://admin-override.json
+   ```
+
+   `PG_DATABASE_URL` lo inyecta el bloque `secrets` de la definición de tarea desde Secrets Manager
+   (`ecs.tf`), así que la contraseña no aparece en el comando, ni en el historial, ni en el JSON.
+   Borrar `admin-override.json` después: lleva el correo del operador. Comprobar que la fila cambió
+   (`... -c "SELECT email, \"canAccessFullAdminPanel\" FROM core.\"user\""`) antes de dar el paso por
+   hecho; un `exitCode: 0` sin ver la fila no prueba nada. Después, cerrar sesión y volver a entrar
+   para que el token lleve el permiso nuevo.
+10. **Un espacio por amigo.** Ya como administrador del servidor, el operador crea cada espacio él
+    mismo: autenticado, la mutación `signUpInNewWorkspace`
+    (`.../auth/auth.resolver.ts:687-702`) acepta `displayName` y `subdomain`, y
+    `assertWorkspaceCreationAllowed` la deja pasar solo porque tiene `canAccessFullAdminPanel`. Si no
+    se pasa `subdomain`, `SubdomainManagerService.generateSubdomain`
+    (`.../domain/subdomain-manager/services/subdomain-manager.service.ts:36-48`) lo deriva del correo
+    o del nombre, con un nombre aleatorio de reserva: para la beta conviene fijarlo a mano
+    (`alice`, `bob`) porque es la URL que el amigo va a usar.
+
+    Después invita al amigo a **su** espacio (ajustes del espacio, invitación por correo). Con
+    multi-espacio y creación limitada, un amigo que intente registrarse por su cuenta recibe
+    `requiresDestination` y solo pasa si tiene invitación pendiente o dominio de acceso aprobado
+    (`assertSignUpWithoutWorkspaceAllowed`, `sign-in-up.service.ts:442-471`): esa invitación es lo
+    que le da entrada, y nada más la da. Como no hay correo saliente, el enlace de invitación
+    (`.../workspace-invitation/services/workspace-invitation.service.ts:350-360`, construido sobre la
+    URL del espacio) sale en el log del servidor y es el operador quien lo entrega.
+11. **Qué pone cada amigo en ChatGPT:** la URL del conector MCP de **su** espacio,
+    `https://<su-subdominio>.<dominio>/mcp`. Desde ese host, el descubrimiento devuelve su propio
+    subdominio como `issuer` y manda el `/authorize` a su propio frontend
+    (`oauth-discovery.controller.ts:28-35`), que es donde tiene sesión y datos. El ápex
+    (`https://<dominio>/mcp`) responde igual a nivel de protocolo, pero su `/authorize` sale en
+    `app.<dominio>`, el host "sin espacio": sirve para la comprobación de humo del paso 8, no como
+    URL de usuario.
+
+**Redespliegue con imagen nueva:** pasos 5, 7 y 6 en ese orden (construir, migrar, aplicar). Migrar
+antes de que el servicio nuevo sirva tráfico, igual que en CRM-011.
+
+**Rollback:** volver `image_digest` al digest anterior y `apply` (ECS hace el rolling hacia atrás).
+Las migraciones de Twenty no son reversibles por CLI: si una sale mal, la vía fiable es restaurar
+por PITR al momento previo, no un "down". Nada de `apply` sin leer el plan.
+
+**Destrucción:** `terraform destroy`. Dos cosas propias de este stack: si `db_deletion_protection`
+está en `true`, desactivarlo primero con un `apply` aparte; y los registros de validación de ACM son
+dos recursos de Terraform que normalmente apuntan al **mismo** registro DNS (ACM emite un solo CNAME
+para un nombre y su comodín), así que si Route 53 rechaza el segundo borrado por no encontrarlo,
+sacar ese recurso del estado (`terraform state rm 'aws_route53_record.acm_validation["*.<dominio>"]'`)
+y repetir. El bucket de estado y la tabla de bloqueo no los gestiona Terraform: se borran a mano, al
+final y a conciencia.
+
+### Límites de la beta (decirlos antes, no descubrirlos)
+
+- **Cinco espacios como máximo, contando el del operador.** Sin clave Enterprise válida
+  —`ENTERPRISE_KEY` está vacío a propósito en el perfil de privacidad—
+  `assertWorkspaceCountWithinLimit` rechaza crear a partir de
+  `MAX_WORKSPACES_WITHOUT_ENTERPRISE_KEY = 5`
+  (`sign-in-up.service.ts:534-552`, `.../auth/constants/max-workspaces-without-organization-key.constant.ts:1`).
+  Es decir: el operador más **cuatro** amigos. Un quinto amigo exige decisión de licencia del
+  founder, no un cambio de Terraform.
+- **Sin correo saliente** (arriba): invitaciones y restablecimientos pasan por el operador y por los
+  logs.
+- **El arranque del servidor en ECS sigue sin medirse**: `alb_health_check_grace_period_seconds`
+  (300 s) sigue siendo una cifra conservadora, no una medición, igual que en CRM-011. Medirlo en el
+  primer arranque real.
+- **Coste:** la tabla de CRM-011 sigue siendo la referencia; la beta añade una zona alojada de Route
+  53 y un certificado ACM (los certificados públicos usados en un ELB no se facturan; la zona y las
+  consultas sí, tarifa **no verificada en esta sesión**). Los 500 USD/mes dejan margen de sobra
+  sobre ese orden de magnitud, que es justo para lo que sirve una alarma.
+- **Aislamiento entre espacios:** sigue siendo el de Twenty (esquema por espacio), con las pruebas
+  negativas entre espacios todavía pendientes (ver arriba en este documento). Vale para amigos en una
+  beta; no es aislamiento comercial de clientes.
+
+### Lecciones
+
+**Síntoma:** `terraform init` falla con `Error: Unsupported argument ... use_lockfile` al declarar
+el backend S3 con bloqueo nativo.
+**Causa:** el bloqueo nativo del backend S3 (`use_lockfile`) existe desde Terraform 1.10, y el
+contenedor fijado con el que se valida este stack es 1.9.8; `required_version` además sigue
+admitiendo toda la serie 1.9.
+**Fix:** bloqueo con `dynamodb_table` y el camino de subida escrito en `versions.tf` (subir
+`required_version`, re-fijar contenedor, cambiar el atributo, borrar la tabla).
+**Regla:** antes de usar una capacidad de Terraform leída en la documentación, comprobarla contra la
+versión **fijada** del proyecto —un `init` en un directorio temporal lo dice en dos segundos—, no
+contra la última versión publicada.
+
+**Síntoma:** `terraform fmt -check -recursive` y `terraform validate` devolvieron `exit 0` sobre un
+directorio que no contenía la configuración. Se vio porque el `init` de la misma tanda contestó
+`Terraform initialized in an empty directory! The directory has no Terraform configuration files` —
+`fmt` y `validate` sobre nada también son `exit 0`, y no lo dicen.
+**Causa:** el comando se escribió como `cd <dir> && docker run ... -v "$PWD:/w" ...` dentro de un
+`wsl.exe -- bash -lc '...'`, y en este arnés el `cd` no llega al proceso siguiente: los pasos
+encadenados se ejecutan en shells distintos, así que `$PWD` era el directorio de partida. El mismo
+efecto hace que una variable asignada en el comando (`x=hello; echo "$x"`) se lea vacía y que un
+`echo "exit=$?"` final informe 0 aunque el paso anterior fallara.
+**Fix:** montar y apuntar con **rutas absolutas** en una sola invocación, sin `cd`, sin variables
+intermedias, y tomar el código de salida del resultado de la herramienta, no de un `echo "$?"`.
+**Regla:** `exit 0` de una herramienta que recorre ficheros no prueba nada si no se ha comprobado
+que vio los ficheros. Lo que vale como evidencia es un mensaje que solo puede salir del trabajo real
+("Using previously-installed hashicorp/aws v5.100.0", "Success! The configuration is valid.") o un
+control sembrado que haga fallar la herramienta a propósito.
+
+**Síntoma:** `git grep -- packages/twenty-front/src <patrón>` devuelve cero resultados para símbolos
+que sí existen, y se concluye que el frontend no tiene esa pantalla.
+**Causa:** el directorio de trabajo había cambiado a `deploy/aws` en un paso anterior, y los
+pathspec de `git grep` son relativos al directorio actual, no a la raíz del repo: el patrón se buscó
+en una ruta que no existe.
+**Regla:** una afirmación del tipo "el repo no tiene X" se emite después de comprobar `pwd` (o con
+`git -C <raíz>`); un cero sin contexto de directorio no es un cero.
