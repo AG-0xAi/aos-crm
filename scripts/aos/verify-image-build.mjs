@@ -36,7 +36,7 @@
 //   node scripts/aos/verify-image-build.mjs
 //   node scripts/aos/verify-image-build.mjs --self-test   (no WSL/Docker)
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -371,10 +371,40 @@ function selfTest() {
     assert(/import \{ gateImageReference \} from '\.\/verify-image-build\.mjs'/.test(provenanceGate),
       'the provenance gate no longer imports this command\'s gate reference');
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
-    assert(/pathToFileURL\(resolve\(invokedPath\)\)\.href === import\.meta\.url/.test(source),
+    assert(/entryPointVerdict\(process\.argv\[1\]\)/.test(source),
       'the entry-point guard that keeps that import from running a build is gone');
-    assert(/verify-image-build\\\.mjs\$\/i\.test\(invokedPath\)/.test(source),
-      'nothing fails closed if this file is run as a command but does not recognise itself');
+    assert(/realpathSync/.test(source),
+      'the guard decides by name again, so a command invoked through a link would exit 0 without building');
+  });
+  // CRM-004 fix5 (reviewer finding). The guard used to recognise itself with a
+  // regex over argv[1], and `import.meta.url` is this file's REAL path, so a
+  // link to this command under another name matched neither branch: it exited 0
+  // having built nothing, which is the one thing a gate command must never do.
+  record('the entry point is decided by resolved path, not by the invoking name, and an argv[1] it cannot resolve fails closed', () => {
+    assert(entryPointVerdict(fileURLToPath(import.meta.url)).isEntry,
+      'this file invoked by its own path is not recognised as the entry point');
+    assert(entryPointVerdict(resolve(REPO_ROOT, 'scripts', 'aos', '..', 'aos', 'verify-image-build.mjs')).isEntry,
+      'another spelling of this same file is not recognised as the entry point');
+    // A real file whose NAME this module would never recognise, invoked as the
+    // command: the old regex exited 0 here, having built nothing.
+    const alias = resolve(REPO_ROOT, 'deploy/local/compose.yaml');
+    const aliased = entryPointVerdict(alias, pathToFileURL(realpathSync(alias)).href);
+    assert(aliased.isEntry && !aliased.unresolved,
+      'a command invoked under a name this module does not recognise would still exit 0 without building');
+    // A genuine import: argv[1] is the module that imported this one, and
+    // nothing may run.
+    const importer = entryPointVerdict(resolve(REPO_ROOT, 'scripts/aos/verify-image-provenance.mjs'));
+    assert(!importer.isEntry && !importer.unresolved, 'importing this module would start a build');
+    // An argv[1] that cannot be resolved is not "probably an import": it is
+    // unmeasured, so the command stops instead of looking green.
+    const missing = entryPointVerdict(resolve(REPO_ROOT, 'scripts/aos/not-a-file.mjs'));
+    assert(!missing.isEntry && missing.unresolved, 'an unresolvable argv[1] would exit 0 without building');
+    // The guard itself, which is the LAST thing in this file. The last slice,
+    // not the first: the needle also appears in the line above, so [1] would
+    // be the text of this very test.
+    const slices = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('export function entryPointVerdict');
+    const guard = slices[slices.length - 1];
+    assert(/entry\.unresolved[\s\S]*process\.exit\(1\)/.test(guard), 'the unresolvable-entry branch no longer stops the command');
   });
   // CRM-004 fix4, the measured red: this build used to carry '-t <deployment
   // reference>', so running the gate moved that tag from the bytes the stack
@@ -444,14 +474,31 @@ function selfTest() {
 }
 
 // scripts/aos/verify-image-provenance.mjs imports gateImageReference from here,
-// so building cannot be a top-level side effect. If this file is ever the main
-// command and still fails to recognise itself, it exits 1 rather than exiting 0
-// without building: a gate command that measures nothing must not look green.
-const invokedPath = process.argv[1] || '';
-if (invokedPath && pathToFileURL(resolve(invokedPath)).href === import.meta.url) {
+// so building cannot be a top-level side effect.
+//
+// Decided by RESOLVED REAL PATH, never by the invoking name. `import.meta.url`
+// is this file's real path, because Node resolves symlinks for module URLs, so
+// comparing it against argv[1] verbatim made a link to this command look like
+// an import -- and CRM-004 fix4's fallback only failed closed when the
+// invoking path still ended in this file's name, so a link under another name
+// matched neither branch and exited 0 having built nothing. An argv[1] that
+// cannot be resolved at all is not read as "probably an import": nothing was
+// measured, so the command stops. A gate command that measures nothing must
+// never look green.
+export function entryPointVerdict(invokedPath, selfUrl = import.meta.url) {
+  if (!invokedPath) return { isEntry: false };
+  try {
+    return { isEntry: pathToFileURL(realpathSync(resolve(invokedPath))).href === selfUrl };
+  } catch (e) {
+    return { isEntry: false, unresolved: `${invokedPath} (${e.code || e.message})` };
+  }
+}
+
+const entry = entryPointVerdict(process.argv[1]);
+if (entry.isEntry) {
   if (process.argv.includes('--self-test')) selfTest();
   else run();
-} else if (/verify-image-build\.mjs$/i.test(invokedPath)) {
-  console.error(`[FAIL] ${invokedPath} was invoked as a command but this module could not recognise itself as the entry point, so no build ran`);
+} else if (entry.unresolved) {
+  console.error(`[FAIL] this module cannot tell whether it was invoked as a command: argv[1] ${entry.unresolved}. Refusing to exit 0 without building.`);
   process.exit(1);
 }
