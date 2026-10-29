@@ -7,7 +7,9 @@
 // that posts workspace content to a third party offered, in tools/list, in the
 // tool catalog or in the server instructions, and refused through execute_tool
 // -> a least-privilege team role created over the API, whose key does record
-// CRUD but cannot mint API keys, create roles or read the role list -> a
+// CRUD but cannot mint API keys, create roles or read the role list, each
+// refusal checked against an Admin credential running the same call so it is
+// the permission and not the request that was refused -> a
 // uniquely named synthetic company created through execute_tool, that exact
 // row read with psql inside this project's own PostgreSQL container, deleted
 // through MCP and its deletion confirmed in the same database -> an expired
@@ -39,8 +41,9 @@ import {
   REPO_ROOT, SERVER_URL, http, mcpCall, unwrapToolResult,
 } from '../mcp/lib.mjs';
 import {
-  TEAM_ROLE_LABEL, TEAM_ROLE_PERMISSIONS,
-  ensureTeamRole, expireApiKey, loginAsAdmin, mintApiKeyForRole, probeTeamKeyPrivileges, revokeApiKey,
+  TEAM_ROLE_LABEL,
+  checkRolePermissions, ensureTeamRole, expireApiKey, findAdminRoleId, loginAsAdmin, mintApiKeyForRole,
+  probeEscalationRefusals, probeTeamKeyPrivileges, revokeApiKey,
 } from '../mcp/team-role.mjs';
 
 const HEALTH_TIMEOUT_MS = 180_000;
@@ -255,10 +258,11 @@ test('execute_tool refuses every tool that posts workspace content to a third pa
 test('the team role for assistant connections is least privilege, and its key cannot escalate', async () => {
   teamRole = await ensureTeamRole(adminToken);
   assert.equal(teamRole.label, TEAM_ROLE_LABEL);
-  for (const [flag, expected] of Object.entries(TEAM_ROLE_PERMISSIONS)) {
-    if (flag in teamRole) {
-      assert.equal(teamRole[flag], expected, `the team role's ${flag} is ${teamRole[flag]}, expected ${expected}`);
-    }
+  // Every switch the role declares, and a switch the server did not return is
+  // a failure here: skipping it silently is what left three of the ten
+  // unchecked.
+  for (const check of checkRolePermissions(teamRole)) {
+    assert.ok(check.ok, `the team role's ${check.name}: ${check.detail}`);
   }
 
   const { apiKeyId, token } = await mintApiKeyForRole(adminToken, {
@@ -274,6 +278,26 @@ test('the team role for assistant connections is least privilege, and its key ca
   }
   if (recordId) {
     await callTool('delete_one_company', { id: recordId }, { token });
+  }
+
+  // The refusals, each one measured against an Admin credential running the
+  // same call with the same arguments. Without that half a refusal could be the
+  // request being malformed, which is how the all-zero roleId used to pass.
+  const adminKey = await mintApiKeyForRole(adminToken, {
+    roleId: await findAdminRoleId(adminToken),
+    name: `${RUN_MARKER} admin reference key`,
+    expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+  });
+  mintedApiKeyIds.push(adminKey.apiKeyId);
+
+  const refusals = await probeEscalationRefusals({
+    teamToken: token,
+    adminToken,
+    adminKeyToken: adminKey.token,
+    assignableRoleId: teamRole.id,
+  });
+  for (const refusal of refusals) {
+    assert.ok(refusal.ok, `${refusal.name}: ${refusal.detail}`);
   }
 });
 
