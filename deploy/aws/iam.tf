@@ -1,13 +1,23 @@
-# Two roles, both without a single static AWS key (R1):
+# No static AWS key anywhere in this file (R1):
 #  - ecs_task_execution: what ECS itself uses to pull the image from ECR,
 #    write to CloudWatch Logs, and resolve the `secrets` block below into
-#    the running container's environment.
-#  - ecs_task: what the application code inside the container (the AWS
-#    SDK) assumes at runtime. Scoped to exactly the S3 bucket this stack
-#    creates -- see s3.tf's comment on fromNodeProviderChain().
-# Server, worker and migrate share ecs_task because they share the same
-# image and the same (single) S3 bucket; nothing here grants more than
-# that bucket plus its SSE-KMS key.
+#    the running container's environment. Shared by server, worker and
+#    migrate: these are ECS control-plane grants (image pull, log stream
+#    creation, secret-to-env resolution), not application data access, so
+#    sharing it does not widen any task's blast radius.
+#  - ecs_task_server / ecs_task_worker / ecs_task_migrate: one role per
+#    service (R1), what the application code inside *that* container (the
+#    AWS SDK) assumes at runtime -- see s3.tf's comment on
+#    fromNodeProviderChain(). server and worker run the same image and both
+#    reach the shared file-storage driver (server for direct API
+#    uploads/downloads, worker for async jobs such as CSV import/export and
+#    attachment processing), so they need the same S3 + SSE-KMS access;
+#    kept as two roles rather than one shared role so a future permission
+#    change to one does not have to touch the other. migrate only runs
+#    database:init/upgrade/cron:register (ecs.tf) -- it never calls the
+#    storage driver, so its role gets no inline policy at all: everything
+#    it actually needs (secrets resolved into env, logs written) comes from
+#    ecs_task_execution above, not from the task role.
 
 data "aws_iam_policy_document" "ecs_tasks_assume_role" {
   statement {
@@ -49,8 +59,22 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   policy = data.aws_iam_policy_document.ecs_task_execution_secrets.json
 }
 
-resource "aws_iam_role" "ecs_task" {
-  name               = "aos-crm-${var.environment}-ecs-task"
+resource "aws_iam_role" "ecs_task_server" {
+  name               = "aos-crm-${var.environment}-ecs-task-server"
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+}
+
+resource "aws_iam_role" "ecs_task_worker" {
+  name               = "aos-crm-${var.environment}-ecs-task-worker"
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+}
+
+# No inline policy on purpose: the migrate task only runs
+# database:init/upgrade/cron:register (ecs.tf) and never calls the storage
+# driver, so it gets no S3/KMS grant that ecs_task_server/worker need and it
+# does not.
+resource "aws_iam_role" "ecs_task_migrate" {
+  name               = "aos-crm-${var.environment}-ecs-task-migrate"
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
 }
 
@@ -85,8 +109,14 @@ data "aws_iam_policy_document" "ecs_task_s3" {
   }
 }
 
-resource "aws_iam_role_policy" "ecs_task_s3" {
+resource "aws_iam_role_policy" "ecs_task_server_s3" {
   name   = "files-bucket-access"
-  role   = aws_iam_role.ecs_task.id
+  role   = aws_iam_role.ecs_task_server.id
+  policy = data.aws_iam_policy_document.ecs_task_s3.json
+}
+
+resource "aws_iam_role_policy" "ecs_task_worker_s3" {
+  name   = "files-bucket-access"
+  role   = aws_iam_role.ecs_task_worker.id
   policy = data.aws_iam_policy_document.ecs_task_s3.json
 }
