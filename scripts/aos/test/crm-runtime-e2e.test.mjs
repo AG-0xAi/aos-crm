@@ -219,18 +219,42 @@ function ensureAdminCredentials() {
   return { email, password, generated: true };
 }
 
+// On the beta profile (CRM-014) the workspace a sign-in belongs to is resolved
+// from the SUBDOMAIN of the `origin` argument, and the bare SERVER_URL
+// deliberately resolves to none: it is the picker host. The administrator's
+// workspace is the first one on this deployment, read out of the database so it
+// cannot drift from what the server resolves; on a fresh database there is no
+// workspace yet and createFirstAdmin publishes the origin the server itself
+// built for the one it created.
+let workspaceOrigin = null;
+
+function originForSubdomain(subdomain) {
+  const url = new URL(ORIGIN);
+  url.hostname = `${subdomain}.${url.hostname}`;
+  return url.origin;
+}
+
+function workspaceOriginFromDbOrNull() {
+  const subdomain = psql('select subdomain from core.workspace order by "createdAt" asc limit 1');
+  return /^[a-z0-9][a-z0-9-]*$/.test(subdomain) ? originForSubdomain(subdomain) : null;
+}
+
 async function loginAsAdmin({ email, password }) {
+  workspaceOrigin ??= workspaceOriginFromDbOrNull();
+  if (workspaceOrigin === null) {
+    return { ok: false, detail: 'no workspace exists on this deployment yet, so no origin resolves to one' };
+  }
   const login = await gql(
     'mutation($email: String!, $password: String!, $origin: String!) {' +
     ' getLoginTokenFromCredentials(email: $email, password: $password, origin: $origin) { loginToken { token } } }',
-    { variables: { email, password, origin: ORIGIN }, path: METADATA },
+    { variables: { email, password, origin: workspaceOrigin }, path: METADATA },
   );
   if (login.body.errors) return { ok: false, detail: gqlErrorMessages(login.body) };
   const loginToken = login.body.data.getLoginTokenFromCredentials.loginToken.token;
   const exchanged = await gql(
     'mutation($loginToken: String!, $origin: String!) {' +
     ' getAuthTokensFromLoginToken(loginToken: $loginToken, origin: $origin) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { variables: { loginToken, origin: ORIGIN }, path: METADATA },
+    { variables: { loginToken, origin: workspaceOrigin }, path: METADATA },
   );
   if (exchanged.body.errors) return { ok: false, detail: gqlErrorMessages(exchanged.body) };
   return { ok: true, token: exchanged.body.data.getAuthTokensFromLoginToken.tokens.accessOrWorkspaceAgnosticToken.token };
@@ -267,10 +291,15 @@ async function createFirstAdmin(credentials) {
   // ("Workspace name is required"), so the single local workspace is named here.
   const workspace = await gql(
     'mutation($input: SignUpInNewWorkspaceInput) {' +
-    ' signUpInNewWorkspace(input: $input) { loginToken { token } workspace { id } } }',
+    ' signUpInNewWorkspace(input: $input) { loginToken { token } workspace { id workspaceUrls { subdomainUrl } } } }',
     { variables: { input: { displayName: 'AOS-CRM Local' } }, token: agnostic, path: METADATA },
   );
   assert.equal(workspace.body.errors, undefined, `signUpInNewWorkspace failed: ${gqlErrorMessages(workspace.body)}`);
+  // The origin the SERVER built for this workspace, not one assembled here:
+  // the sign-in right after has to use the host the server will resolve.
+  const subdomainUrl = workspace.body.data.signUpInNewWorkspace.workspace.workspaceUrls?.subdomainUrl;
+  assert.ok(subdomainUrl, 'signUpInNewWorkspace returned no subdomain URL for the workspace it created');
+  workspaceOrigin = new URL(subdomainUrl).origin;
   return workspace.body.data.signUpInNewWorkspace.workspace.id;
 }
 

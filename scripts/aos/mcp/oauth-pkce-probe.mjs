@@ -18,7 +18,8 @@
 // the end and nothing is written to the repo.
 import {
   ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, SERVER_URL,
-  graphql, http, httpAbsolute, mcpCall, oneShotRedirectListener, pkcePair,
+  founderWorkspaceOrigin, graphql, http, httpAbsolute, loginWithOrigin,
+  mcpCall, oneShotRedirectListener, pkcePair,
 } from './lib.mjs';
 
 // auth.resolver.ts is a @MetadataResolver, so authorizeApp and the sign-in
@@ -49,25 +50,18 @@ function gqlErrors(body) {
   return (body.errors || []).map((e) => e.message).join(' | ');
 }
 
+// The operator signs in at their OWN workspace's origin: on the beta profile
+// the bare SERVER_URL is the picker host and resolves to no workspace
+// (CRM-014).
 async function loginAsAdmin() {
   if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
     die('deploy/local/.env carries no AOS_CRM_ADMIN_EMAIL/AOS_CRM_ADMIN_PASSWORD; run the runtime e2e suite once to create the first administrator');
   }
-  const login = await graphql(
-    METADATA,
-    'mutation($email: String!, $password: String!, $origin: String!) {' +
-      ' getLoginTokenFromCredentials(email: $email, password: $password, origin: $origin) { loginToken { token } } }',
-    { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, origin: SERVER_URL },
-  );
-  if (login.errors) die(`administrator sign-in failed: ${gqlErrors(login)}`);
-  const exchanged = await graphql(
-    METADATA,
-    'mutation($loginToken: String!, $origin: String!) {' +
-      ' getAuthTokensFromLoginToken(loginToken: $loginToken, origin: $origin) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { loginToken: login.data.getLoginTokenFromCredentials.loginToken.token, origin: SERVER_URL },
-  );
-  if (exchanged.errors) die(`login-token exchange failed: ${gqlErrors(exchanged)}`);
-  return exchanged.data.getAuthTokensFromLoginToken.tokens.accessOrWorkspaceAgnosticToken.token;
+  try {
+    return await loginWithOrigin(ADMIN_EMAIL, ADMIN_PASSWORD, founderWorkspaceOrigin());
+  } catch (error) {
+    die(error.message);
+  }
 }
 
 async function main() {

@@ -373,19 +373,43 @@ test('a pending invitation acceptance token reaches no unauthorized caller', asy
     'the pending invitation acceptance token appeared in a response to an unauthorized caller (not printed)');
 });
 
-test('this deployment holds exactly one workspace, and a second one cannot be created (so cross-workspace isolation is NOT measured here)', async () => {
-  // Stated as a limit rather than left implied: IS_MULTIWORKSPACE_ENABLED is
-  // false on this profile, so there is no second workspace to read across. The
-  // boundary this CAN measure is that no second one can come into existence.
-  assert.equal(psql('select count(*) from core.workspace'), '1',
-    'this local deployment no longer holds exactly one workspace: the isolation limit below would be wrong');
+test('opening a workspace is closed to everything except an operator session (and cross-workspace isolation is measured elsewhere)', async () => {
+  // CRM-014 put this deployment on the beta profile, so a second workspace CAN
+  // exist -- what stays closed is who may open one. This suite keeps the half
+  // it can measure with the credentials it already holds and leaves the
+  // boundary between two workspaces to scripts/aos/test/crm-isolation-e2e.test.mjs,
+  // which opens, probes and destroys its own synthetic pair.
+  const before = psql('select count(*) from core.workspace');
+  assert.equal(before, '1',
+    `this local deployment holds ${before} workspaces instead of the founder's one: a synthetic workspace from an interrupted isolation run was left behind`);
 
-  const second = await gql(
+  // An API key is not a person: signUpInNewWorkspace only accepts a user
+  // session (auth.resolver.ts AuthPrincipalGuard apiKey:false), so even an
+  // Admin-role key cannot open one.
+  for (const [name, token] of [['the Admin API key', adminKeyToken], ['the team API key', teamKeyToken]]) {
+    const refused = await gql(
+      METADATA,
+      'mutation($input: SignUpInNewWorkspaceInput) { signUpInNewWorkspace(input: $input) { workspace { id } } }',
+      { input: { displayName: `AOS-CRM ${RUN_MARKER}` } },
+      token,
+    );
+    assert.ok(refused.errors, `${name} opened a workspace`);
+    assert.equal((refused.data?.signUpInNewWorkspace ?? null) !== null, false,
+      `${name} received a workspace payload from a refused call`);
+  }
+
+  // And registration itself stays closed: a brand-new address with no pending
+  // invitation cannot sign itself up
+  // (IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS, sign-in-up.service.ts
+  // assertSignUpWithoutWorkspaceAllowed).
+  const stranger = await gql(
     METADATA,
-    'mutation($input: SignUpInNewWorkspaceInput) { signUpInNewWorkspace(input: $input) { workspace { id } } }',
-    { input: { displayName: `AOS-CRM ${RUN_MARKER}` } },
-    adminToken,
+    'mutation($email: String!, $password: String!) { signUp(email: $email, password: $password) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
+    { email: `extrano.${randomUUID().slice(0, 8)}@aos-crm.invalid`, password: randomBytes(24).toString('base64url') },
   );
-  assert.ok(second.errors, 'a second workspace was created: multiworkspace is not off');
-  assert.equal(psql('select count(*) from core.workspace'), '1', 'the refused call still created a workspace');
+  assert.ok(stranger.errors, 'a public sign-up without an invitation succeeded');
+  assert.equal((stranger.data?.signUp ?? null) !== null, false,
+    'the refused sign-up still returned a payload (not printed: it would carry tokens)');
+
+  assert.equal(psql('select count(*) from core.workspace'), before, 'a refused call still created a workspace');
 });

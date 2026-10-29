@@ -38,7 +38,7 @@ import { resolve } from 'node:path';
 
 import {
   ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, COMPOSE_PROJECT, DISTRO, PG_DB, PG_USER,
-  REPO_ROOT, SERVER_URL, http, mcpCall, unwrapToolResult,
+  REPO_ROOT, SERVER_URL, founderWorkspaceOrigin, http, mcpCall, unwrapToolResult,
 } from '../mcp/lib.mjs';
 import {
   TEAM_ROLE_LABEL,
@@ -150,25 +150,60 @@ test('/mcp refuses a call with no credential and points at its resource metadata
   const challenge = res.headers['www-authenticate'] ?? '';
   const metadataUrl = /resource_metadata="([^"]+)"/.exec(challenge)?.[1];
   assert.ok(metadataUrl, `the 401 carried no resource_metadata pointer: ${challenge}`);
-  assert.equal(metadataUrl, `${SERVER_URL}/.well-known/oauth-protected-resource/mcp`);
+  // The host the CLIENT asked, not the configured SERVER_URL: mcp-auth.guard.ts
+  // builds this pointer from `request.get('host')`, which is what makes a
+  // per-workspace connector URL discover its own workspace (CRM-014, measured
+  // in the next test). This suite dials the published loopback address, so that
+  // is the host it must be answered with.
+  assert.equal(metadataUrl, `${BASE_URL}/.well-known/oauth-protected-resource/mcp`);
 });
 
-test('the OAuth discovery an MCP client reads is published and matches the effective SERVER_URL', async () => {
+test('the OAuth discovery an MCP client reads is published for the exact host it asked', async () => {
   const resource = await http('/.well-known/oauth-protected-resource/mcp');
   assert.equal(resource.status, 200, `protected resource metadata answered ${resource.status}`);
   const resourceDoc = JSON.parse(resource.body);
-  assert.equal(resourceDoc.resource, `${SERVER_URL}/mcp`);
-  assert.deepEqual(resourceDoc.authorization_servers, [SERVER_URL]);
+  assert.equal(resourceDoc.resource, `${BASE_URL}/mcp`);
+  assert.deepEqual(resourceDoc.authorization_servers, [BASE_URL]);
 
   const server = await http('/.well-known/oauth-authorization-server');
   assert.equal(server.status, 200, `authorization server metadata answered ${server.status}`);
   const serverDoc = JSON.parse(server.body);
-  assert.equal(serverDoc.issuer, SERVER_URL);
-  assert.equal(serverDoc.registration_endpoint, `${SERVER_URL}/oauth/register`);
+  assert.equal(serverDoc.issuer, BASE_URL);
+  assert.equal(serverDoc.registration_endpoint, `${BASE_URL}/oauth/register`);
   assert.ok(serverDoc.code_challenge_methods_supported.includes('S256'),
     `PKCE S256 is not advertised: ${JSON.stringify(serverDoc.code_challenge_methods_supported)}`);
   assert.ok(serverDoc.grant_types_supported.includes('authorization_code'),
     `the authorization code grant is not advertised: ${JSON.stringify(serverDoc.grant_types_supported)}`);
+});
+
+test("a workspace's own connector URL discovers that workspace's authorization page, and the API host points at the sign-in host instead (CRM-014 R3)", async () => {
+  // The URL each beta user pastes into ChatGPT or Claude is their OWN
+  // workspace's host + /mcp. Asked with that Host header -- the transport still
+  // dials the published loopback port, so no DNS is involved -- every discovery
+  // value has to name that host, including the /authorize page the user is sent
+  // to, which is the page where they are already signed in.
+  const workspaceHost = new URL(founderWorkspaceOrigin()).host;
+  const resource = await http('/.well-known/oauth-protected-resource/mcp', { headers: { host: workspaceHost } });
+  assert.equal(resource.status, 200, `the workspace host answered ${resource.status} for its resource metadata`);
+  const resourceDoc = JSON.parse(resource.body);
+  assert.equal(resourceDoc.resource, `http://${workspaceHost}/mcp`);
+  assert.deepEqual(resourceDoc.authorization_servers, [`http://${workspaceHost}`]);
+
+  const server = await http('/.well-known/oauth-authorization-server', { headers: { host: workspaceHost } });
+  const serverDoc = JSON.parse(server.body);
+  assert.equal(serverDoc.issuer, `http://${workspaceHost}`);
+  assert.equal(serverDoc.authorization_endpoint, `http://${workspaceHost}/authorize`,
+    'the workspace host does not send the user to its own authorization page');
+
+  // And the other branch of the same decision (oauth-discovery.controller.ts
+  // isApiHost): asked on the configured SERVER_URL, which serves no workspace
+  // of its own, the authorization endpoint is the DEFAULT_SUBDOMAIN sign-in
+  // host and carries the issuer along.
+  const apiHost = new URL(SERVER_URL).host;
+  const apiDoc = JSON.parse((await http('/.well-known/oauth-authorization-server', { headers: { host: apiHost } })).body);
+  assert.equal(apiDoc.issuer, `http://${apiHost}`);
+  assert.match(apiDoc.authorization_endpoint, /^http:\/\/[a-z0-9-]+\.[^/]+\/authorize\?iss=/,
+    `the API host's authorization endpoint is not a subdomain sign-in page with an issuer: ${apiDoc.authorization_endpoint}`);
 });
 
 test('initialize answers as the Twenty MCP server, and its instructions name no third-party tool', async () => {

@@ -4,6 +4,7 @@
 // is read into memory and never printed, logged or written anywhere: callers
 // get an Authorization header value, not the token, and the only thing this
 // module ever reports about it is its length.
+import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { request } from 'node:http';
@@ -169,6 +170,93 @@ export function unwrapToolResult(response) {
     return { ok: false, payload: null, raw: text };
   }
   return { ok: payload.success === true, payload, raw: text };
+}
+
+// ---------------------------------------------------------------------------
+// Beta profile (CRM-014): which workspace a request belongs to is resolved from
+// the SUBDOMAIN of SERVER_URL, so an origin is no longer a constant. The
+// transport above still dials 127.0.0.1 on the published port -- only the
+// `origin` ARGUMENT of the sign-in mutations (auth.resolver.ts takes it as
+// @Args('origin'), not as a header) and the browser's own address carry the
+// subdomain, so none of this needs DNS.
+// ---------------------------------------------------------------------------
+
+export function originForSubdomain(subdomain) {
+  const url = new URL(SERVER_URL);
+  url.hostname = `${subdomain}.${url.hostname}`;
+  return url.origin;
+}
+
+export function wsl(args, opts = {}) {
+  return spawnSync('wsl.exe', ['-d', DISTRO, '--exec', ...args], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    ...opts,
+  });
+}
+
+let cachedLinuxRoot = null;
+
+export function linuxRepoRoot() {
+  if (cachedLinuxRoot !== null) return cachedLinuxRoot;
+  const translated = wsl(['wslpath', '-a', REPO_ROOT]);
+  if (translated.status !== 0) throw new Error(`could not reach WSL distro '${DISTRO}' to translate the repo path`);
+  const path = translated.stdout.trim();
+  if (!path.startsWith('/')) throw new Error(`wslpath returned something that is not a Linux path: ${path}`);
+  cachedLinuxRoot = path;
+  return path;
+}
+
+export function compose(args, opts = {}) {
+  return wsl(['docker', 'compose', '-f', `${linuxRepoRoot()}/deploy/local/compose.yaml`, '-p', COMPOSE_PROJECT, ...args], opts);
+}
+
+// Argv, never a shell: the SQL travels as one `--exec` argument, so camelCase
+// identifiers keep their double quotes without any quoting layer in between.
+export function psql(sql) {
+  const res = compose(['exec', '-T', 'db', 'psql', '-U', PG_USER, '-d', PG_DB, '-t', '-A', '-c', sql]);
+  if (res.status !== 0) throw new Error(`psql exited ${res.status}: ${(res.stderr || '').slice(-300)}`);
+  return res.stdout.trim();
+}
+
+// The operator's own workspace: the first one ever created on this deployment,
+// which is the one the founder signed up and the only one that outlives a test
+// run. Read from the database rather than configured anywhere, so it cannot
+// drift from what the server would resolve.
+export function founderWorkspaceOrigin() {
+  const subdomain = psql('select subdomain from core.workspace order by "createdAt" asc limit 1');
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(subdomain)) {
+    throw new Error(`could not read the first workspace's subdomain from core.workspace (got ${subdomain.length} chars)`);
+  }
+  return originForSubdomain(subdomain);
+}
+
+// The two-step password sign-in, with the workspace carried by `origin`:
+// getLoginTokenFromCredentials resolves the workspace from it, and
+// getAuthTokensFromLoginToken refuses the exchange when the login token was
+// minted for a different workspace than the origin resolves to
+// (auth.resolver.ts validateWorkspaceAccess) -- which is itself one of the
+// isolation boundaries crm-isolation-e2e.test.mjs measures.
+export async function loginWithOrigin(email, password, origin) {
+  const login = await graphql(
+    '/metadata',
+    'mutation($email: String!, $password: String!, $origin: String!) {' +
+      ' getLoginTokenFromCredentials(email: $email, password: $password, origin: $origin) { loginToken { token } } }',
+    { email, password, origin },
+  );
+  if (login.errors) throw new Error(`sign-in failed: ${(login.errors || []).map((e) => e.message).join(' | ')}`);
+  return exchangeLoginToken(login.data.getLoginTokenFromCredentials.loginToken.token, origin);
+}
+
+export async function exchangeLoginToken(loginToken, origin) {
+  const exchanged = await graphql(
+    '/metadata',
+    'mutation($loginToken: String!, $origin: String!) {' +
+      ' getAuthTokensFromLoginToken(loginToken: $loginToken, origin: $origin) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
+    { loginToken, origin },
+  );
+  if (exchanged.errors) throw new Error(`login-token exchange failed: ${(exchanged.errors || []).map((e) => e.message).join(' | ')}`);
+  return exchanged.data.getAuthTokensFromLoginToken.tokens.accessOrWorkspaceAgnosticToken.token;
 }
 
 export function pkcePair() {

@@ -41,7 +41,7 @@ import { resolve } from 'node:path';
 
 import {
   ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, COMPOSE_PROJECT, DISTRO, PG_DB, PG_USER,
-  REPO_ROOT, graphql, http,
+  REPO_ROOT, founderWorkspaceOrigin, graphql, http,
 } from '../mcp/lib.mjs';
 import { loginAsAdmin } from '../mcp/team-role.mjs';
 
@@ -71,6 +71,7 @@ const WORKER_TIMELINE_TIMEOUT_MS = 120_000;
 let linuxRoot = null;
 let adminToken = null;
 let workspaceSchema = null;
+let workspaceBaseUrl = null;
 let createPhase = null;
 let ids = {};
 
@@ -118,7 +119,14 @@ function runBrowserPhase(phase, { ids: handedIds = {} } = {}) {
     '--ipc=host',
     '--security-opt', `seccomp=${linuxRoot}/${SECCOMP_PROFILE}`,
     '--env-file', `${linuxRoot}/deploy/local/.env`,
-    '-e', `AOS_CRM_BROWSER_BASE_URL=${BASE_URL}`,
+    // The WORKSPACE's own URL, not the bare loopback address: on the beta
+    // profile (CRM-014) the app resolves the workspace from the subdomain, and
+    // the bare host is the sign-in/picker page, which serves no workspace. This
+    // is also the URL a beta user actually opens. Chromium resolves
+    // *.localhost to loopback itself (RFC 6761), so no DNS, no hosts file and
+    // no extra container flag is involved; the connection still lands on the
+    // published 127.0.0.1 port through --network host.
+    '-e', `AOS_CRM_BROWSER_BASE_URL=${workspaceBaseUrl}`,
     '-e', `AOS_CRM_BROWSER_PHASE=${phase}`,
     '-e', `AOS_CRM_BROWSER_MARKER=${RUN_MARKER}`,
     '-e', `AOS_CRM_BROWSER_IDS=${JSON.stringify(handedIds)}`,
@@ -186,6 +194,7 @@ before(async () => {
 
   await waitForHealthy(HEALTH_TIMEOUT_MS);
   adminToken = await loginAsAdmin();
+  workspaceBaseUrl = founderWorkspaceOrigin();
 
   const schemas = psql("select nspname from pg_namespace where nspname like 'workspace_%' order by nspname;")
     .split('\n').map((s) => s.trim()).filter(Boolean);

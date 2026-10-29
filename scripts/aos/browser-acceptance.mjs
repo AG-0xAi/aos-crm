@@ -86,8 +86,17 @@ function sandboxEvidence() {
   return { chromiumProcesses, zygotes, switches: [...switches].sort(), uid: process.getuid?.() ?? null };
 }
 
+// The whole `.localhost` TLD is loopback by RFC 6761, and the browser now
+// drives a WORKSPACE SUBDOMAIN of it (CRM-014: with multi-workspace on, the
+// workspace is resolved from the subdomain, so the app's own origin is
+// <subdomain>.localhost). Without the suffix every request the app makes to
+// itself would be recorded as an external destination, which is both false and
+// would bury the one thing this recorder exists to catch.
 function isLoopback(hostname) {
-  return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '[::1]';
+  const host = hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1') return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }
 
 async function check(name, body) {

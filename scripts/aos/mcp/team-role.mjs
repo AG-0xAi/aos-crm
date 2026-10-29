@@ -19,7 +19,7 @@
 // revoked.
 import { pathToFileURL } from 'node:url';
 
-import { ADMIN_EMAIL, ADMIN_PASSWORD, SERVER_URL, graphql, mcpCall, unwrapToolResult } from './lib.mjs';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, founderWorkspaceOrigin, graphql, loginWithOrigin, mcpCall, unwrapToolResult } from './lib.mjs';
 
 const METADATA = '/metadata';
 
@@ -92,25 +92,16 @@ export function checkRolePermissions(role) {
   }));
 }
 
+// The operator's own workspace, not the bare SERVER_URL: on the beta profile
+// (CRM-014) the bare host resolves to NO workspace by design -- it is the
+// sign-in/picker host -- so an origin without a subdomain fails with
+// "Workspace not found" (workspace-domains.service.ts
+// resolveWorkspaceAndPublicDomain).
 export async function loginAsAdmin() {
   if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
     throw new Error('deploy/local/.env carries no AOS_CRM_ADMIN_EMAIL/AOS_CRM_ADMIN_PASSWORD');
   }
-  const login = await graphql(
-    METADATA,
-    'mutation($email: String!, $password: String!, $origin: String!) {' +
-      ' getLoginTokenFromCredentials(email: $email, password: $password, origin: $origin) { loginToken { token } } }',
-    { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, origin: SERVER_URL },
-  );
-  if (login.errors) throw new Error(`administrator sign-in failed: ${gqlErrors(login)}`);
-  const exchanged = await graphql(
-    METADATA,
-    'mutation($loginToken: String!, $origin: String!) {' +
-      ' getAuthTokensFromLoginToken(loginToken: $loginToken, origin: $origin) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { loginToken: login.data.getLoginTokenFromCredentials.loginToken.token, origin: SERVER_URL },
-  );
-  if (exchanged.errors) throw new Error(`login-token exchange failed: ${gqlErrors(exchanged)}`);
-  return exchanged.data.getAuthTokensFromLoginToken.tokens.accessOrWorkspaceAgnosticToken.token;
+  return loginWithOrigin(ADMIN_EMAIL, ADMIN_PASSWORD, founderWorkspaceOrigin());
 }
 
 // Idempotent: a second run reuses the role instead of creating a twin, and
