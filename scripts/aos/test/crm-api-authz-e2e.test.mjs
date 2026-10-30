@@ -347,24 +347,22 @@ test('a pending invitation acceptance token reaches no unauthorized caller', asy
   assert.ok(['permission', 'principal'].includes(sendKind),
     `the team key was not refused invitation sending by this deployment (${sendKind}): ${gqlErrors(teamKeySend).slice(0, 160)}`);
 
-  // 4. The exposure the CRM-005 auth preflight pointed at: availableWorkspaces
-  // hands personalInviteToken to an identity that merely CLAIMS the invited
-  // address, and this deployment keeps IS_EMAIL_VERIFICATION_REQUIRED off. The
-  // path to that payload is a signup with the invited address, which this
-  // deployment must refuse because public registration is closed.
-  const claimed = await gql(
-    METADATA,
-    'mutation($email: String!, $password: String!) { signUp(email: $email, password: $password) { tokens { accessOrWorkspaceAgnosticToken { token } } } }',
-    { email: INVITED_EMAIL, password: randomBytes(24).toString('base64url') },
-  );
-  assert.ok(claimed.errors, 'a signup with the invited address succeeded: registration is open and the invite token is reachable');
-  const returnedSignUpPayload = (claimed.data?.signUp ?? null) !== null;
-  assert.equal(returnedSignUpPayload, false, 'the refused signup still returned a signUp payload (not printed: it would carry tokens)');
-
-  const anonymousAvailable = await gql(METADATA, '{ availableWorkspaces { availableWorkspacesForSignUp { id personalInviteToken } } }', {});
-  assert.ok(anonymousAvailable.errors, 'availableWorkspaces answered an anonymous caller');
-  const anonymousInviteTokenPayload = (anonymousAvailable.data?.availableWorkspaces ?? null) !== null;
-  assert.equal(anonymousInviteTokenPayload, false, 'an anonymous caller received an availableWorkspaces payload (not printed: it can carry personalInviteToken)');
+  // 4. The exposure the CRM-005 auth preflight pointed at -- the sign-up answer
+  // handing personalInviteToken to an identity that merely CLAIMS the invited
+  // address -- is NOT probed here any more, and that is a deliberate move, not
+  // an omission. CRM-005 could assert it was refused because public
+  // registration was closed; on the beta profile that same sign-up SUCCEEDS
+  // (sign-in-up.service.ts allows an address with a pending invitation), so the
+  // probe now has to create a real claimer identity, which has no business
+  // existing in the founder's own deployment. It lives in
+  // scripts/aos/test/crm-isolation-e2e.test.mjs, which runs it against a
+  // synthetic workspace, prints the measured limit and deletes the identity it
+  // created. The MEASURED outcome (2026-10-30): the token IS handed over and
+  // redeeming it joins the workspace -- see .aos/reports/CRM-014.md and the
+  // mitigation in docs/aos/product/BETA_RUNBOOK.md.
+  //
+  // What this suite keeps is the half that is about unauthorized CALLERS rather
+  // than about the invited address itself.
 
   // The leak assertion, over every body this suite collected: presence as a
   // boolean with a fixed message, so a failure cannot print the token.

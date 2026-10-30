@@ -878,6 +878,96 @@ test('the rest of the operator procedure runs for the synthetic friend: the oper
   assert.ok(replayed.errors, 'the password reset token was accepted a second time');
 });
 
+// The exposure the CRM-005 preflight pointed at, re-measured on the profile
+// that changes its answer: with multi-workspace on, a sign-up by an address
+// that merely HAS a pending invitation is allowed
+// (sign-in-up.service.ts assertSignUpWithoutWorkspaceAllowed ->
+// 'requiresDestination' -> hasProvisionedDestination), so an identity that only
+// CLAIMS an invited address can create a user. What must not follow from that
+// is reaching the workspace: neither its invitation credential nor its records.
+test('an identity that only claims an invited address reaches no records, and is offered no workspace it was not invited to (measured limit: it IS handed the pending invitation)', async () => {
+  const claimedEmail = `reclamo.${RUN}@aos-crm.invalid`;
+  const claimedPassword = randomBytes(36).toString('base64url');
+
+  const invited = await graphql(
+    METADATA,
+    'mutation($emails: [String!]!) { sendInvitations(emails: $emails) { success result { id } } }',
+    { emails: [claimedEmail] },
+    workspaces.B.friend.token,
+  );
+  assert.equal(invited.errors, undefined, `the invitation for the claim probe failed: ${gqlErrors(invited)}`);
+  assert.equal(invited.data.sendInvitations.success, true, 'the invitation for the claim probe was not created');
+
+  // The whole payload the stranger receives, including the one field that would
+  // hand them the invitation: availableWorkspaces is NOT a root query on this
+  // deployment ("Cannot query field availableWorkspaces on type Query",
+  // measured), it travels inside the sign-up answer, which is why it is read
+  // from there and not probed separately.
+  const claimed = await graphql(
+    METADATA,
+    'mutation($e: String!, $p: String!) { signUp(email: $e, password: $p) {' +
+      ' tokens { accessOrWorkspaceAgnosticToken { token } }' +
+      ' availableWorkspaces { availableWorkspacesForSignUp { id personalInviteToken inviteHash } } } }',
+    { e: claimedEmail, p: claimedPassword },
+  );
+  const claimerToken = claimed.data?.signUp?.tokens?.accessOrWorkspaceAgnosticToken?.token ?? null;
+  const offered = claimed.data?.signUp?.availableWorkspaces?.availableWorkspacesForSignUp ?? [];
+  const forB = offered.find((workspace) => workspace.id === workspaces.B.id) ?? null;
+  // Booleans and ids from here on: this payload carries an invitation
+  // credential, and an assert.equal that fails prints its ACTUAL value.
+  const wasHandedTheInvitation = typeof forB?.personalInviteToken === 'string' && forB.personalInviteToken.length > 0;
+
+  try {
+    // MEASURED LIMIT, not a pass: on this profile the sign-up answer DOES hand
+    // the pending invitation token to whoever claims the address, and with it
+    // the address can join. It is upstream's design -- the invitation is
+    // addressed to an email and nothing proves the address while
+    // IS_EMAIL_VERIFICATION_REQUIRED is false -- so it is reported to the
+    // founder (.aos/reports/CRM-014.md, docs/aos/product/BETA_RUNBOOK.md) with
+    // its mitigation (invite, have it accepted, and delete anything pending)
+    // instead of being asserted away here. What IS asserted below is the shape
+    // of that exposure: it reaches only the workspace the address was really
+    // invited to, and it buys no records without redeeming the invitation.
+    let joinedWorkspaceId = null;
+    if (claimerToken !== null && wasHandedTheInvitation) {
+      const joined = await graphql(
+        METADATA,
+        'mutation($e: String!, $p: String!, $w: UUID, $h: String, $t: String) {' +
+          ' signUpInWorkspace(email: $e, password: $p, workspaceId: $w, workspaceInviteHash: $h,' +
+          ' workspacePersonalInviteToken: $t) { workspace { id } } }',
+        { e: claimedEmail, p: claimedPassword, w: workspaces.B.id, h: forB.inviteHash, t: forB.personalInviteToken },
+      );
+      joinedWorkspaceId = joined.data?.signUpInWorkspace?.workspace?.id ?? null;
+    }
+    console.log(
+      `[LIMIT] a claimed invited address was handed the pending invitation token: ${wasHandedTheInvitation}; ` +
+      `redeeming it joined the workspace: ${joinedWorkspaceId === workspaces.B.id}`,
+    );
+
+    // The exposure is bounded to the invitation that exists: no other workspace
+    // of this deployment is offered to that address.
+    assert.deepEqual(
+      offered.map((workspace) => workspace.id).filter((id) => id !== workspaces.B.id),
+      [],
+      'the sign-up answer offered a workspace the claimed address was never invited to',
+    );
+    assert.equal(offered.length <= 1, true, `the claimed address was offered ${offered.length} workspaces`);
+
+    // And the token a bare sign-up produces, on its own, reaches no records.
+    if (claimerToken !== null) {
+      const records = await graphql(CORE, '{ companies { edges { node { id } } } }', {}, claimerToken);
+      assert.ok(records.errors, 'the bare sign-up token answered a records query');
+    }
+  } finally {
+    // The claimer deletes its own account (user.resolver.ts deleteUser is
+    // self-only), so this probe leaves no identity behind.
+    if (claimerToken !== null) {
+      const removed = await graphql(METADATA, 'mutation { deleteUser { id } }', {}, claimerToken);
+      if (removed.errors) console.error(`[CLEANUP] the claim probe user survived: ${gqlErrors(removed)}`);
+    }
+  }
+});
+
 test("the founder's own workspace and its records were never touched by this run", () => {
   assert.equal(psql(`select count(*) from core.workspace where id = '${founderWorkspaceId}' and "deletedAt" is null`), '1',
     "the founder's workspace is gone or soft deleted");

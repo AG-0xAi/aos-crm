@@ -169,12 +169,23 @@ async function httpGet(path, init = {}) {
 const CORE = '/graphql';
 const METADATA = '/metadata';
 
+// The Origin header says the origin this client REALLY dialed, which is the
+// published loopback address. It is not SERVER_URL: with NODE_ENV=production the
+// server drops loopback origins from the credentialed allowlist unless
+// AUTH_COOKIE_ALLOWED_ORIGINS names them (resolve-allowed-credentialed-origins.util.ts
+// -- "SERVER_URL defaults to http://localhost:3000, which would hand any local
+// page on that port a credentialed origin"), so the only thing that earns a
+// session here is being same-origin with the request's own Host
+// (is-request-origin-allowed.util.ts). Claiming http://localhost:43000 while
+// dialing 127.0.0.1 is NOT same-origin and is refused with "Request origin is
+// not allowed to receive a session cookie" -- measured on 2026-10-30, and the
+// reason this is a constant and not SERVER_URL.
 async function gql(query, { variables, token, path = CORE } = {}) {
   const res = await httpRequest(path, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      origin: ORIGIN,
+      origin: BASE_URL,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
@@ -458,7 +469,7 @@ test('the row survives restarting the database container (the volume is the stat
 test('an invalid compressed request body is rejected without taking the server down (GHSA-27r3-jxmh-p828)', async () => {
   const res = await httpRequest('/graphql', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'content-encoding': 'gzip', origin: ORIGIN },
+    headers: { 'content-type': 'application/json', 'content-encoding': 'gzip', origin: BASE_URL },
     body: Buffer.from('this is not gzip at all, not even close'),
     timeoutMs: 30_000,
   });
@@ -511,7 +522,7 @@ test('a VALID compressed frame followed by trailing bytes does not kill the serv
     Buffer.from([
       'POST /graphql HTTP/1.1',
       `Host: 127.0.0.1:${WEB_PORT}`,
-      `Origin: ${ORIGIN}`,
+      `Origin: ${BASE_URL}`,
       'Content-Type: application/json',
       'Content-Encoding: gzip',
       `Content-Length: ${body.length}`,
