@@ -226,6 +226,7 @@ export const themeCssVariables = {
       semiBold: 'var(--t-font-weight-semi-bold)',
     },
     family: 'var(--t-font-family)',
+    familyDisplay: 'var(--t-font-family-display)',
   },
   name: 'var(--t-name)',
   snackBar: {

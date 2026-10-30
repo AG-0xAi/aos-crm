@@ -19,8 +19,17 @@
 //   node scripts/aos/verify-brand.mjs
 //   node scripts/aos/verify-brand.mjs --self-test
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { globSync } from 'node:fs';
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, posix, resolve, sep } from 'node:path';
 
@@ -388,7 +397,69 @@ export function scanRepository({ root = REPO_ROOT, allowlist = ALLOWLIST } = {})
   return { filesScanned: files.length, violations };
 }
 
+// The theme is the other half of "Betty, not Twenty": a renamed string on an
+// Inter-and-blue page is still not the brand. These are the GENERATED
+// artifacts (npx nx generateTokens twenty-ui), so this also catches a token
+// source edited without regenerating -- the thing a reader cannot see in a
+// diff. Whether they are in sync with the source is measured inside the gate
+// image, where tsx can run the generator (`--check`).
+export const THEME_ARTIFACTS = [
+  'packages/twenty-ui/src/theme/theme-light.css',
+  'packages/twenty-ui/src/theme/theme-dark.css',
+];
+
+export function checkThemeIdentity(root = REPO_ROOT) {
+  const failures = [];
+  // Light and dark both: the inverse variant is as much the brand as the
+  // primary one (manual 3.1).
+  const required = [
+    ['--t-font-family:', "'Source Sans 3'"],
+    ['--t-font-family-display:', "'Fraunces'"],
+    ['--t-font-color-primary:', ['#35362e', '#f9f5ec']],
+    ['--t-background-primary:', ['#fffdf9', '#2a2b24']],
+    ['--t-accent-primary:', ['#96442d', '#c87452']],
+  ];
+
+  for (const [index, relative] of THEME_ARTIFACTS.entries()) {
+    const source = readFileSync(resolve(root, relative), 'utf8');
+
+    if (/\bInter\b/.test(source)) {
+      failures.push(`${relative} still names Inter as a font family`);
+    }
+
+    for (const [property, expected] of required) {
+      const line = source
+        .split('\n')
+        .find((candidate) => candidate.includes(property));
+      const wanted = Array.isArray(expected) ? expected[index] : expected;
+
+      if (!line) {
+        failures.push(`${relative} declares no ${property}`);
+        continue;
+      }
+
+      if (!line.toLowerCase().includes(wanted.toLowerCase())) {
+        failures.push(
+          `${relative} ${property} is ${line.trim()}, expected it to carry ${wanted}`,
+        );
+      }
+    }
+  }
+
+  return failures;
+}
+
 function run() {
+  const themeFailures = checkThemeIdentity();
+
+  if (themeFailures.length > 0) {
+    for (const failure of themeFailures) console.error(`[FAIL] ${failure}`);
+    console.error(
+      `[FAIL] the generated theme does not carry the brand palette and typography. Edit packages/twenty-ui/design-tokens and run: npx nx generateTokens twenty-ui`,
+    );
+    process.exit(1);
+  }
+
   const { filesScanned, violations } = scanRepository();
 
   if (filesScanned === 0) {
@@ -553,6 +624,44 @@ function selfTest() {
       'packages/twenty-server/src/engine/core-modules/auth/services/sign-in-up.service.ts',
     ]) {
       assert(isScannedPath(path), `should be scanned: ${path}`);
+    }
+  });
+  record("the generated theme carries the brand's palette and typography, in both schemes", () => {
+    const failures = checkThemeIdentity();
+    assert(failures.length === 0, failures.join('; '));
+  });
+  record('a theme that still names Inter, or a blue accent, FAILS', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-theme-'));
+
+    try {
+      for (const relative of THEME_ARTIFACTS) {
+        mkdirSync(dirname(resolve(sandbox, relative)), { recursive: true });
+      }
+      const [light, dark] = THEME_ARTIFACTS;
+      // A theme with upstream's family and accent, which is what a reverted or
+      // unregenerated token source produces.
+      writeFileSync(
+        resolve(sandbox, light),
+        "--t-font-family: Inter, sans-serif;\n--t-font-family-display: 'Fraunces', Georgia, serif;\n--t-font-color-primary: #35362e;\n--t-background-primary: #fffdf9;\n--t-accent-primary: #0047f1;\n",
+      );
+      writeFileSync(resolve(sandbox, dark), '');
+
+      const failures = checkThemeIdentity(sandbox);
+
+      assert(
+        failures.some((failure) => /still names Inter/.test(failure)),
+        `Inter was not reported: ${failures.join('; ')}`,
+      );
+      assert(
+        failures.some((failure) => /--t-accent-primary/.test(failure)),
+        `the blue accent was not reported: ${failures.join('; ')}`,
+      );
+      assert(
+        failures.some((failure) => /declares no/.test(failure)),
+        `the empty dark theme was not reported: ${failures.join('; ')}`,
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
     }
   });
   record('the guard is declared in the gate with its self-test', () => {

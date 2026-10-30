@@ -186,6 +186,10 @@ export const ARCHIVE_PATHS = [
   ...FRONT_SOURCE_PACKAGES.map((p) => `packages/${p}`),
   'jest.preset.js',
   'packages/twenty-server/package.json',
+  // CRM-019: the theme-token generator formats its own output with oxfmt,
+  // which resolves this config from the file location, so the drift check
+  // needs it in the context.
+  '.oxfmtrc.jsonc',
 ];
 
 // Budgets, not "however long it takes". Their sum stays under the gate quota
@@ -208,6 +212,11 @@ const MARKERS = {
   // not oxlint: twenty-front's .oxlintrc.json names a jsPlugin built from
   // twenty-oxlint-rules, which this image does not build.
   lint: 'AOS_FRONT_LINT_EXIT',
+  // CRM-019: twenty-ui's theme CSS and theme constants are GENERATED from
+  // design-tokens. An edited token source committed without regenerating is
+  // invisible in review and silently serves the old palette, so the generator
+  // runs in --check mode here.
+  tokens: 'AOS_UI_TOKENS_EXIT',
 };
 
 export function readMarker(output, name) {
@@ -248,8 +257,9 @@ export function judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerSt
   const tsgoExit = readMarker(output, MARKERS.tsgo);
   const canaryExit = readMarker(output, MARKERS.canary);
   const lintExit = readMarker(output, MARKERS.lint);
-  if (jestExit === null || tsgoExit === null || canaryExit === null || lintExit === null) {
-    return { ok: false, detail: `the container did not report all four markers (jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit}, lint=${lintExit})` };
+  const tokensExit = readMarker(output, MARKERS.tokens);
+  if (jestExit === null || tsgoExit === null || canaryExit === null || lintExit === null || tokensExit === null) {
+    return { ok: false, detail: `the container did not report all five markers (jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit}, lint=${lintExit}, tokens=${tokensExit})` };
   }
   const summary = parseJestSummary(output);
   // The markers travel with the summary failure: the container's tail is what
@@ -265,6 +275,9 @@ export function judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerSt
   }
   if (lintExit !== 0) {
     return { ok: false, detail: `oxfmt reported unformatted sources in twenty-front (exit ${lintExit}); fix with: npx nx lint twenty-front --configuration=fix` };
+  }
+  if (tokensExit !== 0) {
+    return { ok: false, detail: `twenty-ui's generated theme artifacts are stale (exit ${tokensExit}); regenerate with: npx nx generateTokens twenty-ui` };
   }
   // A compiler that accepts a deliberately mistyped file is a compiler that
   // measured nothing, however clean its verdict on the real code.
@@ -363,6 +376,8 @@ function containerScript() {
     'tail -2 /tmp/canary.log',
     `rm -f ${canary} ${SCOPED_TSCONFIG}`,
     `npx oxfmt --check src/; echo "${MARKERS.lint}=$?"`,
+    'cd /app',
+    `npx tsx packages/twenty-ui/scripts/generateThemeTokens.ts --check; echo "${MARKERS.tokens}=$?"`,
     'exit 0',
   ].join('\n');
 }
@@ -475,6 +490,7 @@ function selfTest() {
     `${MARKERS.tsgo}=0`,
     `${MARKERS.canary}=2`,
     `${MARKERS.lint}=0`,
+    `${MARKERS.tokens}=0`,
   ].join('\n');
 
   record('a clean run with both builds, the container, jest, tsgo and a rejected canary passes', () => {
@@ -484,6 +500,11 @@ function selfTest() {
   record('a failing suite is rejected', () => {
     const r = judgeFrontRun({ ...measured, output: clean.replace(`Test Suites: ${EXPECTED_SUITES} passed, ${EXPECTED_SUITES} total`, `Test Suites: 1 failed, ${EXPECTED_SUITES - 1} passed, ${EXPECTED_SUITES} total`) });
     assert(!r.ok, 'expected a failing suite to be rejected');
+  });
+  record('stale generated theme artifacts fail even with everything else green', () => {
+    const r = judgeFrontRun({ ...measured, output: clean.replace(`${MARKERS.tokens}=0`, `${MARKERS.tokens}=1`) });
+    assert(!r.ok, 'expected a stale theme to fail');
+    assert(/generated theme artifacts are stale/.test(r.detail), r.detail);
   });
   record('unformatted sources fail even with jest and tsgo green', () => {
     const r = judgeFrontRun({ ...measured, output: clean.replace(`${MARKERS.lint}=0`, `${MARKERS.lint}=1`) });

@@ -225,6 +225,7 @@ export type ThemeType = {
       semiBold: number;
     };
     family: string;
+    familyDisplay: string;
   };
   name: string;
   snackBar: {
