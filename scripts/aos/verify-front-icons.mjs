@@ -27,9 +27,10 @@
 //   node scripts/aos/verify-front-icons.mjs --self-test   (no WSL, no Docker)
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { globSync, readFileSync } from 'node:fs';
+import { globSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { resolveGateFile } from './verify-brand.mjs';
 
@@ -52,6 +53,9 @@ export function runResourceNames(runId) {
     depsImage: `aos-crm-local/front-deps:gate-${runId}`,
     sourcesImage: `aos-crm-local/front-icons:gate-${runId}`,
     sourceTar: `/tmp/aos-crm-front-icons-sources-${runId}.tar`,
+    // Written by Windows git, read by the distro through /mnt. Per-run like
+    // every other temporary name, for the reason CRM-004 fix5 documents.
+    windowsSourceTar: resolve(tmpdir(), `aos-crm-front-icons-sources-${runId}.tar`),
     containerName: `aos-crm-front-icons-gate-${runId}`,
   };
 }
@@ -61,6 +65,7 @@ const {
   depsImage: DEPS_IMAGE,
   sourcesImage: SOURCES_IMAGE,
   sourceTar: SOURCE_TAR,
+  windowsSourceTar: WINDOWS_SOURCE_TAR,
   containerName: CONTAINER_NAME,
 } = runResourceNames(RUN_ID);
 
@@ -402,14 +407,33 @@ function run() {
   ownImages.push(DEPS_IMAGE);
 
   console.log('[INFO] building the source/library-build image from a clean git archive of HEAD');
-  const archivePaths = ARCHIVE_PATHS.map((p) => JSON.stringify(p)).join(' ');
+
+  // `git archive` runs on the WINDOWS side, not inside the distro. CRM-019
+  // measured why: in a worktree, `.git` is a FILE whose `gitdir:` line is a
+  // Windows path (C:/.../.git/worktrees/<runId>), which Linux cannot resolve --
+  // `git archive` there exits 128 with "not a git repository", so this gate
+  // could only ever run from the main checkout. Windows git resolves it from
+  // either place, and the tar it writes is handed to the distro by path.
+  const archive = spawnSync('git', ['-C', REPO_ROOT, 'archive', '--format=tar',
+    '-o', WINDOWS_SOURCE_TAR, 'HEAD', '--', ...ARCHIVE_PATHS,
+  ], { encoding: 'utf8' });
+  if (archive.status !== 0) {
+    fail(`git archive exited ${archive.status ?? 'unmeasured'}: ${(archive.stderr || '').slice(-300)}`);
+  }
+  const translatedTar = wsl(['wslpath', '-a', WINDOWS_SOURCE_TAR]);
+  if (translatedTar.status !== 0 || !translatedTar.stdout.trim()) {
+    fail(`could not translate the source tar path into the distro (status=${translatedTar.status})`);
+  }
+  const linuxSourceTar = translatedTar.stdout.trim();
+
   const sourcesBuild = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(root)}; rm -f ${SOURCE_TAR}; ` +
-    `git archive --format=tar -o ${SOURCE_TAR} HEAD -- ${archivePaths}; ` +
+    `cp ${JSON.stringify(linuxSourceTar)} ${SOURCE_TAR}; ` +
     `tar --append -f ${SOURCE_TAR} ${SOURCES_DOCKERFILE}; ` +
     `docker build ${NO_ATTESTATION} --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f ${SOURCES_DOCKERFILE} ` +
     `-t ${SOURCES_IMAGE} - < ${SOURCE_TAR}; rm -f ${SOURCE_TAR}`,
   ], { stdio: ['ignore', 'inherit', 'inherit'], timeout: SOURCES_BUILD_TIMEOUT_MS });
+  rmSync(WINDOWS_SOURCE_TAR, { force: true });
   const sourcesBuildStatus = sourcesBuild.status;
   if (sourcesBuildStatus !== 0) {
     fail(`docker build -f ${SOURCES_DOCKERFILE} exited ${sourcesBuildStatus ?? 'unmeasured'}: the sources and library builds the tests need were not produced`);
@@ -542,8 +566,10 @@ function selfTest() {
       `${SOURCES_DOCKERFILE} enters the build context from the working tree but is not dirty-checked`);
     assert(/const trackedInputs = \[\s*\.\.\.ARCHIVE_PATHS,\s*\.\.\.WORKING_TREE_CONTEXT_PATHS,\s*\]/.test(source),
       'the uncommitted-change check no longer derives its inputs from the archive and working-tree context lists');
-    assert(/const archivePaths = ARCHIVE_PATHS\.map/.test(source),
+    assert(source.includes("'-o', WINDOWS_SOURCE_TAR, 'HEAD', '--', ...ARCHIVE_PATHS,"),
       'the git archive no longer takes its paths from the same list the dirty check covers');
+    assert(/spawnSync\('git', \['-C', REPO_ROOT, 'archive'/.test(source),
+      'the git archive runs inside the distro again, where a worktree .git file points at an unresolvable Windows path');
     const appended = [...source.matchAll(/tar --append -f \$\{SOURCE_TAR\} ([^;\s]+)/g)].map((m) => m[1]);
     assert(appended.length === 1 && appended[0] === '${SOURCES_DOCKERFILE}',
       `a working-tree path is appended to the source context outside the checked list: ${appended.join(', ')}`);
@@ -587,9 +613,9 @@ function selfTest() {
     const a = runResourceNames(newRunId());
     const b = runResourceNames(newRunId());
     const kinds = Object.keys(a);
-    assert(kinds.length === 4, `expected four temporary resources, got ${kinds.join(', ')}`);
+    assert(kinds.length === 5, `expected five temporary resources, got ${kinds.join(', ')}`);
     for (const kind of kinds) assert(a[kind] !== b[kind], `two runs on one distro would share ${kind}: ${a[kind]}`);
-    for (const [kind, live] of [['sourceTar', SOURCE_TAR], ['depsImage', DEPS_IMAGE], ['sourcesImage', SOURCES_IMAGE], ['containerName', CONTAINER_NAME]]) {
+    for (const [kind, live] of [['sourceTar', SOURCE_TAR], ['windowsSourceTar', WINDOWS_SOURCE_TAR], ['depsImage', DEPS_IMAGE], ['sourcesImage', SOURCES_IMAGE], ['containerName', CONTAINER_NAME]]) {
       assert(live === runResourceNames(RUN_ID)[kind], `${kind} is not derived from this run's id: ${live}`);
       assert(live.includes(RUN_ID), `${kind} ('${live}') does not carry this run's identity`);
     }
