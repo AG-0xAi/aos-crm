@@ -23,6 +23,21 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Redirect-only: aws_lb_listener.http_redirect (alb-acm.tf) answers every
+  # request on 80 with a 301 to 443 and never forwards to a target group.
+  # Without this rule the listener exists but is unreachable, so
+  # http://<domain>/ times out instead of redirecting. No ipv6_cidr_blocks:
+  # this VPC has no IPv6 CIDR and the ALB uses the default ip_address_type
+  # "ipv4" (network.tf, alb-acm.tf) -- add it only if the stack adopts
+  # dual-stack.
+  ingress {
+    description = "HTTP from the internet, redirected to HTTPS by aws_lb_listener.http_redirect"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = "aos-crm-${var.environment}-alb"
   }

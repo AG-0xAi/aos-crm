@@ -86,6 +86,17 @@ locals {
     # default, same as deploy/local/compose.yaml's x-aos-crm-env anchor.
     LOGIC_FUNCTION_TYPE   = "DISABLED"
     CODE_INTERPRETER_TYPE = "DISABLED"
+    # RDS Postgres 16 enforces SSL by default (rds.force_ssl) and rejects a
+    # plaintext connection outright ("no pg_hba.conf entry ... no
+    # encryption") -- the migrate task below hit exactly that during the
+    # 30/10 beta apply. Twenty's pg clients only add `ssl:
+    # {rejectUnauthorized: false}` when this flag is true
+    # (core.datasource.ts:75, raw.datasource.ts:13,
+    # workspace-data-source.service.ts:152); Twenty has no CA-pinning
+    # option (config-variables.ts:1478), so the connection ends up
+    # encrypted but not verifying RDS's certificate chain. Verifying it
+    # would need a core change, out of this spec (AWS_DEPLOYMENT_PLAN.md).
+    PG_SSL_ALLOW_SELF_SIGNED = "true"
   }
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through

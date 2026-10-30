@@ -124,6 +124,37 @@ DB y Redis nunca públicos: `aws_db_instance.this.publicly_accessible = false` f
 `LOCAL_SETUP.md` (`IS_MULTIWORKSPACE_ENABLED=false` + el alta única del primer admin hecha a mano
 tras el primer deploy, no una variable de Terraform).
 
+**SSL hacia RDS (fix1, 30/10/2026).** RDS Postgres 16 fuerza SSL por defecto (`rds.force_ssl`) y
+rechaza una conexión en claro con `no pg_hba.conf entry for host ... no encryption` -- así falló la
+tarea `migrate` en el primer intento de aplicar la beta. `local.privacy_env` (`ecs.tf`), común a
+`migrate`/`server`/`worker`, añade `PG_SSL_ALLOW_SELF_SIGNED=true`: es el único interruptor que
+hace que los tres clientes pg de Twenty cifren la conexión (`ssl: { rejectUnauthorized: false }`)
+en `core.datasource.ts:75`, `raw.datasource.ts:13` y
+`workspace-data-source.service.ts:152`. Twenty no expone una opción para fijar o verificar la CA
+de RDS (`config-variables.ts:1478`), así que la conexión queda cifrada pero sin validar la cadena
+de certificados del servidor; verificarla exigiría un cambio en el núcleo, fuera de esta spec. El
+`psql` que el propio `entrypoint.sh` de `packages/twenty-docker/twenty` usa para detectar si la
+base está vacía no necesita ese ajuste: `PG_DATABASE_URL` no lleva `sslmode`, así que libpq usa su
+valor por defecto `prefer`, que intenta TLS primero y solo cae a texto plano si el servidor no lo
+ofrece; como RDS exige TLS, ese intento siempre tiene éxito, igual que el pool de Node.
+
+**Regla de entrada 80/tcp en el security group del ALB (fix1, 30/10/2026).** El listener
+`aws_lb_listener.http_redirect` (80 -> 443, `alb-acm.tf`) ya existía, pero `aws_security_group.alb`
+solo abría 443 de entrada: `http://<dominio>/` no llegaba ni al listener, el ALB descartaba el
+paquete antes de poder devolver el 301. `security-groups.tf` añade una regla de entrada 80/tcp
+desde `0.0.0.0/0` (solo sirve para redirigir: el listener de 80 nunca reenvía a un target group).
+Sin bloque IPv6: esta VPC no tiene CIDR IPv6 y el ALB usa el `ip_address_type` por defecto
+(`ipv4`, ver `network.tf` y `aws_lb.this` en `alb-acm.tf`) -- añadir `ipv6_cidr_blocks = ["::/0"]`
+el día que el stack adopte dual-stack, no antes.
+
+**Cifrado en tránsito de ElastiCache (fix1, 30/10/2026, confirmado sin cambios).**
+`aws_elasticache_replication_group.this` ya declaraba `transit_encryption_enabled = true`
+(`redis.tf`) y `secrets.tf` ya compone `REDIS_URL` con el esquema `rediss://` -- ya eran
+coherentes entre sí. `redis-client.service.ts` pasa esa URL tal cual a `new IORedis(redisUrl,
+...)`, e ioredis activa TLS automáticamente para el esquema `rediss://` sin configuración
+adicional. No hizo falta ningún cambio de Terraform aquí; se deja constancia porque el pedido de
+fix1 pedía comprobarlo explícitamente, no porque hubiera un defecto.
+
 ### Validación (R3)
 
 Comandos reales, ejecutados el 29 de octubre de 2026 dentro de la distro WSL dedicada
@@ -741,3 +772,30 @@ pathspec de `git grep` son relativos al directorio actual, no a la raíz del rep
 en una ruta que no existe.
 **Regla:** una afirmación del tipo "el repo no tiene X" se emite después de comprobar `pwd` (o con
 `git -C <raíz>`); un cero sin contexto de directorio no es un cero.
+
+**Síntoma (fix1, 30/10/2026):** la tarea `migrate` sale con `exit 1` en el primer intento real de
+aplicar la beta: `no pg_hba.conf entry for host "10.x", user "aos_crm", database "aos_crm_beta",
+no encryption`.
+**Causa:** RDS Postgres 16 fuerza SSL por defecto (`rds.force_ssl`) y el `local.privacy_env` de
+`ecs.tf` no llevaba ningún interruptor de SSL, así que el cliente pg de Twenty se conectaba en
+claro.
+**Fix:** `PG_SSL_ALLOW_SELF_SIGNED=true` en `local.privacy_env` (común a `migrate`/`server`/
+`worker`), que es el único flag que Twenty expone para cifrar hacia Postgres
+(`core.datasource.ts:75`, `raw.datasource.ts:13`, `workspace-data-source.service.ts:152`); no
+verifica la CA de RDS porque Twenty no expone esa opción (`config-variables.ts:1478`).
+**Regla:** `terraform validate` no abre ninguna conexión a RDS ni a Redis -- un stack que valida
+limpio puede seguir fallando en el primer `run-task` real contra un motor que fuerza TLS por
+defecto. Comprobar los flags de seguridad por defecto del motor gestionado (RDS, ElastiCache)
+contra lo que el cliente de la aplicación necesita, no solo contra lo que Terraform acepta.
+
+**Síntoma (fix1, 30/10/2026):** `http://<dominio>/` no responde (ni siquiera con el 301 esperado)
+aunque `aws_lb_listener.http_redirect` existe.
+**Causa:** `aws_security_group.alb` solo tenía una regla de entrada (443/tcp); sin una regla para
+80/tcp el propio security group descarta el paquete antes de que llegue a ningún listener, exista
+o no.
+**Fix:** regla de entrada 80/tcp desde `0.0.0.0/0` en `aws_security_group.alb`
+(`security-groups.tf`), coherente con que ese puerto solo redirige y nunca reenvía a un target
+group.
+**Regla:** un listener de ALB declarado en Terraform no basta para que el tráfico llegue: el
+security group del load balancer necesita su propia regla de entrada para cada puerto que
+cualquiera de sus listeners escuche, redirect-only incluido.
