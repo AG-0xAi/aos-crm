@@ -545,6 +545,21 @@ export const SOCIAL_PREVIEW_META = [
   ['name', 'twitter:image'],
 ];
 
+// index.html is static and cannot import a constant, so the URL is written
+// twice. This reads the one in Brand.ts -- the file whose whole job is to be
+// the single place the brand's own URLs live -- and requires index.html to
+// agree with it, so the pair cannot drift apart silently.
+export function readDeclaredSocialPreviewImage(root = REPO_ROOT) {
+  const source = readFileSync(
+    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
+    'utf8',
+  );
+
+  return /BRAND_SOCIAL_PREVIEW_IMAGE_URL\s*=\s*['"]([^'"]+)['"]/.exec(
+    source,
+  )?.[1];
+}
+
 // A social card is fetched by a crawler on its OWN network, from a page it may
 // have been handed as a bare URL, so a path relative to this deployment is not
 // a URL it can resolve. Absolute https or the card renders blank.
@@ -554,6 +569,11 @@ export function checkSocialPreviewMetadata(root = REPO_ROOT) {
     'utf8',
   );
   const failures = [];
+  const declared = existsSync(
+    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
+  )
+    ? readDeclaredSocialPreviewImage(root)
+    : undefined;
 
   for (const [attribute, name] of SOCIAL_PREVIEW_META) {
     const tag = [...source.matchAll(/<meta\b[^>]*>/g)]
@@ -573,7 +593,20 @@ export function checkSocialPreviewMetadata(root = REPO_ROOT) {
       failures.push(
         `index.html ${name} is ${JSON.stringify(content ?? null)}, which is not an absolute https URL a crawler can fetch`,
       );
+      continue;
     }
+
+    if (declared !== undefined && content !== declared) {
+      failures.push(
+        `index.html ${name} is ${JSON.stringify(content)} but BRAND_SOCIAL_PREVIEW_IMAGE_URL declares ${JSON.stringify(declared)}`,
+      );
+    }
+  }
+
+  if (declared === undefined) {
+    failures.push(
+      'packages/twenty-shared/src/constants/Brand.ts declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL for index.html to agree with',
+    );
   }
 
   return failures;
@@ -889,13 +922,22 @@ function selfTest() {
 
     assert(failures.length === 0, failures.join('; '));
   });
-  record('a RELATIVE social preview image FAILS, and a missing tag too', () => {
+  record('a RELATIVE social preview image FAILS, a missing tag too, and so does drift', () => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-social-'));
 
     try {
       const htmlPath = resolve(sandbox, 'packages/twenty-front/index.html');
+      const brandPath = resolve(
+        sandbox,
+        'packages/twenty-shared/src/constants/Brand.ts',
+      );
 
       mkdirSync(dirname(htmlPath), { recursive: true });
+      mkdirSync(dirname(brandPath), { recursive: true });
+      writeFileSync(
+        brandPath,
+        "export const BRAND_SOCIAL_PREVIEW_IMAGE_URL = 'https://brand.test/icon.png';\n",
+      );
       // What the review found: both cards pointing at a path no crawler can
       // resolve.
       writeFileSync(
@@ -918,6 +960,23 @@ function selfTest() {
       assert(
         missing.every((failure) => /declares no <meta/.test(failure)),
         JSON.stringify(missing),
+      );
+
+      writeFileSync(
+        htmlPath,
+        '<meta property="og:image" content="https://brand.test/icon.png" />\n<meta name="twitter:image" content="https://elsewhere.test/other.png" />\n',
+      );
+      const drifted = checkSocialPreviewMetadata(sandbox);
+
+      assert(drifted.length === 1, JSON.stringify(drifted));
+      assert(/twitter:image/.test(drifted[0]), drifted[0]);
+
+      rmSync(brandPath);
+      assert(
+        checkSocialPreviewMetadata(sandbox).some((failure) =>
+          /declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL/.test(failure),
+        ),
+        'a missing brand constant was not reported',
       );
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
