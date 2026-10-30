@@ -82,9 +82,16 @@ y el servidor le responde `Workspace creation is restricted to admins`; no se cr
 ## 2. Entregarlo: el amigo como administrador de su espacio, sin correo
 
 Este despliegue **no tiene salida de correo**: `EMAIL_DRIVER` se queda en el valor por defecto
-`LOGGER` (`config-variables.ts:531`), de modo que el "correo" de invitación se escribe en el log del
-contenedor `server` y no sale de la máquina (`email/drivers/logger.driver.ts`). Eso es lo que
-convierte el enlace de invitación en un enlace que el operador copia a mano.
+`LOGGER` (`config-variables.ts:531`), de modo que el "correo" de invitación se escribe en un log y no
+sale de la máquina (`email/drivers/logger.driver.ts`). Eso es lo que convierte el enlace de
+invitación en un enlace que el operador copia a mano.
+
+**En el log del `worker`, no del `server`.** `EmailService.send` no envía: encola un `EmailSenderJob`
+(`email/email.service.ts`), y quien lo ejecuta —y por tanto quien imprime el correo entero— es el
+**worker** (`email/email-sender.job.ts`). Medido el 30/10: el log del `server` no contiene ni una
+línea `Sent email to`, y el del `worker` las contiene todas. Y se lee con `--tail`, **no con
+`--since`**: en este host `docker compose logs --since <duración>` devolvió vacío incluso para
+líneas de hace segundos.
 
 1. Dentro del espacio nuevo, el operador va a **Settings → Members**, invita la dirección del amigo
    y le asigna el rol **Admin** en la misma invitación. La mutación es `sendInvitations(emails,
@@ -93,8 +100,8 @@ convierte el enlace de invitación en un enlace que el operador copia a mano.
 2. El operador lee el enlace en el log del servidor:
 
    ```sh
-   docker compose -f deploy/local/compose.yaml -p aos-crm-local logs server --since 10m \
-     | grep -i -A 3 "Join your team on Twenty"
+   docker compose -f deploy/local/compose.yaml -p aos-crm-local logs --no-log-prefix \
+     --tail 4000 worker | grep -o "http[^\"<> ]*/invite/[^\"<> ]*" | tail -1
    ```
 
    El enlace tiene la forma `http://<subdominio>.localhost:43000/invite/<inviteHash>?inviteToken=<token>&email=<correo>`
@@ -134,12 +141,16 @@ decisión de producto (quitarse `canImpersonate` a sí mismo y dejar constancia)
 
 1. El amigo pulsa "Forgot password" en su propia pantalla de acceso, o el operador dispara el enlace
    con la mutación pública `emailPasswordResetLink(email, workspaceId)` (`auth.resolver.ts:1270`).
-2. El operador lee el enlace del log del servidor, igual que la invitación:
+2. El operador lee el enlace del log del **worker**, igual que la invitación (y por la misma razón:
+   el correo lo imprime quien ejecuta el trabajo encolado):
 
    ```sh
-   docker compose -f deploy/local/compose.yaml -p aos-crm-local logs server --since 10m \
-     | grep -i -A 3 "reset"
+   docker compose -f deploy/local/compose.yaml -p aos-crm-local logs --no-log-prefix \
+     --tail 4000 worker | grep -o "http[^\"<> ]*/reset-password/[0-9a-f]\{64\}" | tail -1
    ```
+
+   `tail -1` no es cosmética: el log conserva los enlaces de restablecimientos anteriores, ya
+   revocados, y el que sirve es el último.
 
    El enlace apunta a la URL del espacio del amigo con el token en la ruta
    (`auth/services/reset-password.service.ts:206-213`) y caduca según

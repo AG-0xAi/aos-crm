@@ -41,7 +41,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 
 import {
-  ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, WEB_PORT,
+  ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, PG_DB, WEB_PORT,
   compose, exchangeLoginToken, founderWorkspaceOrigin, graphql, http,
   loginWithOrigin, mcpCall, oneShotRedirectListener, pkcePair, psql,
   unwrapToolResult,
@@ -115,12 +115,17 @@ async function rest(path, { method = 'GET', token, body } = {}) {
   return { status: res.status, raw: res.body };
 }
 
-// The data schema Twenty provisioned for a workspace, read from the workspace
-// row itself and never guessed from a name, so every psql assertion below
-// addresses exactly the workspace under test.
+// The data schema Twenty provisions for a workspace. There is no column for it:
+// the server derives it from the workspace id, base36 of the uuid
+// (workspace-datasource/utils/get-workspace-schema-name.util.ts over
+// twenty-shared/src/utils/uuidToBase36.ts), so the same derivation is done here
+// and then CONFIRMED against pg_namespace -- a ported formula that silently
+// drifted would otherwise make every psql assertion below address a schema that
+// does not exist, and read as "nothing leaked".
 function dataSchemaOf(workspaceId) {
-  const name = psql(`select "schemaName" from core.workspace where id = '${workspaceId}'`);
-  assert.match(name, /^workspace_[a-z0-9]+$/, `workspace ${workspaceId} has no data schema name in core.workspace`);
+  const name = `workspace_${BigInt(`0x${workspaceId.replace(/-/g, '')}`).toString(36)}`;
+  assert.ok(schemaExists(name),
+    `the schema name derived for workspace ${workspaceId} (${name}) does not exist in ${PG_DB}: the derivation no longer matches the server's`);
   return name;
 }
 
@@ -194,7 +199,7 @@ async function createSyntheticWorkspace(side) {
 async function inviteFriendAsAdmin(workspace, email) {
   const invited = await graphql(
     METADATA,
-    'mutation($emails: [String!]!, $roleId: String) { sendInvitations(emails: $emails, roleId: $roleId) { success result { id email } errors } }',
+    'mutation($emails: [String!]!, $roleId: UUID) { sendInvitations(emails: $emails, roleId: $roleId) { success result { id email } errors } }',
     { emails: [email], roleId: workspace.adminRoleId },
     workspace.operatorToken,
   );
@@ -272,7 +277,7 @@ async function objectMetadata(token, nameSingular) {
 async function uploadWorkspaceLogo(token) {
   const boundary = `----aos-crm-${randomUUID()}`;
   const operations = JSON.stringify({
-    query: 'mutation($file: Upload!) { uploadWorkspaceLogo(file: $file) { id path size } }',
+    query: 'mutation($file: Upload!) { uploadWorkspaceLogo(file: $file) { id path size url } }',
     variables: { file: null },
   });
   const body = Buffer.concat([
@@ -298,7 +303,10 @@ async function uploadWorkspaceLogo(token) {
 }
 
 async function destroySyntheticWorkspace(workspace) {
-  const deleted = await graphql(METADATA, 'mutation { deleteCurrentWorkspace { id deletedAt } }', {}, workspace.operatorToken);
+  // `deleteToken` is set when the operator has already left this workspace, in
+  // which case the deletion is asked for by its own admin -- which is the
+  // runbook's "a friend asks for their workspace to be deleted".
+  const deleted = await graphql(METADATA, 'mutation { deleteCurrentWorkspace { id deletedAt } }', {}, workspace.deleteToken ?? workspace.operatorToken);
   if (deleted.errors && !/not found|suspended|deleted/i.test(gqlErrors(deleted))) {
     throw new Error(`deleteCurrentWorkspace(${workspace.side}) failed: ${gqlErrors(deleted)}`);
   }
@@ -520,22 +528,56 @@ test("A cannot read or change B's object metadata, and B can", async () => {
   assert.equal(reverted.errors, undefined, `B could not restore its own object icon: ${gqlErrors(reverted)}`);
 });
 
-test("A cannot fetch a file of B by id, and B can", async () => {
+test("a file of B is reachable only through B's own signed URL, and no credential of A opens it", async () => {
   const uploaded = await uploadWorkspaceLogo(workspaces.B.apiKeyToken);
   assert.equal(uploaded.status, 200, `the logo upload answered ${uploaded.status}: ${uploaded.raw.slice(0, 300)}`);
   const file = uploaded.body?.data?.uploadWorkspaceLogo;
-  assert.ok(file?.id, `the logo upload returned no file: ${uploaded.raw.slice(0, 300)}`);
-  // 'core-picture/<workspaceId>/...' -> 'core-picture'
+  assert.ok(file?.id && file?.url, `the logo upload returned no file with a signed URL: ${uploaded.raw.slice(0, 300)}`);
+  // The folder prefix of the stored path ('core-picture/<name>.png' ->
+  // 'core-picture'), which is what the by-id route matches on
+  // (file.service.ts getFilePresignedUrlOrStreamById: path LIKE '<folder>/%').
+  // `/file/...` is singular: ApiPath.File is 'file' and ApiPath.Files is a
+  // different route family, which answers 404 to everybody and would have
+  // looked exactly like isolation.
   const folder = String(file.path).replace(/^\/+/, '').split('/')[0];
+  const signed = new URL(file.url);
+  const unsignedPath = `/file/${folder}/${file.id}`;
 
-  const own = await http(`/files/${folder}/${file.id}`, { headers: { authorization: `Bearer ${workspaces.B.apiKeyToken}` } });
-  assert.equal(own.status, 200, `B's own key could not fetch its own file (${own.status}), so the refusal below would prove nothing`);
+  // Positive control: B's own signed URL serves the bytes. The transport still
+  // dials the published loopback port; only the path and query come from the
+  // URL the server minted.
+  const own = await http(`${signed.pathname}${signed.search}`);
+  assert.equal(own.status, 200, `B's own signed URL did not serve its own file (${own.status}), so the refusals below would prove nothing`);
 
-  const foreign = await http(`/files/${folder}/${file.id}`, { headers: { authorization: `Bearer ${workspaces.A.apiKeyToken}` } });
-  assert.ok(isRefusedStatus(foreign.status), `A's key fetched B's file with ${foreign.status}`);
+  // MEASURED, and not what a reader would assume: this route authorizes ONLY
+  // by that signature (file-by-id.guard.ts reads request.query.token, takes the
+  // workspace from the JWT payload and never looks at a bearer credential), so
+  // an API key of the OWNING workspace is refused too. The isolation claim is
+  // therefore sharper than "A is refused": no credential of any workspace
+  // reaches a file by id, and the signature itself is bound to one workspace
+  // AND one file id.
+  for (const [name, headers] of [
+    ["A's Admin API key", { authorization: `Bearer ${workspaces.A.apiKeyToken}` }],
+    ["A's operator session", { authorization: `Bearer ${workspaces.A.operatorToken}` }],
+    ["B's own Admin API key", { authorization: `Bearer ${workspaces.B.apiKeyToken}` }],
+    ['no credential at all', {}],
+  ]) {
+    const res = await http(unsignedPath, { headers });
+    assert.ok(isRefusedStatus(res.status), `${name} fetched B's file without the signature, with ${res.status}`);
+  }
 
-  const anonymous = await http(`/files/${folder}/${file.id}`);
-  assert.ok(isRefusedStatus(anonymous.status), `an anonymous caller fetched B's file with ${anonymous.status}`);
+  // The signature does not travel to another file: same token, different id.
+  const otherId = randomUUID();
+  const swapped = await http(`/file/${folder}/${otherId}${signed.search}`);
+  assert.ok(isRefusedStatus(swapped.status),
+    `B's file token served a different file id with ${swapped.status}`);
+
+  // And the row itself belongs to B in the database: nothing of this file is
+  // addressable inside A's workspace.
+  assert.equal(psql(`select count(*) from core.file where id = '${file.id}' and "workspaceId" = '${workspaces.A.id}'`), '0',
+    "B's file row is attributed to A's workspace");
+  assert.equal(psql(`select count(*) from core.file where id = '${file.id}' and "workspaceId" = '${workspaces.B.id}'`), '1',
+    "B's file row is not attributed to B's workspace");
 });
 
 test("A's API key sees only A through MCP: not B's record by id, not by name, and no write to B", async () => {
@@ -716,6 +758,124 @@ test('a user who is not a server admin cannot open a workspace (R2)', async () =
   assert.ok(stranger.errors, 'a public sign-up without an invitation succeeded on the beta profile');
   assert.equal((stranger.data?.signUp ?? null) !== null, false,
     'the refused sign-up still returned a payload (not printed: it would carry tokens)');
+});
+
+test('the rest of the operator procedure runs for the synthetic friend: the operator leaves B, and a password reset travels without email (R2)', async () => {
+  // 1. The operator leaves the workspace they handed over. Their own member row
+  //    in B is what they delete (user.resolver.ts deleteUserFromWorkspace); the
+  //    friend stays as B's admin, which is why the teardown can still delete it.
+  const member = await graphql(
+    CORE,
+    'query($userId: UUID!) { workspaceMembers(filter: { userId: { eq: $userId } }) { edges { node { id userId } } } }',
+    { userId: psql(`select id from core."user" where email = '${ADMIN_EMAIL}'`) },
+    workspaces.B.operatorToken,
+  );
+  assert.equal(member.errors, undefined, `the operator could not find their own member row in B: ${gqlErrors(member)}`);
+  const memberId = member.data.workspaceMembers.edges[0]?.node?.id;
+  assert.ok(memberId, "the operator has no workspace member row in B, so there is nothing to leave");
+
+  const left = await graphql(
+    METADATA,
+    'mutation($id: String!) { deleteUserFromWorkspace(workspaceMemberIdToDelete: $id) { id } }',
+    { id: memberId },
+    workspaces.B.operatorToken,
+  );
+  assert.equal(left.errors, undefined, `the operator could not leave B: ${gqlErrors(left)}`);
+  workspaces.B.deleteToken = workspaces.B.friend.token;
+
+  assert.equal(
+    psql(`select count(*) from core."userWorkspace" where "workspaceId" = '${workspaces.B.id}' and "userId" = (select id from core."user" where email = '${ADMIN_EMAIL}')`),
+    '0',
+    "the operator still belongs to B after leaving it",
+  );
+  // And the operator can no longer sign in there.
+  let refusedAtB = false;
+  try {
+    await loginWithOrigin(ADMIN_EMAIL, ADMIN_PASSWORD, workspaces.B.origin);
+  } catch {
+    refusedAtB = true;
+  }
+  assert.equal(refusedAtB, true, "the operator could still sign in at B after leaving it");
+
+  // 2. The password reset, by the only route this deployment has: the link is
+  //    written to the server's own log (EMAIL_DRIVER=LOGGER) and the database
+  //    keeps only a sha256 of the token, so the log is where the operator reads
+  //    it -- which is exactly what the runbook tells them to do.
+  const asked = await graphql(
+    METADATA,
+    'mutation($email: String!, $workspaceId: UUID) { emailPasswordResetLink(email: $email, workspaceId: $workspaceId) { success } }',
+    { email: FRIEND_EMAIL, workspaceId: workspaces.B.id },
+  );
+  assert.equal(asked.errors, undefined, `the reset link could not be requested: ${gqlErrors(asked)}`);
+  assert.equal(asked.data.emailPasswordResetLink.success, true, 'emailPasswordResetLink reported no success');
+
+  // The mutation answers before the link is generated (it fires the work and
+  // returns), so the stored token is polled first.
+  const tokenDeadline = Date.now() + 60_000;
+  let stored = '0';
+  while (Date.now() < tokenDeadline) {
+    stored = psql(
+      `select count(*) from core."appToken" where type = 'PASSWORD_RESET_TOKEN' and "revokedAt" is null and "userId" = (select id from core."user" where email = '${FRIEND_EMAIL}')`,
+    );
+    if (stored !== '0') break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  assert.equal(stored, '1', 'no live password reset token was stored for the friend');
+
+  // The plaintext token exists ONLY in that log line: the database keeps a
+  // sha256 of it (reset-password.service.ts rotatePasswordResetToken), and the
+  // API never returns it. It is the WORKER's log and not the server's --
+  // EmailService.send enqueues an EmailSenderJob and the worker is what runs
+  // the LOGGER driver -- which is the single most important detail of this step
+  // for whoever follows the runbook. Read with --tail and not --since:
+  // `docker compose logs --since <duration>` came back empty on this host even
+  // for lines seconds old, which would read as "the mail never went out".
+  // Extracted, never printed: the assertions below carry length and booleans.
+  let resetToken = null;
+  const logDeadline = Date.now() + 60_000;
+  while (Date.now() < logDeadline && resetToken === null) {
+    const logs = compose(['logs', '--no-log-prefix', '--tail', '4000', 'worker']);
+    const matches = [...(logs.stdout || '').matchAll(/\/reset-password\/([0-9a-f]{64})/g)];
+    // The LAST one in the log: older runs leave their own (already revoked)
+    // links behind, and the one that matters is the newest. Which run it
+    // belongs to is then PROVEN by the address the server validates it for.
+    if (matches.length > 0) resetToken = matches[matches.length - 1][1];
+    else await new Promise((r) => setTimeout(r, 2000));
+  }
+  assert.ok(resetToken, "the reset link never appeared in the worker log, so the operator has no way to deliver it");
+  assert.equal(resetToken.length, 64, 'the reset token in the log is not the shape this flow mints');
+
+  const valid = await graphql(
+    METADATA,
+    'query($token: String!) { validatePasswordResetToken(passwordResetToken: $token) { id email } }',
+    { token: resetToken },
+  );
+  assert.equal(valid.errors, undefined, `the reset token from the log did not validate: ${gqlErrors(valid)}`);
+  // This is what ties the token to THIS run: the address carries the run id.
+  assert.equal(valid.data.validatePasswordResetToken.email, FRIEND_EMAIL);
+
+  const newPassword = randomBytes(36).toString('base64url');
+  const changed = await graphql(
+    METADATA,
+    'mutation($token: String!, $password: String!) { updatePasswordViaResetToken(passwordResetToken: $token, newPassword: $password) { success } }',
+    { token: resetToken, password: newPassword },
+  );
+  assert.equal(changed.errors, undefined, `the password could not be changed with the reset token: ${gqlErrors(changed)}`);
+  assert.equal(changed.data.updatePasswordViaResetToken.success, true);
+
+  // The friend signs in with the new password, at their own workspace's origin.
+  const reauthenticated = await loginWithOrigin(FRIEND_EMAIL, newPassword, workspaces.B.origin);
+  assert.ok(reauthenticated.length > 0, 'the friend could not sign in with the new password');
+  workspaces.B.friend.token = reauthenticated;
+  workspaces.B.deleteToken = reauthenticated;
+
+  // And the token cannot be used twice.
+  const replayed = await graphql(
+    METADATA,
+    'mutation($token: String!, $password: String!) { updatePasswordViaResetToken(passwordResetToken: $token, newPassword: $password) { success } }',
+    { token: resetToken, password: randomBytes(36).toString('base64url') },
+  );
+  assert.ok(replayed.errors, 'the password reset token was accepted a second time');
 });
 
 test("the founder's own workspace and its records were never touched by this run", () => {
