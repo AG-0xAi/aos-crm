@@ -1,4 +1,10 @@
 import { type OpenAPIV3_1 } from 'openapi-types';
+import {
+  BRAND_DOMAIN,
+  BRAND_LICENSE_NAME,
+  BRAND_NAME,
+  BRAND_SOURCE_CODE_URL,
+} from 'twenty-shared/constants';
 import { ApiPath } from 'twenty-shared/types';
 
 import { computeOpenApiPath } from 'src/engine/core-modules/open-api/utils/path.utils';
@@ -12,7 +18,7 @@ export const baseSchema = (
   return {
     openapi: '3.1.1',
     info: {
-      title: 'Twenty Api',
+      title: `${BRAND_NAME} API`,
       description: `Use this page to explore and call the **REST API**.
 
 ## Authentication
@@ -106,7 +112,7 @@ order_by=id[AscNullsFirst],createdAt[DescNullsLast]
 ## Usage with LLMs
 
 The recommended way to give an LLM agent (Claude Desktop, Cursor, Windsurf, …)
-access to your workspace is the **Twenty MCP server**, not this OpenAPI schema.
+access to your workspace is the **Betty MCP server**, not this OpenAPI schema.
 The MCP server exposes typed tools the agent can call directly with proper
 header-based auth (OAuth or API key), no tokens in URLs.
 
@@ -122,17 +128,17 @@ hand the file to your tool — never paste a tokenized URL into a chat:
 
 \`\`\`bash
 curl -H 'Authorization: Bearer <token>' \\
-  ${serverUrl}/${ApiPath.Rest}/open-api/${schemaName} > twenty-${schemaName}.json
+  ${serverUrl}/${ApiPath.Rest}/open-api/${schemaName} > betty-${schemaName}.json
 \`\`\`
 `,
       termsOfService:
-        'https://github.com/twentyhq/twenty?tab=coc-ov-file#readme',
+        BRAND_SOURCE_CODE_URL,
       contact: {
-        email: 'felix@twenty.com',
+        email: `hola@${BRAND_DOMAIN}`,
       },
       license: {
-        name: 'AGPL-3.0',
-        url: 'https://github.com/twentyhq/twenty?tab=License-1-ov-file#readme',
+        name: BRAND_LICENSE_NAME,
+        url: `${BRAND_SOURCE_CODE_URL}?tab=License-1-ov-file#readme`,
       },
       version: API_Version,
     },
@@ -159,8 +165,8 @@ curl -H 'Authorization: Bearer <token>' \\
       },
     ],
     externalDocs: {
-      description: 'Find out more about **Twenty**',
-      url: 'https://twenty.com',
+      description: `Find out more about **${BRAND_NAME}**`,
+      url: `https://${BRAND_DOMAIN}`,
     },
     paths: { [`/open-api/${schemaName}`]: computeOpenApiPath(serverUrl) },
   };

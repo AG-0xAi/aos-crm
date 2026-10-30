@@ -4,35 +4,35 @@ import { buildMcpServerCard } from 'src/engine/core-modules/well-known/utils/bui
 describe('buildMcpServerCard', () => {
   it('advertises the streamable-http endpoint on the given host', () => {
     const card = buildMcpServerCard({
-      baseUrl: 'https://mycompany.twenty.com',
+      baseUrl: 'https://mycompany.betty.management',
       version: '1.2.3',
     });
 
     expect(card.remotes).toHaveLength(1);
     expect(card.remotes[0]).toMatchObject({
       type: 'streamable-http',
-      url: 'https://mycompany.twenty.com/mcp',
+      url: 'https://mycompany.betty.management/mcp',
       supportedProtocolVersions: [MCP_PROTOCOL_VERSION],
     });
   });
 
   it('carries the registry schema, stable identity and passed version', () => {
     const card = buildMcpServerCard({
-      baseUrl: 'https://api.twenty.com',
+      baseUrl: 'https://api.betty.management',
       version: '0.42.0',
     });
 
     expect(card.$schema).toBe(
       'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json',
     );
-    expect(card.name).toBe('com.twenty/twenty');
+    expect(card.name).toBe('management.betty/betty');
     expect(card.version).toBe('0.42.0');
     expect(card.repository.source).toBe('github');
   });
 
   it('marks the Authorization header optional and secret (OAuth or API key)', () => {
     const card = buildMcpServerCard({
-      baseUrl: 'https://mycompany.twenty.com',
+      baseUrl: 'https://mycompany.betty.management',
       version: '1.0.0',
     });
 

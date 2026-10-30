@@ -1,6 +1,7 @@
 import { type NavigationMenuItemAddStep } from '@/navigation-menu-item/edit/types/NavigationMenuItemAddStep';
 import { useQuery } from '@apollo/client/react';
 import { useLingui } from '@lingui/react/macro';
+import { BRAND_DOMAIN } from 'twenty-shared/constants';
 import { NavigationMenuItemType } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 import { TintedIconTile } from 'twenty-ui/components/data-display';
@@ -172,7 +173,7 @@ export const useNavigationMenuItemAddOptions = ({
             addItem({
               type: NavigationMenuItemType.LINK,
               name: 'Twenty',
-              link: 'https://twenty.com',
+              link: `https://${BRAND_DOMAIN}`,
               color: DEFAULT_NAVIGATION_MENU_ITEM_COLOR_LINK,
             });
           },

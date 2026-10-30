@@ -129,23 +129,7 @@ const createWelcomeRichText = ({
             content: [
               {
                 type: TIPTAP_NODE_TYPES.TEXT,
-                text: 'If you have any issues, you can check ',
-              },
-              {
-                type: TIPTAP_NODE_TYPES.TEXT,
-                text: 'our documentation',
-                marks: [
-                  {
-                    type: TIPTAP_MARK_TYPES.LINK,
-                    attrs: {
-                      href: 'https://docs.twenty.com/getting-started/introduction',
-                    },
-                  },
-                ],
-              },
-              {
-                type: TIPTAP_NODE_TYPES.TEXT,
-                text: ' or contact us through the Support section in Settings.',
+                text: 'If you have any issues, you can reach us through the Support section in Settings.',
               },
             ],
           },

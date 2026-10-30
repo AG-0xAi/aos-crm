@@ -25,7 +25,10 @@ import { useLingui } from '@lingui/react/macro';
 import { isNonEmptyString } from '@sniptt/guards';
 import { useEffect, useState } from 'react';
 import { FieldMetadataType } from 'twenty-shared/types';
+import { DOCUMENTATION_PATHS } from 'twenty-shared/constants';
 import { isDefined } from 'twenty-shared/utils';
+
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { Callout } from 'twenty-ui/components/feedback';
 import { LightIconButton } from 'twenty-ui/components/input';
 import {
@@ -176,6 +179,9 @@ export const WorkflowEditActionFormBuilder = ({
   );
 
   const [isCalloutVisible, setIsCalloutVisible] = useState<boolean>(true);
+  const formActionDocumentationUrl = useHelpCenterUrl(
+    DOCUMENTATION_PATHS.USER_GUIDE_WORKFLOWS_CAPABILITIES_WORKFLOW_ACTIONS,
+  );
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [hoveredField, setHoveredField] = useState<string | null>(null);
   const isAiChatInboxEnabled = useIsFeatureEnabled(
@@ -288,14 +294,14 @@ export const WorkflowEditActionFormBuilder = ({
               closeLabel={t`Close`}
               onDismiss={() => setIsCalloutVisible(false)}
               action={
-                <Callout.Action
-                  type="button"
-                  onClick={() =>
-                    openUrlInNewTab(
-                      'https://docs.twenty.com/user-guide/workflows/capabilities/workflow-actions#form',
-                    )
-                  }
-                >{t`Learn more`}</Callout.Action>
+                isDefined(formActionDocumentationUrl) ? (
+                  <Callout.Action
+                    type="button"
+                    onClick={() =>
+                      openUrlInNewTab(formActionDocumentationUrl)
+                    }
+                  >{t`Learn more`}</Callout.Action>
+                ) : undefined
               }
             />
           </StyledCalloutContainer>
