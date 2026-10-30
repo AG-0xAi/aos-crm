@@ -391,6 +391,44 @@ variable "email_from_local_part" {
   default     = "no-reply"
 }
 
+variable "outbound_email_enabled" {
+  description = <<-EOT
+    Whether the server and the worker really send mail through SES
+    (EMAIL_DRIVER=SMTP, ecs.tf) or only write every message to their own log
+    (EMAIL_DRIVER=LOGGER, which is Twenty's own default,
+    config-variables.ts:531). False by default because that is what the beta
+    runs today and because SES is still in the sandbox, where a message to an
+    address nobody verified one by one is refused rather than delivered
+    (CRM-017). Everything SES needs exists either way -- identity, DKIM,
+    MAIL FROM, the SMTP user and its secrets (ses.tf) -- so this is a tfvars
+    change, not an apply of new infrastructure, and it is stage 2 of
+    BETA_RUNBOOK.md §8.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "email_verification_required" {
+  description = <<-EOT
+    Whether a user must have a verified email address to sign in
+    (IS_EMAIL_VERIFICATION_REQUIRED, ecs.tf). False by default, which is both
+    what the beta runs today and upstream's own default
+    (config-variables.ts:100): checkIsEmailVerified (auth.service.ts:260-266,
+    called from :186, :225 and auth.resolver.ts:1021) refuses the sign-in of
+    every user whose isEmailVerified is still false, and every account this
+    beta has was created by hand without email. Turning it on before those
+    rows are verified locks the founder and his friends out of their own
+    workspaces. Stage 3 of BETA_RUNBOOK.md §8.
+  EOT
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.email_verification_required || var.outbound_email_enabled
+    error_message = "email_verification_required = true needs outbound_email_enabled = true: with EMAIL_DRIVER=LOGGER the verification link only ever reaches the server log, so requiring verification would lock out every user who cannot read that log."
+  }
+}
+
 variable "apex_mailbox_mx_records" {
   description = <<-EOT
     Optional MX records for an external mailbox provider receiving mail at
@@ -414,4 +452,58 @@ variable "apex_mailbox_spf_value" {
   EOT
   type        = string
   default     = ""
+}
+
+variable "apex_mailbox_cname_records" {
+  description = <<-EOT
+    Optional CNAME records the same external mailbox provider asks for under
+    var.domain_name: its own DKIM keys, plus autodiscover/autoconfig when it
+    publishes them. A map of record name to target host, where the name is
+    relative to var.domain_name, lowercase and with no trailing dot --
+    { "provider-key-a._domainkey" = "provider-key-a.dkim.example.net" }.
+    Empty (default) creates no record at all. No real value ships here: the
+    names and the targets are the founder's provider's and this fork is
+    public (terraform.tfvars.example shows the shape).
+
+    A CNAME cannot coexist with a record of another type at the same name,
+    so a name that lands on one of this stack's own records does not merge
+    with it -- it breaks it. The second validation below refuses exactly
+    those names:
+      - 32 lowercase alphanumerics followed by "._domainkey": the shape of
+        SES's Easy DKIM record names (aws_route53_record.ses_dkim, ses.tf).
+        A provider's own DKIM name is a word, so "provider-key-a._domainkey"
+        passes and only a name shaped like an SES token is refused.
+      - "mail": SES's custom MAIL FROM domain, which already holds an MX and
+        a TXT record (ses.tf).
+      - "_dmarc": the DMARC policy record (ses.tf).
+      - "api", "app" and "www": the hosts this stack itself serves (ecs.tf,
+        alb-acm.tf and var.www_cname_target).
+  EOT
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for name in keys(var.apex_mailbox_cname_records) :
+      can(regex("^[a-z0-9_]([a-z0-9._-]*[a-z0-9])?$", name)) && !endswith(name, var.domain_name)
+    ])
+    error_message = "apex_mailbox_cname_records keys are record names relative to domain_name: lowercase, no trailing dot, and without domain_name itself appended (Terraform adds it)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name in keys(var.apex_mailbox_cname_records) :
+      !contains(["mail", "_dmarc", "api", "app", "www"], lower(name)) &&
+      !can(regex("^[a-z0-9]{32}\\._domainkey$", lower(name)))
+    ])
+    error_message = "apex_mailbox_cname_records would overwrite a record this stack manages: mail (SES MAIL FROM), _dmarc (DMARC policy), a name shaped like an SES Easy DKIM token, or api/app/www (the CRM's own hosts)."
+  }
+
+  validation {
+    condition = alltrue([
+      for target in values(var.apex_mailbox_cname_records) :
+      can(regex("^[a-z0-9.-]+$", target))
+    ])
+    error_message = "apex_mailbox_cname_records values must be hostnames, not URLs."
+  }
 }

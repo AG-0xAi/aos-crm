@@ -90,7 +90,8 @@ y el servidor le responde `Workspace creation is restricted to admins`; no se cr
 Este despliegue **no tiene salida de correo**: `EMAIL_DRIVER` se queda en el valor por defecto
 `LOGGER` (`config-variables.ts:531`), de modo que el "correo" de invitación se escribe en un log y no
 sale de la máquina (`email/drivers/logger.driver.ts`). Eso es lo que convierte el enlace de
-invitación en un enlace que el operador copia a mano.
+invitación en un enlace que el operador copia a mano. Es la etapa 1 de §8, y mientras siga ahí este
+procedimiento es el único que funciona.
 
 **En el log del `worker`, no del `server`.** `EmailService.send` no envía: encola un `EmailSenderJob`
 (`email/email.service.ts`), y quien lo ejecuta —y por tanto quien imprime el correo entero— es el
@@ -376,13 +377,93 @@ hay interruptor de configuración que lo quite: la lista solo se puede ampliar
 o se acepta (la landing es suya y controla qué scripts carga), o hace falta un cambio de código en
 ese fichero, que está fuera de lo que CRM-018 tocó.
 
-## 8. Lo que este runbook no cubre
+## 8. El correo: tres etapas, y el buzón del dominio
+
+Mandar y recibir son dos cosas distintas, las hace cada una un proveedor distinto, y se encienden
+por separado:
+
+- **Mandar** (invitaciones, restablecimientos, avisos) lo hace Amazon SES, que CRM-017 ya montó en
+  AWS: el dominio dado de alta, sus firmas DKIM, el remitente y un usuario con permiso para enviar y
+  nada más. Está montado pero **apagado**, a propósito.
+- **Recibir** (el buzón donde el founder lee lo que le escriben) lo hace un proveedor de correo
+  externo contratado con el dominio. SES no recibe nada.
+
+### Las tres etapas de mandar correo
+
+Cada etapa es **una línea en `terraform.tfvars` y un apply**, nunca un cambio de código ni una
+imagen nueva:
+
+| Etapa | Qué se pone en `terraform.tfvars` | Qué cambia para la gente |
+| --- | --- | --- |
+| **1. Hoy** | nada: los valores por defecto | El correo **se escribe en el log del worker** y no sale a internet, que es de lo que vive el procedimiento a mano de §2 y §4. Para entrar no hace falta tener la dirección verificada. |
+| **2. Correo de verdad** | `outbound_email_enabled = true` | Invitaciones y restablecimientos salen por SES desde el remitente del dominio, y el operador deja de copiar enlaces del log. Entrar sigue sin exigir verificación. |
+| **3. Verificación obligatoria** | y además `email_verification_required = true` | Quien no tenga su dirección verificada no puede entrar. Es el control que cierra el agujero del aviso de §2 («una invitación pendiente es una credencial»). |
+
+**La etapa 1 es la que está aplicada y la que describe el resto de este runbook.** Las etapas 2 y 3
+son decisiones del founder, y cada una tiene una condición que no depende de nosotros.
+
+### Qué hay que esperar para la etapa 2
+
+AWS tiene la cuenta de SES en el **sandbox**: en ese modo SES solo entrega a direcciones que alguien
+haya dado de alta y confirmado **una a una** en la consola de AWS. Invitar a un amigo desde el CRM
+con SES en sandbox no da un error visible en la aplicación: el correo simplemente no llega. Por eso
+la etapa 2 espera a que AWS saque la cuenta del sandbox (hay una solicitud abierta; la primera fue
+denegada). Mientras eso no pase, encenderla empeora las cosas respecto a la etapa 1, donde al menos
+el enlace está en el log y el operador lo puede pasar.
+
+### Qué hay que hacer antes de la etapa 3, y por qué en este orden
+
+En cada entrada, el servidor comprueba que la dirección del usuario esté marcada como verificada en
+la base de datos (`checkIsEmailVerified`, `auth.service.ts:260-266`). **Todas las cuentas que existen
+hoy se crearon a mano, sin correo, así que ninguna lo está.** Encender la etapa 3 antes de arreglar
+eso echa fuera de su propio espacio a todo el mundo, el operador incluido. El orden es:
+
+1. Etapa 2 encendida y probada: un correo de verdad que llega. Sin eso, el enlace de verificación no
+   tiene a dónde ir, y de eso se ocupa Terraform, que **se niega a aplicar la etapa 3 sin la 2** y lo
+   dice con ese motivo en el mensaje de error.
+2. Mirar en la base de datos quién no está verificado y marcarlo (`select email, "isEmailVerified"
+   from core."user";`). Cuando no quede ninguno en `false`, la etapa 3 es segura.
+
+### Volver atrás
+
+Quitar la línea de `terraform.tfvars` y aplicar. ECS vuelve a desplegar el servicio y el worker con
+el valor anterior; no hay que reconstruir ninguna imagen ni tocar la base de datos. De la etapa 3 se
+vuelve en minutos; de la etapa 2, los correos ya enviados ya están enviados.
+
+### Conectar el buzón del dominio
+
+El proveedor del buzón da tres cosas en su pantalla de configuración, y cada una tiene su variable:
+
+| Lo que da el proveedor | Variable de `terraform.tfvars` |
+| --- | --- |
+| Los servidores de correo entrante (registros MX de la raíz) | `apex_mailbox_mx_records` |
+| La línea SPF de la raíz | `apex_mailbox_spf_value` |
+| Sus CNAME: las firmas DKIM del proveedor y, si los publica, `autodiscover` / `autoconfig` | `apex_mailbox_cname_records` |
+
+El formato exacto, con valores de ejemplo, está en `deploy/aws/terraform.tfvars.example`. Los
+nombres del mapa van **sin el dominio**: Terraform se lo añade.
+
+Dos cosas que conviene saber antes de rellenarlo:
+
+- **Un CNAME no convive con otro registro del mismo nombre: lo sustituye.** Por eso Terraform
+  **rechaza** un CNAME en `mail` (el remitente de SES), en `_dmarc`, en un nombre con la forma de
+  las firmas DKIM que crea SES, y en `api`, `app` y `www` (los hosts del propio CRM). Si se intenta,
+  el apply se para y el mensaje dice qué registro se habría roto. Las firmas DKIM del proveedor del
+  buzón sí entran: tienen nombre de palabra, no de clave generada.
+- **El DMARC ya existe.** CRM-017 dejó `_dmarc` en modo de solo observar (`p=none`). Si el proveedor
+  del buzón pide añadir el suyo, no se añade: ya hay uno, y dos se pisan.
+
+Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
+en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
+
+## 9. Lo que este runbook no cubre
 
 - **El panel de administración del servidor** (`/settings/admin-panel`) da al operador búsqueda de
   usuarios, impersonación y variables de configuración. No forma parte de este procedimiento y no se
   ha ejercitado en CRM-014.
 - **SSO, facturación y permisos por fila** son Enterprise y esta beta no los usa.
-- **Correo saliente**: no hay. Invitaciones y restablecimientos pasan por el log del servidor y por la
-  mano del operador, que es la decisión registrada en el plan de AWS (CRM-013 R3).
+- **Correo saliente**: montado en AWS y apagado. Hoy las invitaciones y los restablecimientos siguen
+  pasando por el log del worker y por la mano del operador; encenderlo es una decisión del founder en
+  dos pasos, y está en §8 con sus condiciones.
 - **Copias de seguridad** del volumen de PostgreSQL: fuera de este track. Antes de que los amigos
   metan datos de verdad, es la siguiente pregunta que hay que resolver.

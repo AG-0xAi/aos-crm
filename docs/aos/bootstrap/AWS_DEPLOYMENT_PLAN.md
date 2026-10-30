@@ -535,11 +535,12 @@ el operador tiene que asumir, no descubrir:
   logs tiene 30 días de retención por defecto (`var.log_retention_days`); tratar el acceso de
   lectura a CloudWatch como acceso a cuentas de la beta.
 
-**Superado por CRM-017 (30/10/2026):** el founder pidió que las invitaciones llegaran al correo;
-`EMAIL_DRIVER` pasa de `LOGGER` a `SMTP` sobre Amazon SES. Ver la sección CRM-017 al final de este
-documento para el dominio de envío, las credenciales SMTP y el procedimiento de salida del sandbox
-de SES. Este bloque queda como historial de la decisión original del 29/10, no como el estado
-actual.
+**Preparado para superarse, pero todavía vigente (CRM-017 + CRM-018 fix1, 30/10/2026):** el founder
+pidió que las invitaciones llegaran al correo, y CRM-017 montó SES para eso (ver su sección más
+abajo: dominio de envío, credenciales SMTP y salida del sandbox). Pero el interruptor está **apagado
+por defecto** (`var.outbound_email_enabled = false`, «CRM-018 fix1» al final), que es lo que está
+desplegado: **este bloque sigue describiendo el estado actual**, y deja de describirlo el día que el
+founder encienda la etapa 2.
 
 ### R4 — Validación (sin credenciales) y procedimiento del coordinador
 
@@ -729,9 +730,10 @@ final y a conciencia.
   (`sign-in-up.service.ts:534-552`, `.../auth/constants/max-workspaces-without-organization-key.constant.ts:1`).
   Es decir: el operador más **cuatro** amigos. Un quinto amigo exige decisión de licencia del
   founder, no un cambio de Terraform.
-- **Correo saliente ya no pasa por el operador** (CRM-017, 30/10/2026): invitaciones y
-  restablecimientos llegan por SES/SMTP. El límite real pasa a ser el sandbox de SES (ver esa
-  sección) hasta que se pida la salida a producción.
+- **Correo saliente: montado y apagado** (CRM-017 + fix1, 30/10/2026). SES está creado, pero
+  `var.outbound_email_enabled` es `false` por defecto, así que invitaciones y restablecimientos
+  **siguen pasando por el operador**. Encenderlo espera a que SES salga del sandbox; exigir
+  verificación de correo espera además a que los usuarios actuales estén verificados.
 - **El arranque del servidor en ECS sigue sin medirse**: `alb_health_check_grace_period_seconds`
   (300 s) sigue siendo una cifra conservadora, no una medición, igual que en CRM-011. Medirlo en el
   primer arranque real.
@@ -869,6 +871,10 @@ la política que ya deja leer los otros tres secretos al rol de ejecución.
 | `EMAIL_FROM_ADDRESS` | `<var.email_from_local_part>@<dominio>` (por defecto `no-reply@<dominio>`) |
 | `EMAIL_FROM_NAME` | `Betty` |
 
+> **Corregido después, antes de aplicar nada:** `EMAIL_DRIVER` no se quedó fijo en `SMTP`. Depende de
+> `var.outbound_email_enabled`, que por defecto es `false` y deja `LOGGER`, el valor que está
+> desplegado. Ver «CRM-018 fix1» al final de este documento.
+
 Las cuatro primeras existen en `config-variables.ts:515-579`; `EMAIL_FROM_NAME` también, en ese
 mismo rango (valor por defecto de upstream `"Felix from Twenty"`).
 
@@ -876,7 +882,14 @@ mismo rango (valor por defecto de upstream `"Felix from Twenty"`).
 
 `local.privacy_env` añade `IS_EMAIL_VERIFICATION_REQUIRED = "true"` (`config-variables.ts:100`,
 `false` por defecto en upstream) -- tiene sentido ahora que existe un remitente verificado de
-verdad, no antes. También `MAX_WORKSPACES = "0"`: ese contrato ("vacío o 0 = sin límite") es de
+verdad, no antes.
+
+> **Corregido después, antes de aplicar nada:** tampoco se quedó fijo en `"true"`. Depende de
+> `var.email_verification_required`, `false` por defecto, y Terraform rechaza ponerla en `true` sin
+> el correo activo. Encenderla con los usuarios actuales sin verificar les niega la entrada
+> (`checkIsEmailVerified`). Ver «CRM-018 fix1» al final de este documento.
+
+También `MAX_WORKSPACES = "0"`: ese contrato ("vacío o 0 = sin límite") es de
 CRM-015, en paralelo a este track y todavía sin aterrizar en `packages/twenty-server` en el momento
 de escribir esto; fijar la variable de entorno aquí no rompe nada porque `validateSync`
 (`config-variables.ts:2628-2634`) no exige que cada clave exista en la clase `ConfigVariables` --
@@ -1202,7 +1215,10 @@ ChatGPT y Claude, cómo cambiar la raíz a la landing y cómo volver atrás, est
 [../product/BETA_RUNBOOK.md](../product/BETA_RUNBOOK.md) §7. Resumen para el coordinador:
 
 1. **Primero la API.** `apply` con el cambio de `ecs.tf`: solo se redefine la tarea de ECS con
-   `SERVER_URL=https://api.<dominio>` y el servicio se vuelve a desplegar. No hay DNS nuevo.
+   `SERVER_URL=https://api.<dominio>` y el servicio se vuelve a desplegar. No hay DNS nuevo. En el
+   `plan`, comprobar además que las definiciones de tarea nuevas siguen llevando `EMAIL_DRIVER` en
+   `LOGGER`, `IS_EMAIL_VERIFICATION_REQUIRED` en `false` y ningún secreto SMTP: eso es lo que dice
+   que el apply mueve la API y nada más (fix1, al final de esta sección).
 2. **Comprobarlo** con `node scripts/aos/verify-public-hosts.mjs --domain <dominio>
    --workspace-host <espacio>.<dominio>`.
 3. **La raíz, cuando la landing esté lista.** Rellenar `apex_a_records` y `www_cname_target` en
@@ -1242,3 +1258,105 @@ lo planifica como destruir y recrear — sobre el registro A de la raíz de un d
 mantiene la dirección intacta.
 **Regla:** antes de meter `count` o `for_each` en un recurso ya aplicado, mirar qué le pasa a su
 dirección en el estado. Si cambia, o se evita el `count`, o hace falta un bloque `moved`.
+
+### fix1 — El correo, por etapas, y el buzón del dominio (30 de octubre de 2026)
+
+**Por qué hizo falta antes de aplicar CRM-018.** CRM-018 cambia `SERVER_URL` dentro del mismo
+`local.privacy_env` de `ecs.tf` donde CRM-017 había dejado **fijos** `EMAIL_DRIVER = "SMTP"` e
+`IS_EMAIL_VERIFICATION_REQUIRED = "true"`. Lo que está desplegado hoy usa `LOGGER` y no exige
+verificación, así que aplicar CRM-018 tal cual no habría movido solo la API: habría encendido de
+golpe la etapa 2 **y** la etapa 3 del correo, con SES todavía en el sandbox (los correos a
+direcciones no verificadas una a una no llegan) y con todos los usuarios actuales sin
+`isEmailVerified`, que es justo lo que `checkIsEmailVerified` (`auth.service.ts:260-266`, llamado en
+`:186`, `:225` y `auth.resolver.ts:1021`) usa para negar la entrada. Un cambio de DNS habría
+arrastrado un cambio de acceso.
+
+**Lo que ahora decide cada etapa**, en `deploy/aws/variables.tf`:
+
+| Variable | Tipo | Por defecto | Qué controla |
+| --- | --- | --- | --- |
+| `outbound_email_enabled` | bool | `false` | `EMAIL_DRIVER`: `SMTP` con `true`, `LOGGER` con `false` |
+| `email_verification_required` | bool | `false` | `IS_EMAIL_VERIFICATION_REQUIRED` |
+
+Los valores por defecto son **el estado desplegado hoy**, no una preferencia: con ellos el apply de
+CRM-018 cambia la API de sitio y nada más. `email_verification_required` lleva una `validation` que
+la rechaza sin `outbound_email_enabled` (Terraform >= 1.9 permite que una validación mire otra
+variable, y `versions.tf` ya exige `>= 1.9.0`): exigir verificación cuando el enlace de verificación
+solo llega al log es echar a todo el mundo fuera. `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` y
+`MAX_WORKSPACES = "0"` se quedan en las tres etapas: ninguna envía nada por sí sola.
+
+**Las credenciales SMTP viajan con el interruptor.** `local.app_secrets` inyecta
+`EMAIL_SMTP_USER`/`EMAIL_SMTP_PASSWORD` solo con `outbound_email_enabled = true`. Razón: una
+contraseña de envío que ningún driver va a usar es una credencial sentada en el entorno de tres
+familias de tareas sin motivo, y el entorno de un proceso es lo primero que lee un volcado, un
+endpoint de depuración o una fuga del contenedor. Los secretos y el permiso del rol de ejecución
+sobre ellos (`ses.tf`, `iam.tf`) **siguen siendo incondicionales**, así que encender el correo no
+necesita crear un secreto ni tocar IAM: sigue siendo una línea de `tfvars`.
+
+**El buzón del dominio.** CRM-017 ya dejaba `apex_mailbox_mx_records` y `apex_mailbox_spf_value`.
+fix1 añade `apex_mailbox_cname_records` (`map(string)`, vacío por defecto) para los CNAME que pide el
+proveedor del buzón: sus firmas DKIM y, si los publica, `autodiscover`/`autoconfig`. Las claves son
+nombres **relativos** a `domain_name` y el recurso es `for_each` keyed por nombre, no `count`, para
+que añadir o quitar uno más adelante no renumere —y por tanto no recree— los demás. Un CNAME no
+convive con un registro de otro tipo en el mismo nombre, así que la variable valida y **rechaza**:
+
+- un nombre con la forma de los DKIM de SES (32 alfanuméricos + `._domainkey`), que son los que crea
+  `aws_route53_record.ses_dkim`. Los del proveedor del buzón tienen nombre de palabra y pasan;
+- `mail`, el dominio MAIL FROM de SES, que ya tiene un MX y un TXT;
+- `_dmarc`, la política que CRM-017 dejó en `p=none`;
+- `api`, `app` y `www`, los hosts del propio CRM;
+- una clave con `domain_name` ya pegado detrás, que es el error de copiar y pegar más probable;
+- un destino escrito como URL en vez de como host.
+
+`terraform.tfvars.example` documenta el formato con valores genéricos (`example.net`), porque este
+fork es público.
+
+#### Validación de fix1 (sin credenciales, 30 de octubre de 2026)
+
+Mismo contenedor fijado por digest (Terraform v1.9.8) en la distro `AOS-CRM-Ubuntu-24.04`, conteo de
+variables `AWS_*` = `0` y `~/.aws` inexistente (comprobado en la misma sesión). Contenido copiado a
+`/tmp/crm018fix1-validate`, ruta nativa de la distro, y comprobado idéntico con `diff -rq
+--exclude=.terraform --exclude=.terraform.lock.hcl` (exit 0).
+
+```
+$ ... fmt -check -recursive        exit 0 (sin salida)
+$ ... init -backend=false          exit 0 (aws v5.100.0, random v3.9.1)
+$ ... validate                     exit 0 ("Success! The configuration is valid.")
+$ sh scripts/scan-secrets.sh       exit 0 (sin coincidencias)
+```
+
+**Las etapas se midieron con un `plan` de verdad, no se razonaron.** En `/tmp/crm018fix1-logic`, con
+el `variables.tf` real y un fichero de solo salidas que copia expresión por expresión lo que
+calculan `ecs.tf` y `ses.tf` (sin proveedor ni recursos, así que `plan` corre sin backend y sin
+credenciales):
+
+| Entrada | `email_driver` | `is_email_verification_required` | Secretos inyectados |
+| --- | --- | --- | --- |
+| valores por defecto | `LOGGER` | `false` | los 3 de siempre, sin SMTP |
+| `outbound_email_enabled=true` | `SMTP` | `false` | los 3 + `EMAIL_SMTP_USER` + `EMAIL_SMTP_PASSWORD` |
+| las dos en `true` | `SMTP` | `true` | los 3 + los 2 de SMTP |
+
+Y los rechazos, los siete con `exit 1` y con el mensaje que les toca: `email_verification_required`
+sin `outbound_email_enabled`; un CNAME en `_dmarc`, en `mail`, con forma de token DKIM de SES y en
+`api`; una clave con el dominio pegado detrás; y un destino con `https://`. El caso bueno del mapa
+sí produce los dos registros, con el dominio añadido
+(`providerkey-a._domainkey.<dominio> CNAME providerkey-a.dkim.example.net`).
+
+**Lo que sigue sin medirse:** el `plan` contra el estado aplicado de la beta. La afirmación «con los
+valores por defecto esto no cambia el correo» está medida sobre las expresiones, no sobre el estado:
+el coordinador tiene que ver en su `plan` que las definiciones de tarea nuevas llevan `LOGGER`,
+`IS_EMAIL_VERIFICATION_REQUIRED=false` y ningún secreto SMTP antes de aplicar.
+
+#### Lección
+
+**Síntoma:** un track (CRM-018) que solo tocaba DNS y una URL estaba a punto de cambiar también quién
+puede entrar en la aplicación.
+**Causa:** el track anterior (CRM-017) dejó su etapa 2 escrita como valores fijos en el bloque de
+entorno compartido, en vez de como variables apagadas. Mientras nadie aplicase, el repo y lo
+desplegado decían cosas distintas; el siguiente apply, de cualquier track que tocase ese bloque, se
+llevaba la diferencia entera por delante.
+**Fix:** las dos banderas pasan a variables cuyo valor por defecto **es el estado desplegado**, más
+una validación que impide la combinación peligrosa.
+**Regla:** una capacidad que el founder todavía no ha autorizado a encender no se escribe como valor
+fijo en un bloque compartido. Se escribe como variable con el estado actual por defecto, y entonces
+cada etapa es un `tfvars` y no una sorpresa en el apply de otro.

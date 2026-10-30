@@ -101,6 +101,23 @@ resource "aws_route53_record" "apex_mailbox_spf" {
   records = [var.apex_mailbox_spf_value]
 }
 
+# CRM-018 fix1: the CNAMEs that same provider asks for -- its DKIM keys, and
+# autodiscover/autoconfig if it publishes them. for_each keyed by the record
+# name, not count: adding or removing one name later then touches that record
+# alone instead of renumbering (and so recreating) the others. The names that
+# would collide with SES's DKIM, its MAIL FROM domain, _dmarc or the CRM's own
+# hosts are refused by the variable's own validation (variables.tf), where the
+# message can name the record it would have broken.
+resource "aws_route53_record" "apex_mailbox_cname" {
+  for_each = var.apex_mailbox_cname_records
+
+  zone_id = local.route53_zone_id
+  name    = "${each.key}.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [each.value]
+}
+
 # R2: the only grant this user has, anywhere in the account -- sending
 # through SES's SMTP endpoint, as the one address this stack sends as.
 # ses:FromAddress is one of the documented SES condition keys for
