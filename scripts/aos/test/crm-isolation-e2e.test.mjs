@@ -303,10 +303,21 @@ async function uploadWorkspaceLogo(token) {
 }
 
 async function destroySyntheticWorkspace(workspace) {
-  // `deleteToken` is set when the operator has already left this workspace, in
-  // which case the deletion is asked for by its own admin -- which is the
-  // runbook's "a friend asks for their workspace to be deleted".
-  const deleted = await graphql(METADATA, 'mutation { deleteCurrentWorkspace { id deletedAt } }', {}, workspace.deleteToken ?? workspace.operatorToken);
+  // The synthetic USER first, while it still has a session: a user row is
+  // server-level, not workspace-level, so destroying the workspace would leave
+  // it behind forever -- and nobody can delete it afterwards, because
+  // user.resolver.ts deleteUser is self-only and this password exists only in
+  // this process's memory. Measured on 2026-10-30: without this, every run of
+  // this suite left one more orphan identity in the founder's deployment.
+  if (workspace.friend) {
+    const removed = await graphql(METADATA, 'mutation { deleteUser { id } }', {}, workspace.friend.token);
+    if (removed.errors) console.error(`[CLEANUP] the synthetic friend of ${workspace.side} survived: ${gqlErrors(removed)}`);
+    workspace.friend = null;
+  }
+  // Then the workspace, with its own API KEY and not with a user session: by
+  // this point the operator may have left it (the R2 procedure) and the friend
+  // is gone, while an API key belongs to the workspace itself.
+  const deleted = await graphql(METADATA, 'mutation { deleteCurrentWorkspace { id deletedAt } }', {}, workspace.apiKeyToken);
   if (deleted.errors && !/not found|suspended|deleted/i.test(gqlErrors(deleted))) {
     throw new Error(`deleteCurrentWorkspace(${workspace.side}) failed: ${gqlErrors(deleted)}`);
   }
@@ -781,7 +792,6 @@ test('the rest of the operator procedure runs for the synthetic friend: the oper
     workspaces.B.operatorToken,
   );
   assert.equal(left.errors, undefined, `the operator could not leave B: ${gqlErrors(left)}`);
-  workspaces.B.deleteToken = workspaces.B.friend.token;
 
   assert.equal(
     psql(`select count(*) from core."userWorkspace" where "workspaceId" = '${workspaces.B.id}' and "userId" = (select id from core."user" where email = '${ADMIN_EMAIL}')`),
@@ -867,7 +877,6 @@ test('the rest of the operator procedure runs for the synthetic friend: the oper
   const reauthenticated = await loginWithOrigin(FRIEND_EMAIL, newPassword, workspaces.B.origin);
   assert.ok(reauthenticated.length > 0, 'the friend could not sign in with the new password');
   workspaces.B.friend.token = reauthenticated;
-  workspaces.B.deleteToken = reauthenticated;
 
   // And the token cannot be used twice.
   const replayed = await graphql(
