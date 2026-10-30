@@ -26,5 +26,15 @@ export const FONT_TOKENS = {
     medium: token('500', { unit: 'number' }),
     semiBold: token('600', { unit: 'number' }),
   },
-  family: token('Inter, sans-serif'),
+  // CRM-019 (R1): the brand's two OFL families (manual 02 section 3.3), both
+  // self-hosted from twenty-front/public/brand/fonts with their licences next
+  // to them. Upstream named Inter here but shipped no @font-face, so Inter was
+  // only ever used where the reader happened to have it installed; the faces
+  // are declared in twenty-front/src/index.css.
+  family: token("'Source Sans 3', system-ui, Arial, sans-serif"),
+  // Fraunces, for the few places the brand speaks in display type. Always used
+  // through the `.betty-serif` class, which also pins SOFT 0 / WONK 0: the
+  // manual forbids Fraunces' wonky terminals and the variable font defaults to
+  // WONK 1.
+  familyDisplay: token("'Fraunces', Georgia, serif"),
 };
