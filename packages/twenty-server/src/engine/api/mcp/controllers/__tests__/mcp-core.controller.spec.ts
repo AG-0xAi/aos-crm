@@ -72,9 +72,13 @@ describe('McpCoreController', () => {
     const mockUser = { id: 'user-1' } as UserEntity;
     const mockUserWorkspaceId = 'user-workspace-1';
     const mockApiKey = { id: 'api-key-1' } as FlatApiKey;
+    const mockRequestBaseUrl = 'https://api.example.test';
     const mockHttpRequest = {
       workspace: mockWorkspace,
       apiKey: mockApiKey,
+      protocol: 'https',
+      get: (header: string) =>
+        header === 'host' ? 'api.example.test' : undefined,
     } as unknown as import('express').Request;
     const mockAuthContext = {
       type: 'apiKey',
@@ -137,6 +141,7 @@ describe('McpCoreController', () => {
           apiKey: mockApiKey,
           application: undefined,
           isDirectMode: false,
+          requestBaseUrl: mockRequestBaseUrl,
         },
       );
       expect(result).toEqual(mockResponse);
@@ -192,6 +197,7 @@ describe('McpCoreController', () => {
           apiKey: mockApiKey,
           application: undefined,
           isDirectMode: false,
+          requestBaseUrl: mockRequestBaseUrl,
         },
       );
       expect(result).toEqual(mockResponse);
@@ -242,6 +248,7 @@ describe('McpCoreController', () => {
           apiKey: mockApiKey,
           application: undefined,
           isDirectMode: false,
+          requestBaseUrl: mockRequestBaseUrl,
         },
       );
       expect(result).toEqual(mockResponse);
@@ -311,6 +318,7 @@ describe('McpCoreController', () => {
           userWorkspaceId: undefined,
           apiKey: mockApiKey,
           isDirectMode: false,
+          requestBaseUrl: mockRequestBaseUrl,
         },
       );
       expect(result).toEqual(mockResponse);
@@ -378,6 +386,7 @@ describe('McpCoreController', () => {
           apiKey: mockApiKey,
           application: undefined,
           isDirectMode: false,
+          requestBaseUrl: mockRequestBaseUrl,
         },
         expect.any(Function),
       );

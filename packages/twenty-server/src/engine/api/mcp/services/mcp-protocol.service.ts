@@ -10,7 +10,6 @@ import { MCP_EXCLUDED_TOOL_NAMES } from 'src/engine/api/mcp/constants/mcp-exclud
 import { MCP_EXECUTE_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-execute-tool-annotations.const';
 import { MCP_OPEN_WORLD_READ_ONLY_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-open-world-read-only-tool-annotations.constant';
 import { MCP_PROTOCOL_VERSION } from 'src/engine/api/mcp/constants/mcp-protocol-version.const';
-import { MCP_SERVER_INFO } from 'src/engine/api/mcp/constants/mcp-server-info.const';
 import { JsonRpc } from 'src/engine/api/mcp/dtos/json-rpc';
 import {
   McpException,
@@ -36,6 +35,7 @@ import { type McpToolCallResult } from 'src/engine/api/mcp/types/mcp-tool-call-r
 import { type McpToolSet } from 'src/engine/api/mcp/types/mcp-tool-set.type';
 import { type McpToolsListResult } from 'src/engine/api/mcp/types/mcp-tools-list-result.type';
 import { buildJsonRpcError } from 'src/engine/api/mcp/utils/build-json-rpc-error.util';
+import { buildMcpServerInfo } from 'src/engine/api/mcp/utils/build-mcp-server-info.util';
 import { getMcpPreloadToolNames } from 'src/engine/api/mcp/utils/get-mcp-preload-tool-names.util';
 import { getMcpRegistryToolAnnotations } from 'src/engine/api/mcp/utils/get-mcp-registry-tool-annotations.util';
 import { isMcpMethod } from 'src/engine/api/mcp/utils/is-mcp-method.util';
@@ -137,7 +137,7 @@ export class McpProtocolService {
         resources: { listChanged: false },
         prompts: { listChanged: false },
       },
-      serverInfo: MCP_SERVER_INFO,
+      serverInfo: buildMcpServerInfo(context.requestBaseUrl),
       instructions,
     };
   }

@@ -206,14 +206,31 @@ test("a workspace's own connector URL discovers that workspace's authorization p
     `the API host's authorization endpoint is not a subdomain sign-in page with an issuer: ${apiDoc.authorization_endpoint}`);
 });
 
-test('initialize answers as the Twenty MCP server, and its instructions name no third-party tool', async () => {
+test('initialize answers as the Betty MCP server, and its instructions name no third-party tool', async () => {
   const res = await mcpCall(
     'initialize',
     { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'aos-crm-mcp-e2e', version: '1' } },
     { token: adminToken },
   );
   assert.equal(res.status, 200, `initialize answered ${res.status}`);
-  assert.equal(res.result.serverInfo.name, 'Twenty MCP Server');
+  assert.equal(res.result.serverInfo.name, 'Betty MCP Server');
+  // MCP 2025-11-25 Implementation.title: what the assistant shows a human.
+  assert.equal(res.result.serverInfo.title, 'Betty');
+  assert.ok(
+    !JSON.stringify(res.result.serverInfo).match(/twenty/i),
+    `serverInfo still names Twenty: ${JSON.stringify(res.result.serverInfo)}`,
+  );
+  // This stack is published on plain http loopback, and buildMcpServerInfo
+  // withholds the icons rather than publish an http URL an assistant refuses or
+  // an https URL this deployment does not answer on. Over https the same code
+  // publishes one icon on the request's own origin (measured by
+  // packages/twenty-server/src/engine/api/mcp/utils/__tests__/build-mcp-server-info.util.spec.ts).
+  assert.equal(new URL(BASE_URL).protocol, 'http:', 'this check assumes the local http profile');
+  assert.equal(
+    res.result.serverInfo.icons,
+    undefined,
+    `over plain http the server published icons anyway: ${JSON.stringify(res.result.serverInfo.icons)}`,
+  );
   assert.ok(res.result.protocolVersion, 'initialize returned no protocol version');
   const instructions = res.result.instructions ?? '';
   assert.ok(instructions.length > 0, 'initialize returned empty instructions');

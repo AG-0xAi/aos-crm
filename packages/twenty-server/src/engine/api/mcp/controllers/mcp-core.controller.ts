@@ -40,6 +40,7 @@ import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorat
 import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
 import { AuthPrincipalGuard } from 'src/engine/guards/auth-principal.guard';
 import { WorkspaceNotSuspendedGuard } from 'src/engine/guards/workspace-not-suspended.guard';
+import { getRequestBaseUrl } from 'src/utils/get-request-base-url.util';
 
 @Controller(ApiPath.Mcp)
 @UseGuards(
@@ -106,6 +107,7 @@ export class McpCoreController {
       application,
       agentId: request.agentId,
       isDirectMode: mode === 'direct',
+      requestBaseUrl: getRequestBaseUrl(request),
     };
 
     // JSON-RPC notifications (no id) expect no response body regardless of Accept

@@ -50,11 +50,16 @@ const StyledCardWrapper = styled.div`
   width: fit-content;
 `;
 
+// Brand manual 3.2 and 6: the accent SURFACE step (beige in light, charcoal in
+// dark) with the thread as the single ornament, drawn at its own 320x80 size so
+// it is never stretched. Upstream filled this band with a halftone in Twenty's
+// blue.
 const StyledHeader = styled.div`
   align-items: center;
-  background-image: url('/images/integrations/oauth-modal-header.png');
+  background-color: ${themeCssVariables.accent.quaternary};
+  background-image: url('/brand/ornament/betty-hilo-corto.svg');
   background-position: center;
-  background-size: cover;
+  background-repeat: no-repeat;
   display: flex;
   gap: ${themeCssVariables.spacing[2]};
   height: ${themeCssVariables.spacing[30]};
@@ -116,9 +121,11 @@ const StyledScopeItem = styled.li`
   }
 `;
 
+// accent3570 is the step accent.ts reserves for icons and graphics; color.blue
+// is a named record colour users pick for tags, not the brand accent.
 const StyledScopeIcon = styled.div`
   align-items: center;
-  color: ${themeCssVariables.color.blue};
+  color: ${themeCssVariables.accent.accent3570};
   display: flex;
   flex-shrink: 0;
   justify-content: center;

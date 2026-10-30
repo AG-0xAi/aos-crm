@@ -1,4 +1,5 @@
 import { styled } from '@linaria/react';
+import { BRAND_ASSET_PATHS } from 'twenty-shared/constants';
 import { IconArrowRight, IconGoogle, IconMicrosoft } from 'twenty-ui/icon';
 import { themeCssVariables, useTheme } from 'twenty-ui/theme';
 
@@ -49,7 +50,7 @@ const StyledDivider = styled.div`
   width: 1px;
 `;
 
-const StyledTwentyLogo = styled.img`
+const StyledBrandLogo = styled.img`
   border-radius: ${themeCssVariables.border.radius.xs};
   height: ${SYNC_BADGE_LOGO_SIZE}px;
   width: ${SYNC_BADGE_LOGO_SIZE}px;
@@ -69,7 +70,7 @@ export const OnboardingImportPreviewSyncBadge = () => {
           color={themeCssVariables.font.color.tertiary}
         />
       </StyledArrow>
-      <StyledTwentyLogo src="/images/integrations/twenty-logo.svg" alt="" />
+      <StyledBrandLogo src={BRAND_ASSET_PATHS.favicon} alt="" />
     </StyledBadge>
   );
 };

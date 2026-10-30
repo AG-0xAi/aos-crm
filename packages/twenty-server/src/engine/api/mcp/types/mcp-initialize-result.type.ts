@@ -1,4 +1,4 @@
-import { type MCP_SERVER_INFO } from 'src/engine/api/mcp/constants/mcp-server-info.const';
+import { type McpServerInfo } from 'src/engine/api/mcp/utils/build-mcp-server-info.util';
 
 export type McpInitializeResult = {
   protocolVersion: string;
@@ -6,6 +6,6 @@ export type McpInitializeResult = {
     'tools' | 'resources' | 'prompts',
     { listChanged: boolean }
   >;
-  serverInfo: typeof MCP_SERVER_INFO;
+  serverInfo: McpServerInfo;
   instructions: string;
 };

@@ -11,6 +11,10 @@
 // together with Claude's prefilled link (or its stated absence over plain
 // http), the ChatGPT steps and the workspace's own MCP URL -> the settings
 // navigation read for the removal of Community and the hiding of Documentation
+// -> a connector registered through dynamic client registration and its OAuth
+// consent screen read for Betty's app icon and ornament, with every image the
+// page PAINTED (img sources plus computed background-image) asserted to name no
+// Twenty asset
 // -> every request the page made to a host other than loopback reported as
 // metadata and asserted to name no Twenty-owned host.
 // @e2e-falla-si: put "Twenty" back in any of those screens, point the legal
@@ -58,6 +62,9 @@ const IMAGE_TAG = `aos-crm-local/brand-acceptance:gate-${process.pid}-${randomUU
 const CONTAINER_NAME = `aos-crm-brand-gate-${process.pid}`;
 const HEALTH_TIMEOUT_MS = 240_000;
 const PHASE_TIMEOUT_MS = 420_000;
+// Registered but never dialled: the consent screen is only read, never
+// submitted, so nothing ever redirects here.
+const AUTHORIZE_REDIRECT_URI = 'http://127.0.0.1:43999/aos-crm-brand-callback';
 
 let linuxRoot = null;
 let workspaceBaseUrl = null;
@@ -88,7 +95,7 @@ async function waitForHealthy(timeoutMs) {
 // and exits 0 whether or not a check failed. A run with no result block at all
 // is a browser that could not start, which is a different failure and is
 // reported as one.
-function runBrowserPhase(phase) {
+function runBrowserPhase(phase, extraEnv = {}) {
   const res = wsl(
     [
       'docker',
@@ -109,6 +116,10 @@ function runBrowserPhase(phase) {
       `AOS_CRM_BROWSER_PHASE=${phase}`,
       '-e',
       `AOS_CRM_BROWSER_MARKER=${RUN_MARKER}`,
+      ...Object.entries(extraEnv).flatMap(([name, value]) => [
+        '-e',
+        `${name}=${value}`,
+      ]),
       IMAGE_TAG,
       'node',
       '/aos/brand-acceptance.mjs',
@@ -256,13 +267,48 @@ test('the settings navigation has no Community entry and no Documentation while 
   assertNoTwentyHost(results.navigation, 'navigation');
 });
 
+test("the OAuth consent screen shows Betty's icon and ornament, not Twenty's logo and blue band", async () => {
+  // A connector registered the way ChatGPT and Claude register theirs: dynamic
+  // client registration. The flow is never completed -- the browser only READS
+  // the consent screen -- so no grant is minted and nothing listens on the
+  // redirect URI.
+  const registration = await http('/oauth/register', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      client_name: `AOS-CRM brand acceptance ${RUN_MARKER}`,
+      redirect_uris: [AUTHORIZE_REDIRECT_URI],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    }),
+  });
+
+  assert.equal(
+    registration.status,
+    201,
+    `dynamic registration answered ${registration.status}: ${registration.body.slice(0, 200)}`,
+  );
+
+  const clientId = JSON.parse(registration.body).client_id;
+
+  assert.ok(clientId, 'dynamic registration returned no client id');
+
+  results.authorize = runBrowserPhase('authorize', {
+    AOS_CRM_AUTHORIZE_CLIENT_ID: clientId,
+    AOS_CRM_AUTHORIZE_REDIRECT_URI: AUTHORIZE_REDIRECT_URI,
+  });
+  assertPhasePassed(results.authorize, 'authorize');
+  assertNoTwentyHost(results.authorize, 'authorize');
+});
+
 test('no phase reached a Twenty-owned host at all', () => {
   const phases = Object.entries(results);
 
   assert.equal(
     phases.length,
-    3,
-    `expected three measured phases, got ${phases.map(([name]) => name).join(', ') || 'none'}`,
+    4,
+    `expected four measured phases, got ${phases.map(([name]) => name).join(', ') || 'none'}`,
   );
 
   for (const [phase, result] of phases) assertNoTwentyHost(result, phase);

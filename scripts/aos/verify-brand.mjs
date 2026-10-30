@@ -104,6 +104,25 @@ export const TWENTY_HOST_PATTERN =
 // names, which the contract says keep their upstream names.
 export const TWENTY_WORD_PATTERN = /(^|[^A-Za-z0-9_-])Twenty([^A-Za-z0-9_-]|$)/;
 
+// A reference to a FILE that carries Twenty's own mark. Neither pattern above
+// sees these: `twenty-logo.svg` is a hyphenated identifier, and
+// `/images/icons/android/android-launchericon-192-192.png` names no host and no
+// word -- yet it was the default logo on every sign-in screen until CRM-019
+// fix1. The founder saw exactly this on 30/10.
+export const TWENTY_ASSET_PATTERNS = [
+  // The mark itself, in any raster or vector form.
+  /\b[a-z0-9._-]*twenty[a-z0-9._-]*\.(?:svg|png|jpe?g|webp|ico|gif)\b/i,
+  // The PWA icon set: every size of Twenty's tile, under its own directories.
+  /\bimages\/icons\/(?:android|ios|windows11)\//i,
+  /\bandroid-launchericon\b/i,
+  /\bSquare\d+x\d+Logo\b/,
+  /\b(?:LargeTile|SmallTile|SplashScreen|StoreLogo|Wide\d+x\d+Logo)\.scale-/,
+  // Twenty-brand ornaments: the blue halftone OAuth band and the violet
+  // halftone of the onboarding welcome.
+  /\boauth-modal-header\b/i,
+  /\bwelcome-halftone\b/i,
+];
+
 // Every exception, with the reason it is one. No wildcards: an entry names one
 // file and the exact text it excuses, so an entry that stops matching is a
 // failure (see the self-test) rather than cover for the next string that
@@ -362,6 +381,14 @@ export function findViolations({ relativePath, source }) {
     if (TWENTY_WORD_PATTERN.test(` ${value} `)) {
       violations.push({ kind: 'twenty-name', text: 'Twenty', inside: value });
     }
+
+    for (const pattern of TWENTY_ASSET_PATTERNS) {
+      const asset = pattern.exec(value);
+
+      if (asset !== null) {
+        violations.push({ kind: 'twenty-asset', text: asset[0], inside: value });
+      }
+    }
   }
 
   return violations.map((violation) => ({ ...violation, file: relativePath }));
@@ -449,7 +476,120 @@ export function checkThemeIdentity(root = REPO_ROOT) {
   return failures;
 }
 
+// The direct child element names of a JSX fragment, ignoring anything nested
+// inside them. A tiny depth walker rather than a regex: `<Row><Column><Link/>
+// </Column></Row>` must read as one child, not three.
+export function directChildTagNames(body) {
+  const names = [];
+  let depth = 0;
+
+  for (const match of body.matchAll(/<(\/?)([A-Za-z][\w.]*)\b[^>]*?(\/?)>/g)) {
+    const [, closing, name, selfClosing] = match;
+
+    if (closing === '/') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+
+    if (depth === 0) names.push(name);
+    if (selfClosing !== '/') depth += 1;
+  }
+
+  return names;
+}
+
+// react-email's <Row> renders `<table><tbody><tr>`, so every direct child has
+// to be a <Column> -- a `<td>`. Anything else is a non-`<td>` inside a `<tr>`:
+// strict clients (Outlook) mis-render or drop it, and the footer this caught
+// ships in almost every template. Every other <Row> in the package already
+// wraps; this makes that a gate instead of a convention.
+export function findEmailRowFailures({ relativePath, source }) {
+  const failures = [];
+
+  for (const row of source.matchAll(/<Row\b[^>]*>([\s\S]*?)<\/Row>/g)) {
+    // A Fragment emits no element, so a Column inside one still renders the
+    // <td>. `<>` shorthand is already invisible to the walker.
+    const body = row[1].replace(/<\/?(?:React\.)?Fragment\b[^>]*>/g, '');
+    const offenders = directChildTagNames(body).filter(
+      (name) => name !== 'Column',
+    );
+
+    if (offenders.length > 0) {
+      failures.push(
+        `${relativePath}: <Row> has direct child <${offenders.join('>, <')}> instead of <Column>; react-email's Row is a <tr> and only <Column> renders a <td>`,
+      );
+    }
+  }
+
+  return failures;
+}
+
+export function checkEmailMarkup(root = REPO_ROOT) {
+  const files = globSync('packages/twenty-emails/src/**/*.tsx', { cwd: root })
+    .map((p) => p.split(sep).join(posix.sep))
+    .filter(isScannedPath)
+    .sort();
+
+  if (files.length === 0) return ['no e-mail components were read at all'];
+
+  return files.flatMap((relativePath) =>
+    findEmailRowFailures({
+      relativePath,
+      source: readFileSync(resolve(root, relativePath), 'utf8'),
+    }),
+  );
+}
+
+export const SOCIAL_PREVIEW_META = [
+  ['property', 'og:image'],
+  ['name', 'twitter:image'],
+];
+
+// A social card is fetched by a crawler on its OWN network, from a page it may
+// have been handed as a bare URL, so a path relative to this deployment is not
+// a URL it can resolve. Absolute https or the card renders blank.
+export function checkSocialPreviewMetadata(root = REPO_ROOT) {
+  const source = readFileSync(
+    resolve(root, 'packages/twenty-front/index.html'),
+    'utf8',
+  );
+  const failures = [];
+
+  for (const [attribute, name] of SOCIAL_PREVIEW_META) {
+    const tag = [...source.matchAll(/<meta\b[^>]*>/g)]
+      .map((match) => match[0])
+      .find((candidate) =>
+        new RegExp(`${attribute}="${name}"`).test(candidate),
+      );
+
+    if (!tag) {
+      failures.push(`index.html declares no <meta ${attribute}="${name}">`);
+      continue;
+    }
+
+    const content = /content="([^"]*)"/.exec(tag)?.[1];
+
+    if (!content || !content.startsWith('https://')) {
+      failures.push(
+        `index.html ${name} is ${JSON.stringify(content ?? null)}, which is not an absolute https URL a crawler can fetch`,
+      );
+    }
+  }
+
+  return failures;
+}
+
 function run() {
+  const markupFailures = [
+    ...checkEmailMarkup(),
+    ...checkSocialPreviewMetadata(),
+  ];
+
+  if (markupFailures.length > 0) {
+    for (const failure of markupFailures) console.error(`[FAIL] ${failure}`);
+    process.exit(1);
+  }
+
   const themeFailures = checkThemeIdentity();
 
   if (themeFailures.length > 0) {
@@ -485,10 +625,13 @@ function run() {
   }
 
   console.log(
-    `[PASS] no user-visible reference to Twenty in ${filesScanned} shipped source files (${ALLOWLIST.length} allowlisted exceptions, each with a reason).`,
+    `[PASS] no user-visible reference to Twenty, and no reference to a Twenty-branded asset file, in ${filesScanned} shipped source files (${ALLOWLIST.length} allowlisted exceptions, each with a reason).`,
   );
   console.log(
-    'Scope: string literals, template literals and same-line JSX text in the front, ui, shared, emails and server packages, plus index.html. It does NOT read the rendered page (see scripts/aos/verify-front-icons.mjs) and does NOT observe network traffic (see scripts/aos/capture-traffic.mjs).',
+    `[PASS] every <Row> in the e-mail package wraps its children in <Column>, and index.html names an absolute https image for both social preview cards.`,
+  );
+  console.log(
+    'Scope: string literals, template literals and same-line JSX text in the front, ui, shared, emails and server packages, plus index.html. It does NOT read the rendered page (see scripts/aos/verify-front-icons.mjs and scripts/aos/test/crm-brand-e2e.test.mjs) and does NOT observe network traffic (see scripts/aos/capture-traffic.mjs).',
   );
 }
 
@@ -663,6 +806,127 @@ function selfTest() {
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
+  });
+  record('a reference to a Twenty-branded ASSET FILE fails, even with no host and no word', () => {
+    for (const source of [
+      "const logo = '/images/integrations/twenty-logo.svg';",
+      "background-image: url('/images/integrations/twenty-logo.svg');",
+      "const url = `${window.location.origin}/images/icons/android/android-launchericon-192-192.png`;",
+      "background-image: url('/images/integrations/oauth-modal-header.png');",
+      "const art = '/images/onboarding/welcome-halftone.svg';",
+      "const tile = '/images/icons/windows11/Square150x150Logo.scale-100.png';",
+      "const splash = '/images/icons/windows11/SplashScreen.scale-200.png';",
+    ]) {
+      const found = scan(source);
+
+      assert(
+        found.some((violation) => violation.kind === 'twenty-asset'),
+        `not flagged as a Twenty asset: ${source}`,
+      );
+    }
+  });
+  record("the brand's own assets and third-party logos are NOT flagged", () => {
+    for (const source of [
+      "const logo = '/brand/logo/betty-app-icon.svg';",
+      "background-image: url('/brand/ornament/betty-hilo-corto.svg');",
+      "const badge = '/images/onboarding/trust-badges/soc2.png';",
+      "const client = '/images/integrations/slack-logo.png';",
+      "const hero = '/images/ai/ai-tools-cover-light.png';",
+    ]) {
+      assert(scan(source).length === 0, `false positive: ${source}`);
+    }
+  });
+  record('this repo names no Twenty-branded asset file anywhere in scope', () => {
+    const { violations } = scanRepository();
+    const assets = violations.filter(
+      (violation) => violation.kind === 'twenty-asset',
+    );
+
+    assert(assets.length === 0, JSON.stringify(assets.slice(0, 5)));
+  });
+  record('a <Row> whose direct child is not a <Column> FAILS', () => {
+    // The exact shape the independent review found in Footer.tsx: a ShadowText
+    // straight inside a Row, which is a non-<td> inside a <tr>.
+    const broken = `<Row>\n  <ShadowText>\n    <Link href="x" value="y" />\n  </ShadowText>\n</Row>`;
+    const failures = findEmailRowFailures({
+      relativePath: 'packages/twenty-emails/src/components/Footer.tsx',
+      source: broken,
+    });
+
+    assert(failures.length === 1, `expected 1 failure, got ${failures.length}`);
+    assert(/<ShadowText>/.test(failures[0]), failures[0]);
+  });
+  record('the same markup wrapped in <Column> passes, and nesting is not miscounted', () => {
+    const wrapped = `<Row>\n  <Column>\n    <ShadowText>\n      <Link href="x" value="y" />\n    </ShadowText>\n  </Column>\n</Row>`;
+
+    assert(
+      findEmailRowFailures({ relativePath: 'f.tsx', source: wrapped }).length === 0,
+      'a wrapped Row was flagged',
+    );
+    assert(
+      directChildTagNames('<Column><Link /></Column><Column>x</Column>').join() ===
+        'Column,Column',
+      directChildTagNames('<Column><Link /></Column><Column>x</Column>').join(),
+    );
+  });
+  record('a Column inside a Fragment still counts as the <td>', () => {
+    const fragment = `<Row>\n  <Fragment key={i}>\n    <Column>x</Column>\n  </Fragment>\n</Row>`;
+
+    assert(
+      findEmailRowFailures({ relativePath: 'f.tsx', source: fragment }).length === 0,
+      'a Column wrapped in a Fragment was flagged',
+    );
+    // ... and a Fragment is not a hole the real offender can hide in.
+    const hidden = `<Row>\n  <Fragment>\n    <ShadowText>x</ShadowText>\n  </Fragment>\n</Row>`;
+
+    assert(
+      findEmailRowFailures({ relativePath: 'f.tsx', source: hidden }).length === 1,
+      'a non-Column inside a Fragment was not flagged',
+    );
+  });
+  record('every <Row> in this repo wraps in <Column>', () => {
+    const failures = checkEmailMarkup();
+
+    assert(failures.length === 0, failures.join('; '));
+  });
+  record('a RELATIVE social preview image FAILS, and a missing tag too', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-social-'));
+
+    try {
+      const htmlPath = resolve(sandbox, 'packages/twenty-front/index.html');
+
+      mkdirSync(dirname(htmlPath), { recursive: true });
+      // What the review found: both cards pointing at a path no crawler can
+      // resolve.
+      writeFileSync(
+        htmlPath,
+        '<meta property="og:image" content="/brand/logo/icon-512.png" />\n<meta name="twitter:image" content="/brand/logo/icon-512.png" />\n',
+      );
+
+      const relative = checkSocialPreviewMetadata(sandbox);
+
+      assert(relative.length === 2, JSON.stringify(relative));
+      assert(
+        relative.every((failure) => /not an absolute https URL/.test(failure)),
+        JSON.stringify(relative),
+      );
+
+      writeFileSync(htmlPath, '<title>Betty</title>\n');
+      const missing = checkSocialPreviewMetadata(sandbox);
+
+      assert(missing.length === 2, JSON.stringify(missing));
+      assert(
+        missing.every((failure) => /declares no <meta/.test(failure)),
+        JSON.stringify(missing),
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+  record("this repo's index.html names an absolute https image for both cards", () => {
+    const failures = checkSocialPreviewMetadata();
+
+    assert(failures.length === 0, failures.join('; '));
   });
   record('the guard is declared in the gate with its self-test', () => {
     const verify = JSON.parse(readFileSync(resolveGateFile(), 'utf8'));

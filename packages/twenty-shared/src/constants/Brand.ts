@@ -13,11 +13,21 @@ export const BRAND_ASSET_PATHS = {
   wordmark: '/brand/logo/betty-wordmark-primary.svg',
   wordmarkInverse: '/brand/logo/betty-wordmark-inverse.svg',
   appIcon: '/brand/logo/betty-app-icon.svg',
+  monogram: '/brand/logo/betty-monogram.svg',
   favicon: '/brand/logo/betty-favicon.svg',
   icon512: '/brand/logo/icon-512.png',
   // Mail clients do not render SVG, so e-mail uses raster only.
   emailIcon: '/brand/logo/favicon-180.png',
+  // Manual 6: one dominant ornament per surface, decorative (alt="").
+  threadOrnament: '/brand/ornament/betty-hilo-corto.svg',
 } as const;
+
+// The social preview card is fetched by crawlers from their own network, so it
+// cannot be a path relative to a deployment they are not looking at. This is
+// the same approved icon this repo ships under BRAND_ASSET_PATHS.icon512
+// (identical SHA-256), served by the brand's own site.
+export const BRAND_SOCIAL_PREVIEW_IMAGE_URL =
+  'https://betty.management/assets/logo/icon-512.png';
 
 // Brand manual 3.2. Only values needed outside the front's theme tokens live
 // here: e-mail HTML cannot read CSS custom properties.

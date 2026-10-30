@@ -12,4 +12,7 @@ export type McpCoreQueryContext = {
   application?: FlatApplication;
   agentId: string | undefined;
   isDirectMode: boolean;
+  // The origin this request arrived on, which is also the origin that serves
+  // the server icon advertised by initialize (buildMcpServerInfo).
+  requestBaseUrl: string;
 };

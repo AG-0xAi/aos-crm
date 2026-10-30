@@ -1,4 +1,4 @@
-import { Container, Row } from 'react-email';
+import { Column, Container, Row } from 'react-email';
 import { BRAND_DOMAIN, BRAND_NAME } from 'twenty-shared/constants';
 
 import { Link } from 'src/components/Link';
@@ -17,9 +17,11 @@ export const Footer = () => {
   return (
     <Container style={footerContainerStyle}>
       <Row>
-        <ShadowText>
-          <Link href={`https://${BRAND_DOMAIN}`} value={BRAND_DOMAIN} />
-        </ShadowText>
+        <Column>
+          <ShadowText>
+            <Link href={`https://${BRAND_DOMAIN}`} value={BRAND_DOMAIN} />
+          </ShadowText>
+        </Column>
       </Row>
       <ShadowText>{BRAND_NAME}</ShadowText>
     </Container>

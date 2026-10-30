@@ -1,6 +1,7 @@
 import { styled } from '@linaria/react';
 import { useState } from 'react';
 import { isNonEmptyString } from '@sniptt/guards';
+import { BRAND_ASSET_PATHS } from 'twenty-shared/constants';
 import { Avatar } from 'twenty-ui/primitives/data-display';
 import { IconRefresh } from 'twenty-ui/icon';
 import { useTheme, themeCssVariables } from 'twenty-ui/theme';
@@ -66,7 +67,7 @@ export const AppConnectionHeader = ({
   return (
     <StyledContainer>
       <StyledAppLogoTile>
-        <StyledAppLogo src={'/images/integrations/twenty-logo.svg'} alt="" />
+        <StyledAppLogo src={BRAND_ASSET_PATHS.appIcon} alt="" />
       </StyledAppLogoTile>
       <StyledLinkIconContainer aria-hidden>
         <IconRefresh size={theme.icon.size.md} stroke={theme.icon.stroke.lg} />

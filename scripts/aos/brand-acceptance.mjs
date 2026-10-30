@@ -13,6 +13,11 @@
 //               the card for Twenty's hosted ChatGPT app.
 //  - navigation: the settings navigation. Community gone, Documentation hidden
 //               while HELP_CENTER_URL is unset, and no "Twenty" in the drawer.
+//  - authorize : the OAuth consent screen a connector sends the user to. The
+//               app tile and the header band read off the DOM and the computed
+//               style, so a Twenty logo or Twenty's blue halftone band is a
+//               failure rather than something only a human notices. The
+//               founder saw exactly that screen still branded Twenty on 30/10.
 //
 // It asserts on RENDERED TEXT and on hrefs read off the DOM, never on
 // screenshots, and takes none. It also reports every request the page made to a
@@ -75,6 +80,11 @@ function isLoopback(hostname) {
 // The product name as a word, exactly as the static guard reads it, so a
 // rendered string and a source string are judged by the same rule.
 const TWENTY_WORD = /(^|[^A-Za-z0-9_-])Twenty([^A-Za-z0-9_-]|$)/;
+
+// The asset families scripts/aos/verify-brand.mjs refuses in the source, read
+// here off what the page actually painted.
+const TWENTY_ASSET =
+  /twenty-logo|oauth-modal-header|welcome-halftone|images\/icons\/(?:android|ios|windows11)\//i;
 
 async function visibleText(page) {
   return (await page.locator('body').innerText()).replace(/\s+/g, ' ');
@@ -277,6 +287,81 @@ async function runNavigationPhase(page) {
   );
 }
 
+// Every image the page painted: <img> sources and every non-empty computed
+// background-image. Reading the computed style and not the source means a
+// Linaria class whose hash nobody can predict is still measured, and a Twenty
+// asset reintroduced through any selector is caught.
+async function paintedImageUrls(page) {
+  return page.evaluate(() => {
+    const backgrounds = Array.from(document.querySelectorAll('*'))
+      .map((element) => window.getComputedStyle(element).backgroundImage)
+      .filter((value) => typeof value === 'string' && value !== 'none');
+    const sources = Array.from(document.querySelectorAll('img')).map(
+      (image) => image.getAttribute('src') ?? '',
+    );
+
+    return [...new Set([...backgrounds, ...sources])].filter(
+      (value) => value !== '',
+    );
+  });
+}
+
+async function runAuthorizePhase(page) {
+  const clientId = requireEnv('AOS_CRM_AUTHORIZE_CLIENT_ID');
+  const redirectUri = requireEnv('AOS_CRM_AUTHORIZE_REDIRECT_URI');
+
+  await signIn(page);
+  // Only READ the consent screen: clicking Authorize would mint a real grant.
+  await page.goto(
+    `${BASE_URL}/authorize?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      '&response_type=code&scope=api%20profile&state=aos-crm-brand',
+    { waitUntil: 'domcontentloaded' },
+  );
+
+  const title = page.getByText(/to your account/i).first();
+
+  await title.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+  record('the OAuth consent screen renders for a registered connector', true);
+
+  const text = await visibleText(page);
+
+  recordNoTwenty('no "Twenty" on the OAuth consent screen', text);
+
+  const painted = await paintedImageUrls(page);
+  const offenders = painted.filter((value) => TWENTY_ASSET.test(value));
+
+  record(
+    'the consent screen paints no Twenty logo and no Twenty header band',
+    offenders.length === 0,
+    offenders.join(' | ').slice(0, 300),
+  );
+  record(
+    "the app tile shows Betty's own icon",
+    painted.some((value) => value.includes('/brand/logo/')),
+    painted.join(' | ').slice(0, 300),
+  );
+  record(
+    "the header band carries the brand's own ornament",
+    painted.some((value) => value.includes('/brand/ornament/')),
+    painted.join(' | ').slice(0, 300),
+  );
+
+  // The two tiles are decoration beside a title that already names the app, so
+  // a screen reader must not hear them twice.
+  const decorativeAlts = await page
+    .locator('img')
+    .evaluateAll((images) =>
+      images.map((image) => image.getAttribute('alt')),
+    );
+
+  record(
+    'the connector tiles are decorative (alt="")',
+    decorativeAlts.length > 0 && decorativeAlts.every((alt) => alt === ''),
+    JSON.stringify(decorativeAlts),
+  );
+}
+
 async function main() {
   // chromiumSandbox: true EXPLICITLY. Playwright's own default is false, and a
   // browser with its sandbox off is not the browser this acceptance is about.
@@ -312,6 +397,7 @@ async function main() {
     if (PHASE === 'public') await runPublicPhase(page);
     else if (PHASE === 'settings') await runSettingsPhase(page);
     else if (PHASE === 'navigation') await runNavigationPhase(page);
+    else if (PHASE === 'authorize') await runAuthorizePhase(page);
     else throw new Error(`unknown phase '${PHASE}'`);
   } finally {
     await context.close();

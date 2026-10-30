@@ -1,4 +1,5 @@
 import { styled } from '@linaria/react';
+import { BRAND_ASSET_PATHS } from 'twenty-shared/constants';
 import { themeCssVariables } from 'twenty-ui/theme';
 
 const StyledLogo = styled.img`
@@ -23,5 +24,5 @@ const StyledLogo = styled.img`
 `;
 
 export const OnboardingPulsingLogo = () => (
-  <StyledLogo src="/images/integrations/twenty-logo.svg" alt="" />
+  <StyledLogo src={BRAND_ASSET_PATHS.appIcon} alt="" />
 );
