@@ -274,7 +274,12 @@ test("the OAuth consent screen shows Betty's icon and ornament, not Twenty's log
   // redirect URI.
   const registration = await http('/oauth/register', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    // The same host the browser opens the consent screen on, so the connector
+    // is registered against the workspace the screen will resolve.
+    headers: {
+      'content-type': 'application/json',
+      host: new URL(workspaceBaseUrl).host,
+    },
     body: JSON.stringify({
       client_name: `AOS-CRM brand acceptance ${RUN_MARKER}`,
       redirect_uris: [AUTHORIZE_REDIRECT_URI],
