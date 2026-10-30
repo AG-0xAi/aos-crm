@@ -27,7 +27,7 @@
 //   node scripts/aos/verify-front-icons.mjs --self-test   (no WSL, no Docker)
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -91,6 +91,19 @@ export const GUARDED_COMPONENTS = [
 export const FLAG_STATE_FILE =
   'src/modules/client-config/states/allowRequestsToTwentyIcons.ts';
 
+// The two things twenty-front's own program carries that `include` does not
+// pull in by import resolution, because nothing imports them: the ambient
+// declarations (src/types/global.d.ts declares `Window._env_`, which
+// src/config/index.ts reads) and the jest setup file, whose
+// `import '@testing-library/jest-dom'` is what registers the DOM matchers the
+// suites below use. A program narrowed to the changed files and their imports
+// loses both, and tsgo then rejects untouched upstream code -- measured on
+// 2026-10-30: TS2339 on `_env_` in src/config/index.ts plus seven TS2339 on
+// `toBeInTheDocument` in the three icon suites. These are the project's own
+// files, not a relaxation: both are in twenty-front/tsconfig.json's `include`,
+// which the self-test checks, so the scoped program stays a subset of it.
+export const AMBIENT_PROGRAM_FILES = ['src/**/*.d.ts', 'setupTests.ts'];
+
 // WHAT THE TYPECHECK COVERS, and why it is not the whole twenty-front project.
 // Measured on 2026-10-29 in this same image: `tsgo -p tsconfig.json` over all
 // of twenty-front reports TS7016 in six untouched upstream files, because the
@@ -98,9 +111,10 @@ export const FLAG_STATE_FILE =
 // declared only by twenty-server -- a phantom dependency a full-monorepo
 // install hides by hoisting. The sources image restores exactly those
 // declarations, and the program typechecked here is the four files this track
-// changes plus their tests and everything they import (which does include the
-// jotai/cookie-storage chain that TS7016 hit). The whole-project run, its
-// remaining diagnostics and their causes are reported in
+// changes plus their tests, the project's own ambient declarations and jest
+// setup (AMBIENT_PROGRAM_FILES) and everything all of those import (which does
+// include the jotai/cookie-storage chain that TS7016 hit). The whole-project
+// run, its remaining diagnostics and their causes are reported in
 // docs/aos/bootstrap/FUNCTIONAL_EVIDENCE.md instead of silently dropped.
 export const TYPECHECK_INCLUDE = [FLAG_STATE_FILE, ...GUARDED_COMPONENTS];
 const SCOPED_TSCONFIG = 'tsconfig.aos-crm005.json';
@@ -297,7 +311,7 @@ function git(args) {
 export function scopedTsconfig(canaryPath) {
   return {
     extends: './tsconfig.json',
-    include: [...TYPECHECK_INCLUDE, ...SPECS, canaryPath],
+    include: [...AMBIENT_PROGRAM_FILES, ...TYPECHECK_INCLUDE, ...SPECS, canaryPath],
   };
 }
 
@@ -574,6 +588,30 @@ function selfTest() {
     }
     assert(config.include.includes('src/aos-crm-canary-x.ts'),
       'the canary is not in the typechecked program, so the compiler would never be asked to reject it');
+  });
+  record("the scoped program keeps the ambient declarations and jest setup twenty-front's own program carries", () => {
+    const front = resolve(REPO_ROOT, 'packages', 'twenty-front');
+    const config = scopedTsconfig('src/aos-crm-canary-x.ts');
+    const project = JSON.parse(readFileSync(resolve(front, 'tsconfig.json'), 'utf8'));
+    for (const entry of AMBIENT_PROGRAM_FILES) {
+      assert(config.include.includes(entry), `${entry} is not in the typechecked program`);
+      // A subset of the project's own program, never an addition to it: if
+      // upstream drops one of these, this fails here instead of quietly
+      // typechecking something twenty-front does not.
+      assert(project.include.includes(entry),
+        `${entry} is no longer in twenty-front's own tsconfig include, so the scoped program is not a subset of the project's`);
+    }
+    // Asserted against the files the entries actually resolve to in this
+    // checkout, not against the list itself: dropping an entry (or upstream
+    // moving what it carried) has to fail HERE, and a list checked against
+    // itself would pass whatever is in it.
+    const carried = AMBIENT_PROGRAM_FILES
+      .flatMap((entry) => globSync(entry, { cwd: front }))
+      .map((relative) => readFileSync(resolve(front, relative), 'utf8'));
+    assert(carried.some((source) => /interface Window\b[\s\S]*?_env_/.test(source)),
+      'the typechecked program no longer carries the ambient declaration of Window._env_, which src/config/index.ts reads: tsgo would reject untouched upstream code');
+    assert(carried.some((source) => /@testing-library\/jest-dom/.test(source)),
+      'the typechecked program no longer carries the import that registers the jest-dom matcher types, so the suites toBeInTheDocument calls would be untyped');
   });
   record('the sources image carries the jest preset and restores the declarations twenty-front relies on', () => {
     const instructions = readFileSync(resolve(REPO_ROOT, SOURCES_DOCKERFILE), 'utf8')
