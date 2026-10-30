@@ -38,13 +38,19 @@ dar o quitar esa marca a otra persona existe `updateServerAdminAccess` en el pan
 **URLs.** Con multi-espacio activo el espacio se deduce del *host* de la petición, no de la
 configuración:
 
-| Para qué | Local | AWS (beta, CRM-013) |
+| Para qué | Local | AWS (beta, CRM-013 + CRM-018) |
 | --- | --- | --- |
 | Acceso / selector de espacios | `http://app.localhost:43000` | `https://app.<dominio>` |
 | Espacio del operador | `http://aos-crm.localhost:43000` | `https://<subdominio>.<dominio>` |
 | Espacio de un amigo | `http://<subdominio>.localhost:43000` | `https://<subdominio>.<dominio>` |
 | Conector MCP de ese amigo | `http://<subdominio>.localhost:43000/mcp` | `https://<subdominio>.<dominio>/mcp` |
 | Pantalla de autorización | `http://<subdominio>.localhost:43000/authorize` | `https://<subdominio>.<dominio>/authorize` |
+| API (`SERVER_URL`): ficheros, OAuth, webhooks | `http://localhost:43000` | `https://api.<dominio>` |
+| La raíz `<dominio>` | no se usa | **no es del CRM** (ver §7) |
+
+Desde CRM-018 (orden del founder, 30 de octubre de 2026) **la raíz del dominio no sirve el CRM en
+AWS**: queda libre para la landing. La API se mudó a `api.<dominio>` y los espacios, el acceso y la
+pantalla de autorización siguen exactamente donde estaban. El stack local no cambia.
 
 En local el host base es `localhost` y no `127.0.0.1` a propósito: los navegadores resuelven
 `*.localhost` a loopback sin DNS ni fichero `hosts` (RFC 6761), y una IP literal no tiene
@@ -241,9 +247,29 @@ No la del host base. El descubrimiento OAuth se construye con el **host que pidi
   donde ya está identificado. Ahí ve qué pide el cliente y lo aprueba (`authorizeApp`,
   `auth.resolver.ts:1139`), y el código vuelve al cliente con PKCE S256.
 
-Si en cambio pegara el host base (`SERVER_URL`), el servidor detecta que ese host no sirve ninguna
-interfaz de espacio (`isApiHost`) y manda la autorización a `app.<dominio>/authorize?iss=…`. Funciona,
-pero hace al usuario pasar por el selector, así que el procedimiento es dar su propia URL.
+**Corrección (CRM-018, 30 de octubre de 2026).** Hasta ahora este runbook decía que pegar el host de
+la API «funciona, pero hace al usuario pasar por el selector». Al leer el código con detalle, **no
+funciona**, y conviene saber por qué para no perder una tarde: el servidor ve que ese host no sirve
+ninguna interfaz de espacio (`isApiHost` en `oauth-discovery.controller.ts:91-95`) y manda la
+autorización a `app.<dominio>/authorize?iss=…`; pero en `app.<dominio>` el front carga el enrutador
+sin espacio (`DomainShell.tsx:39` → `useCreateRootAppRouter.tsx`), que **no tiene ruta
+`/authorize`** — solo acceso, invitación, verificación de correo y restablecimiento. El usuario
+acaba en una página «no encontrada». Y aunque la tuviera, la mutación que concede el permiso exige
+un espacio en la sesión (`authorizeApp` con `@AuthWorkspace()`, `auth.resolver.ts:1149` y
+`auth-workspace.decorator.ts`), y `app.<dominio>` es justamente el host que el servidor traduce a
+«ningún espacio» (`get-subdomain-and-custom-domain-from-hostname.util.ts:30`).
+
+**Por eso hay una sola URL de conector y es la del espacio.** Es además la que la propia aplicación
+enseña en **Ajustes > IA**: esa pantalla la construye con el origen de la ventana del navegador, no
+con una URL configurada (`SettingsMcpSetup.tsx:49` sobre `buildMcpServerUrl`, que lee
+`REACT_APP_SERVER_BASE_URL`; cuando el servidor sirve el front inyecta `window._env_ = {}`, ver
+`render-frontend-html.util.ts:19`, así que el valor acaba siendo `window.location.origin`). Si el
+usuario está dentro de su espacio, lo que copia de Ajustes > IA y lo que dice este runbook son la
+misma URL. No hay dos respuestas.
+
+Este punto no se ha ejercitado contra el despliegue de AWS: está leído del código y medido en local
+por `crm-isolation-e2e.test.mjs`. La comprobación tras el despliegue es
+`scripts/aos/verify-public-hosts.mjs` (ver §7).
 
 Medido en `crm-isolation-e2e.test.mjs` (R3): el token OAuth que obtiene un usuario de su espacio
 **solo ve su espacio** por `/mcp` — los ids del otro espacio no se leen, no aparecen al buscar por
@@ -255,7 +281,102 @@ Límite heredado de CRM-007 y que sigue en pie: un token de acceso OAuth ya emit
 autocontenido y sobrevive a la revocación de su autorización hasta que caduca (hasta 1800 s). Para
 cortar el acceso de inmediato hay que cambiar la contraseña del usuario o quitarlo del espacio.
 
-## 7. Lo que este runbook no cubre
+## 7. Sacar el CRM de la raíz y poner ahí la landing
+
+Orden del founder del 30 de octubre de 2026: la raíz del dominio es para la landing, el CRM vive en
+sus subdominios. Son **dos pasos separados**, y el orden importa.
+
+### Paso 1 — Mover la API (se puede hacer ya, sin la landing)
+
+La API pasa de la raíz a `api.<dominio>`. No hace falta ningún DNS nuevo ni ningún certificado
+nuevo: el comodín `*.<dominio>` y el certificado comodín ya cubren ese nombre, y `api` es un
+subdominio que Twenty tiene reservado, así que ningún espacio puede llamarse así nunca
+(`twenty-shared/src/constants/ReservedSubdomains.ts`).
+
+1. Aplicar Terraform con el cambio de CRM-018 (`deploy/aws/ecs.tf`). Lo único que cambia es la
+   definición de tarea de ECS: el servicio se despliega de nuevo con `SERVER_URL=https://api.<dominio>`.
+2. Esperar a que el servicio quede estable y comprobarlo con la comprobación de abajo.
+
+**Qué se nota y qué no.** No se nota: los espacios, el acceso, los enlaces de los correos y la
+pantalla de autorización siguen igual, porque todos se construyen desde `app.<dominio>` o desde el
+subdominio del espacio, nunca desde la raíz. Sí se nota, y hay que tenerlo en cuenta:
+
+- **Los enlaces de ficheros firmados que ya se habían generado** apuntaban a la raíz
+  (`file-url.service.ts`); los nuevos apuntan a `api.<dominio>`. Mientras la raíz siga en el ALB,
+  los viejos siguen funcionando; cuando la raíz se vaya a la landing, dejan de funcionar. Son
+  enlaces de corta vida (caducan con su token), así que basta con no hacer los dos pasos el mismo
+  minuto.
+- **Webhooks de Google y Microsoft** se registran con la URL de la API
+  (`google-webhook-subscription.driver.ts`, `microsoft-webhook-subscription.driver.ts`). Esta beta
+  no los usa; si algún día se usan, hay que volver a registrarlos tras el cambio.
+
+### Paso 2 — Dar la raíz a la landing (cuando la landing esté lista)
+
+En `terraform.tfvars`, rellenar las dos variables que CRM-018 añadió y aplicar:
+
+```hcl
+apex_a_records   = ["<la dirección A que publique el host de la landing>"]
+www_cname_target = "<el destino CNAME que publique el host de la landing>"
+```
+
+Con esas dos líneas el plan toca **solo** dos registros DNS: la raíz deja de ser un alias al ALB y
+pasa a ser un registro A al host externo, y `www` pasa a tener su propio CNAME (hoy no tiene
+registro propio: lo resuelve el comodín). Sin esas dos líneas el plan no cambia nada, que es como
+está hoy.
+
+Lo que **no** se toca y conviene no tocar: los registros de correo de la raíz (MX y SPF de
+`apex_mailbox_mx_records` / `apex_mailbox_spf_value`, CRM-017) son de otro tipo y conviven con el
+registro A. Moverse la landing no afecta al correo.
+
+### Volver atrás
+
+Quitar esas dos líneas de `terraform.tfvars` y aplicar: la raíz vuelve a ser alias del ALB y el
+registro de `www` desaparece. El TTL de los registros externos es de 300 segundos
+(`var.external_record_ttl`), así que la vuelta tarda minutos, no horas. Volver atrás del paso 1 es
+igual de simple: revertir `SERVER_URL` y desplegar, pero **solo tiene sentido si la raíz todavía
+está en el ALB**.
+
+### Comprobarlo (no fiarse de que el apply dijo «ok»)
+
+```sh
+node scripts/aos/verify-public-hosts.mjs --domain <dominio> --workspace-host <subdominio>.<dominio>
+```
+
+Comprueba, contra el despliegue de verdad: que `api.<dominio>/healthz` responde 200; que el
+descubrimiento OAuth en `api.<dominio>` y en el espacio devuelve como emisor **el host que se
+pidió**; que `/mcp` sin credenciales devuelve 401 con su puntero `resource_metadata` a ese mismo
+host en los dos; y que `app.<dominio>` sirve la pantalla de acceso de verdad (busca el elemento que
+el servidor inyecta, no solo un 200). Si algo falla en su subdominio pero la raíz sí lo contesta, lo
+dice con esas palabras. Sale distinto de 0 si algo falla.
+
+Después del paso 2, añadir `--require-apex-off`: así además exige que la raíz **ya no** sirva el
+CRM. Antes del paso 2 eso es normal y el script lo dice como información, no como fallo.
+
+### Reconectar ChatGPT y Claude
+
+La URL del conector **no cambia con esta mudanza**: siempre fue y sigue siendo la del espacio,
+`https://<subdominio>.<dominio>/mcp` (§6). Quien ya lo tenga conectado no tiene que hacer nada.
+
+Quien lo tenga apuntando a la raíz (porque alguien se lo dio mal) tiene que rehacerlo: borrar el
+conector en su cliente y añadirlo de nuevo con la URL de su espacio. La forma de llegar a ella sin
+preguntar a nadie es **Ajustes > IA** dentro de su propio espacio, que muestra exactamente esa URL y
+la deja copiar. Al añadirlo, el cliente pide autorización y el usuario la aprueba en la pantalla de
+su espacio; no hay que tocar nada en el servidor.
+
+### Un aviso de seguridad que hay que leer antes del paso 2
+
+Mientras `FRONTEND_URL` siga siendo la raíz —y tiene que seguir siéndolo, es de donde el servidor
+deduce el nombre de cada espacio—, el servidor sigue teniendo el **origen de la raíz en su lista de
+orígenes de confianza** para peticiones con credenciales
+(`resolve-allowed-credentialed-origins.util.ts:85`, que la deriva de `FRONTEND_URL` sin condición).
+Hoy eso es inofensivo porque la raíz es el propio CRM. Cuando la raíz la sirva un tercero, cualquier
+script que se ejecute en la landing queda tratado como origen de confianza por la API del CRM. No
+hay interruptor de configuración que lo quite: la lista solo se puede ampliar
+(`AUTH_COOKIE_ALLOWED_ORIGINS`), no recortar. **Es una decisión para el founder** antes del paso 2:
+o se acepta (la landing es suya y controla qué scripts carga), o hace falta un cambio de código en
+ese fichero, que está fuera de lo que CRM-018 tocó.
+
+## 8. Lo que este runbook no cubre
 
 - **El panel de administración del servidor** (`/settings/admin-panel`) da al operador búsqueda de
   usuarios, impersonación y variables de configuración. No forma parte de este procedimiento y no se
