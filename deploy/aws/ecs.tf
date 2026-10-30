@@ -77,11 +77,26 @@ locals {
     # ALB reaches the tasks from inside var.vpc_cidr (10.42.0.0/16), so this
     # pins the behaviour the stack depends on instead of inheriting it.
     TRUST_PROXY = "loopback, linklocal, uniquelocal"
-    # No outbound mail in the beta (founder decision, 29/10/2026): the
-    # operator passes invitation links by hand and runs password resets.
-    # LOGGER is upstream's default (config-variables.ts:531) and sends
-    # nothing: stated here so no SMTP driver can arrive by default change.
-    EMAIL_DRIVER = "LOGGER"
+    # Outbound mail through SES (CRM-017, founder request 30/10/2026).
+    # EMAIL_DRIVER=SMTP is the only other driver Twenty ships
+    # (config-variables.ts:515-579); LOGGER (the beta's original choice,
+    # 29/10/2026) never left the server's own logs. ses.tf creates the
+    # domain identity, its DNS records and the aos-crm-<env>-ses-smtp IAM
+    # user whose derived SMTP credentials EMAIL_SMTP_USER/EMAIL_SMTP_PASSWORD
+    # resolve from below (local.app_secrets via Secrets Manager, never a
+    # plaintext value in this block).
+    EMAIL_DRIVER       = "SMTP"
+    EMAIL_SMTP_HOST    = "email-smtp.${var.aws_region}.amazonaws.com"
+    EMAIL_SMTP_PORT    = "587"
+    EMAIL_FROM_ADDRESS = local.email_from_address
+    EMAIL_FROM_NAME    = "Betty"
+    # CRM-017 R3: a verified, SES-backed sender now exists, so email
+    # verification can be required. MAX_WORKSPACES=0 is CRM-015's own
+    # contract ("empty or 0 = no limit"); setting it here ahead of that
+    # track landing is harmless -- config-variables.ts's validateSync
+    # (:2628-2634) does not reject unrecognised env keys.
+    IS_EMAIL_VERIFICATION_REQUIRED = "true"
+    MAX_WORKSPACES                 = "0"
     # SEC-01 (SECURITY_AUDIT.md): forced regardless of any upstream
     # default, same as deploy/local/compose.yaml's x-aos-crm-env anchor.
     LOGIC_FUNCTION_TYPE   = "DISABLED"
@@ -106,6 +121,8 @@ locals {
     { name = "PG_DATABASE_URL", valueFrom = aws_secretsmanager_secret.pg_database_url.arn },
     { name = "REDIS_URL", valueFrom = aws_secretsmanager_secret.redis_url.arn },
     { name = "ENCRYPTION_KEY", valueFrom = aws_secretsmanager_secret.encryption_key.arn },
+    { name = "EMAIL_SMTP_USER", valueFrom = aws_secretsmanager_secret.ses_smtp_user.arn },
+    { name = "EMAIL_SMTP_PASSWORD", valueFrom = aws_secretsmanager_secret.ses_smtp_password.arn },
   ]
 }
 

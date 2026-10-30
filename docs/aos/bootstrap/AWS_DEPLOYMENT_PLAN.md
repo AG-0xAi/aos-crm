@@ -535,6 +535,12 @@ el operador tiene que asumir, no descubrir:
   logs tiene 30 días de retención por defecto (`var.log_retention_days`); tratar el acceso de
   lectura a CloudWatch como acceso a cuentas de la beta.
 
+**Superado por CRM-017 (30/10/2026):** el founder pidió que las invitaciones llegaran al correo;
+`EMAIL_DRIVER` pasa de `LOGGER` a `SMTP` sobre Amazon SES. Ver la sección CRM-017 al final de este
+documento para el dominio de envío, las credenciales SMTP y el procedimiento de salida del sandbox
+de SES. Este bloque queda como historial de la decisión original del 29/10, no como el estado
+actual.
+
 ### R4 — Validación (sin credenciales) y procedimiento del coordinador
 
 Comandos reales del 30 de octubre de 2026, en la distro WSL dedicada
@@ -723,8 +729,9 @@ final y a conciencia.
   (`sign-in-up.service.ts:534-552`, `.../auth/constants/max-workspaces-without-organization-key.constant.ts:1`).
   Es decir: el operador más **cuatro** amigos. Un quinto amigo exige decisión de licencia del
   founder, no un cambio de Terraform.
-- **Sin correo saliente** (arriba): invitaciones y restablecimientos pasan por el operador y por los
-  logs.
+- **Correo saliente ya no pasa por el operador** (CRM-017, 30/10/2026): invitaciones y
+  restablecimientos llegan por SES/SMTP. El límite real pasa a ser el sandbox de SES (ver esa
+  sección) hasta que se pida la salida a producción.
 - **El arranque del servidor en ECS sigue sin medirse**: `alb_health_check_grace_period_seconds`
   (300 s) sigue siendo una cifra conservadora, no una medición, igual que en CRM-011. Medirlo en el
   primer arranque real.
@@ -799,3 +806,260 @@ group.
 **Regla:** un listener de ALB declarado en Terraform no basta para que el tráfico llegue: el
 security group del load balancer necesita su propia regla de entrada para cada puerto que
 cualquiera de sus listeners escuche, redirect-only incluido.
+
+## CRM-017 — correo saliente con SES y verificación de correo (30 de octubre de 2026)
+
+Orden del founder del 30/10: que las invitaciones lleguen al correo real, no solo al log del
+servidor. Twenty solo habla dos drivers de correo —`LOGGER` y `SMTP`
+(`packages/twenty-server/src/engine/core-modules/twenty-config/config-variables.ts:515-579`)— y
+Amazon SES, en la misma cuenta y región que el resto del stack (`var.aws_region`, por defecto
+`eu-west-1`), expone un endpoint SMTP sin que el stack necesite llamar a su API directamente.
+**Este track tampoco crea nada en AWS**: no usó ninguna credencial de AWS, no ejecutó `plan` ni
+`apply`. Lo aplica el coordinador, igual que CRM-011/CRM-013.
+
+Sobre CRM-013 cambia exactamente esto: `EMAIL_DRIVER` pasa de `LOGGER` a `SMTP`, aparece una
+identidad de dominio en SES con sus registros DNS, un usuario IAM con una única acción concedida
+(`ses:SendRawEmail`) sobre esa identidad, dos secretos nuevos en Secrets Manager (usuario y
+contraseña SMTP) y dos variables de entorno más (`IS_EMAIL_VERIFICATION_REQUIRED`,
+`MAX_WORKSPACES`). El resto del stack no se toca.
+
+### R1 — Dominio de envío
+
+`ses.tf` crea una sola identidad de dominio (`aws_sesv2_email_identity.this`, sobre
+`var.domain_name`) con Easy DKIM y sus tres registros DNS CNAME (uno por token de
+`dkim_signing_attributes[0].tokens`), un subdominio MAIL FROM propio (`mail.<dominio>`) con su MX
+(`10 feedback-smtp.<región>.amazonses.com`) y su SPF (`v=spf1 include:amazonses.com ~all`), y un
+registro DMARC en `_dmarc.<dominio>` con `p=none` (monitor, ni cuarentena ni rechazo) y un
+`rua=mailto:...` opcional si se da `var.dmarc_rua_email`. Todos los registros se crean en la misma
+zona que ya resuelve `data.aws_route53_zone.this` (`data.tf`, CRM-013 R2) -- ninguna zona nueva.
+
+Por qué un MAIL FROM propio y no el de `amazonses.com` por defecto: pone el `envelope-from` (lo que
+SPF comprueba de verdad) en un nombre del propio dominio en vez de un subdominio compartido de
+Amazon; `behavior_on_mx_failure = "USE_DEFAULT_VALUE"` cae al MAIL FROM de `amazonses.com` mientras
+el MX/SPF de `mail.<dominio>` no hayan propagado, en vez de rechazar correo durante ese margen.
+
+Buzón externo en el ápex (opcional, `var.apex_mailbox_mx_records` / `var.apex_mailbox_spf_value`,
+vacíos por defecto): pensado para un proveedor como Hostinger que sirva `usuario@<dominio>` sin
+relación con SES. Nunca pisa nada de SES porque vive en un nombre de registro distinto (`<dominio>`
+para el buzón externo; `mail.<dominio>` para el MAIL FROM de SES) -- ambos pueden coexistir en la
+misma zona sin conflicto de Route 53.
+
+### R2 — Credenciales SMTP y configuración de Twenty
+
+`ses.tf` crea un usuario IAM `aos-crm-${var.environment}-ses-smtp` sin ningún otro permiso en la
+cuenta salvo `ses:SendRawEmail` sobre la identidad del dominio, con la condición `ses:FromAddress`
+fijada a `local.email_from_address` (`<var.email_from_local_part>@<dominio>`, por defecto
+`no-reply@<dominio>`) -- una de las claves de condición que SES documenta para `SendRawEmail`, no
+solo para los `Send*Email` más simples, así que aplica aquí. `aws_iam_access_key` deriva la
+contraseña SMTP con el atributo `ses_smtp_password_v4` que el propio proveedor de Terraform calcula
+(la conversión SigV4 que documenta AWS): ningún literal, igual que `secrets.tf` ya hacía con
+`random_password`. Usuario y contraseña se guardan en dos secretos de Secrets Manager
+(`aos-crm/<env>/ses-smtp-user`, `aos-crm/<env>/ses-smtp-password`) y se inyectan como
+`EMAIL_SMTP_USER`/`EMAIL_SMTP_PASSWORD` en el bloque `secrets` de `server` y `worker`
+(`ecs.tf`, `local.app_secrets`) -- nunca como variable de entorno en claro; `iam.tf` añade sus ARN a
+la política que ya deja leer los otros tres secretos al rol de ejecución.
+
+`local.privacy_env` (`ecs.tf`) pasa a llevar:
+
+| Variable | Valor |
+| --- | --- |
+| `EMAIL_DRIVER` | `SMTP` |
+| `EMAIL_SMTP_HOST` | `email-smtp.<región>.amazonaws.com` |
+| `EMAIL_SMTP_PORT` | `587` |
+| `EMAIL_FROM_ADDRESS` | `<var.email_from_local_part>@<dominio>` (por defecto `no-reply@<dominio>`) |
+| `EMAIL_FROM_NAME` | `Betty` |
+
+Las cuatro primeras existen en `config-variables.ts:515-579`; `EMAIL_FROM_NAME` también, en ese
+mismo rango (valor por defecto de upstream `"Felix from Twenty"`).
+
+### R3 — Verificación y límites
+
+`local.privacy_env` añade `IS_EMAIL_VERIFICATION_REQUIRED = "true"` (`config-variables.ts:100`,
+`false` por defecto en upstream) -- tiene sentido ahora que existe un remitente verificado de
+verdad, no antes. También `MAX_WORKSPACES = "0"`: ese contrato ("vacío o 0 = sin límite") es de
+CRM-015, en paralelo a este track y todavía sin aterrizar en `packages/twenty-server` en el momento
+de escribir esto; fijar la variable de entorno aquí no rompe nada porque `validateSync`
+(`config-variables.ts:2628-2634`) no exige que cada clave exista en la clase `ConfigVariables` --
+una variable que el código aún no lee simplemente no hace nada hasta que CRM-015 aterrice.
+
+### R4 — Sandbox de SES, salida a producción, permission set y validación
+
+**Sandbox de SES.** Toda cuenta nueva de SES en una región nueva empieza en el sandbox: solo puede
+enviar **desde** y **hacia** identidades verificadas, con un tope de 200 mensajes/24h y 1
+mensaje/segundo. La identidad de dominio de R1 resuelve el lado del remitente una vez que el DNS
+propague y SES la marque verificada; mientras el sandbox siga activo, cada destinatario de prueba
+(el amigo que recibe la invitación) también tiene que estar verificado a mano
+(`aws sesv2 create-email-identity --email-identity <correo-del-amigo>`, confirmando el enlace que
+llega a ese correo), o la beta sigue, en la práctica, limitada al operador probándose a sí mismo.
+
+**Pedir la salida a producción.** La pide el coordinador, con credenciales SSO, una vez que el
+dominio esté verificado:
+
+```sh
+aws sesv2 put-account-details \
+  --mail-type TRANSACTIONAL \
+  --website-url https://<dominio> \
+  --use-case-description "Invitaciones de workspace y restablecimiento de contraseña para una beta cerrada de un CRM (Twenty), amigos invitados por el operador, sin envío masivo ni marketing." \
+  --additional-contact-email-addresses '["<correo-de-contacto>"]' \
+  --production-access-enabled
+```
+
+AWS revisa la solicitud (minutos a días, no instantáneo); hasta que la apruebe, el sandbox sigue
+rigiendo -- no hay forma de saltárselo con Terraform ni con ninguna otra llamada.
+
+**Ampliación del permission set de despliegue.** La política en línea que CRM-013 R3 ya documentó
+(`ManageAosCrmRoles` + `PassAosCrmRolesToEcsOnly` + `ReadIamForPlanRefresh`) no cubre usuarios IAM,
+solo roles: `ses.tf` crea un `aws_iam_user`, así que el coordinador necesita una sentencia más,
+limitada igual que las otras a nombres `aos-crm-*`. Política completa, lista para pegar en
+sustitución de la que ya tenía el permission set:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageAosCrmRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::*:role/aos-crm-*"
+    },
+    {
+      "Sid": "PassAosCrmRolesToEcsOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/aos-crm-*",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "ReadIamForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRoleTags",
+        "iam:ListInstanceProfilesForRole",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ManageAosCrmSmtpUsers",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateUser",
+        "iam:DeleteUser",
+        "iam:GetUser",
+        "iam:TagUser",
+        "iam:UntagUser",
+        "iam:PutUserPolicy",
+        "iam:GetUserPolicy",
+        "iam:DeleteUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:CreateAccessKey",
+        "iam:DeleteAccessKey",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::*:user/aos-crm-*"
+    }
+  ]
+}
+```
+
+`CreateAccessKey`/`DeleteAccessKey`/`ListAccessKeys` toman el ARN del usuario como recurso, igual
+que las acciones de usuario; por eso comparten el mismo `Resource` con el resto de la sentencia en
+vez de necesitar `"*"`.
+
+**Comprobaciones tras el `apply`** (coordinador, con SSO, después de dejar correr el `apply` y
+esperar a que el DNS propague -- minutos, no segundos):
+
+```sh
+aws sesv2 get-email-identity --email-identity <dominio> \
+  --query '{verified: VerifiedForSendingStatus, dkim: DkimAttributes.Status, mailFrom: MailFromAttributes}'
+```
+
+Lo que tiene que verse, no solo "responder": `verified: true`, `dkim: "SUCCESS"` (no `PENDING` ni
+`FAILED`) y `MailFromAttributes.MailFromDomainStatus: "SUCCESS"`. Después, un correo de prueba a
+una dirección que ya esté verificada (obligatorio mientras siga en sandbox):
+
+```sh
+aws sesv2 send-email \
+  --from-email-address-identity-arn "$(terraform output -raw ses_email_identity_arn)" \
+  --from-email-address "<var.email_from_local_part>@<dominio>" \
+  --destination '{"ToAddresses":["<correo-verificado-de-prueba>"]}' \
+  --content '{"Simple":{"Subject":{"Data":"aos-crm SES test"},"Body":{"Text":{"Data":"CRM-017 post-apply check"}}}}'
+```
+
+Un `MessageId` en la respuesta no basta: hay que ver el correo llegar a esa bandeja (o, si el
+sandbox todavía frena por verificación de destinatario, el rechazo concreto que lo explique) antes
+de dar el paso por hecho.
+
+**Validación estática (sin credenciales de AWS), 30 de octubre de 2026.** Mismo contenedor fijado
+por digest que CRM-011/CRM-013 (Terraform v1.9.8), sin ninguna variable `AWS_*` ni `~/.aws`
+montado, dentro de la distro WSL dedicada (`AOS-CRM-Ubuntu-24.04`), rutas absolutas y sin `cd`
+(misma razón que CRM-011 R3). Una diferencia frente a las validaciones anteriores, registrada como
+lección abajo: el `-v` que monta `deploy/aws` directamente sobre la ruta de Windows
+(`/mnt/c/...`) deja `init` colgado minutos instalando el proveedor `hashicorp/aws` (más de 150 MB),
+porque esa escritura cruza la capa DrvFs de WSL2; se sincronizó el mismo contenido, byte a byte
+(`diff -rq` sin diferencias, excluyendo `.terraform`/`.terraform.lock.hcl`), a una ruta nativa de
+la distro (`/tmp`) y se corrió ahí:
+
+```
+$ docker run --rm -v /tmp/crm017-tf-validate:/w -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    fmt -check -recursive
+exit 0 (sin salida: todo canónico)
+
+$ docker run --rm -v /tmp/crm017-tf-validate:/w -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    init -backend=false
+exit 0 ("Terraform has been successfully initialized!"; "Using previously-installed
+hashicorp/aws v5.100.0" / "...random v3.9.1" en la segunda corrida, con el bloque `backend "s3"`
+ya declarado en `versions.tf`)
+
+$ docker run --rm -v /tmp/crm017-tf-validate:/w -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    validate
+exit 0 ("Success! The configuration is valid.")
+
+$ sh scripts/scan-secrets.sh
+exit 0 (sin coincidencias)
+```
+
+El escaneo se comprobó contra un control sembrado a propósito (una clave con forma `AKIA...` de 20
+caracteres añadida a `ses.tf`): devolvió `exit 1` señalando exactamente esa línea, y volvió a
+`exit 0` al quitarla -- mismo método que documentó CRM-013 R4, repetido aquí porque `ses.tf` es un
+fichero nuevo que ese control nunca había cubierto.
+
+### Lecciones
+
+**Síntoma:** `terraform init -backend=false` no termina (minutos sin avanzar, `docker stats`
+muestra la misma cifra de `NET I/O`/`BLOCK I/O` sin crecer) cuando el volumen montado es una ruta
+de Windows bajo `/mnt/c/...` dentro de WSL2.
+**Causa:** el proveedor `hashicorp/aws` 5.100.0 instala un binario de varios cientos de MB; WSL2
+traduce ese volumen por DrvFs (9p), que es mucho más lento que un filesystem nativo para escribir
+un fichero grande de una sola vez -- la descarga en sí termina en segundos (confirmado con
+`docker stats`: `NET I/O` deja de crecer enseguida), es la escritura posterior la que se queda
+colgada.
+**Fix:** copiar el contenido de `deploy/aws` a una ruta nativa de la distro (`/tmp`, dentro del
+filesystem ext4 de WSL2) y correr los cuatro comandos ahí, confirmando antes con
+`diff -rq --exclude=.terraform --exclude=.terraform.lock.hcl` que el contenido es idéntico al de la
+ruta real.
+**Regla:** si `terraform init` va a instalar un proveedor grande, no montar el directorio de
+trabajo directamente sobre una ruta `/mnt/c/...` en WSL2 -- usar una ruta nativa de la distro y
+sincronizar, o aceptar varios minutos de escritura silenciosa antes de que el comando devuelva
+nada.

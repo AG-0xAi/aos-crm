@@ -1,4 +1,4 @@
-# AOS-CRM on AWS (CRM-011 staging, CRM-013 beta)
+# AOS-CRM on AWS (CRM-011 staging, CRM-013 beta, CRM-017 outbound email)
 
 Terraform for a private deployment of AOS-CRM: ECS Fargate (server + worker,
 from the ECR image by digest), a one-off migration task, RDS PostgreSQL 16,
@@ -8,8 +8,11 @@ least-privilege IAM, explicit log retention and an AWS Budgets alarm.
 
 CRM-013 turns this into the beta environment: Twenty runs with multi-workspace
 on and workspace creation limited to server admins, so each user gets their own
-`<workspace>.<domain>` space and only the operator can create one. See
-`.aos/pack/aos-crm/specs/aws-beta/spec.md` for the contract and
+`<workspace>.<domain>` space and only the operator can create one. CRM-017
+(`ses.tf`) adds Amazon SES as the outbound email driver, so invitations and
+password resets reach a real inbox instead of only the server log. See
+`.aos/pack/aos-crm/specs/aws-beta/spec.md` and
+`.aos/pack/aos-crm/specs/correo-ses/spec.md` for the contracts and
 `docs/aos/bootstrap/AWS_DEPLOYMENT_PLAN.md` for the ordered deploy procedure,
 cost, rollback/backup/teardown, the deploy permission set and the limits that
 come from Twenty's own code.

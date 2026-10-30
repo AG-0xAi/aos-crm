@@ -49,6 +49,8 @@ data "aws_iam_policy_document" "ecs_task_execution_secrets" {
       aws_secretsmanager_secret.pg_database_url.arn,
       aws_secretsmanager_secret.redis_url.arn,
       aws_secretsmanager_secret.encryption_key.arn,
+      aws_secretsmanager_secret.ses_smtp_user.arn,
+      aws_secretsmanager_secret.ses_smtp_password.arn,
     ]
   }
 }

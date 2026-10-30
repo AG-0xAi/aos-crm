@@ -93,6 +93,18 @@ variable "budget_alert_email" {
   }
 }
 
+variable "dmarc_rua_email" {
+  description = <<-EOT
+    Optional mailbox that receives DMARC aggregate reports (rua=mailto:...)
+    on the _dmarc.<domain_name> TXT record ses.tf creates with p=none
+    (CRM-017 R1). Empty (default) omits the rua tag entirely. No default
+    value ships here for the same reason as budget_alert_email: a real
+    address is founder-identifying.
+  EOT
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # Sizes (tamaños) -- no default, same reasoning as above
 # ---------------------------------------------------------------------------
@@ -304,4 +316,40 @@ variable "ecs_container_insights" {
   description = "Whether to enable ECS Container Insights (extra CloudWatch cost) on the cluster."
   type        = bool
   default     = false
+}
+
+variable "email_from_local_part" {
+  description = <<-EOT
+    Local part of EMAIL_FROM_ADDRESS (ecs.tf composes it with var.domain_name
+    into local.email_from_address, ses.tf). Generic, non-identifying default:
+    change only if the founder wants a different sender than
+    no-reply@<domain_name>.
+  EOT
+  type        = string
+  default     = "no-reply"
+}
+
+variable "apex_mailbox_mx_records" {
+  description = <<-EOT
+    Optional MX records for an external mailbox provider receiving mail at
+    the apex of var.domain_name (for example Hostinger), each formatted as
+    Route 53 expects an MX record value: "<priority> <mail server host>".
+    Empty (default) creates no apex MX record. Never collides with SES: the
+    MAIL FROM MX ses.tf creates lives at mail.<domain_name>, a different
+    record name.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
+variable "apex_mailbox_spf_value" {
+  description = <<-EOT
+    Optional full SPF TXT value for the apex of var.domain_name, covering an
+    external mailbox provider's own outbound mail (for example
+    "v=spf1 include:_spf.hostinger.com ~all" for Hostinger). Empty (default)
+    creates no apex SPF record. Never overwrites SES's own SPF record
+    (ses.tf), which lives at mail.<domain_name>, a different record name.
+  EOT
+  type        = string
+  default     = ""
 }

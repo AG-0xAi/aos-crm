@@ -66,8 +66,25 @@ output "s3_bucket_name" {
 
 output "secrets_manager_secret_arns" {
   value = {
-    pg_database_url = aws_secretsmanager_secret.pg_database_url.arn
-    redis_url       = aws_secretsmanager_secret.redis_url.arn
-    encryption_key  = aws_secretsmanager_secret.encryption_key.arn
+    pg_database_url   = aws_secretsmanager_secret.pg_database_url.arn
+    redis_url         = aws_secretsmanager_secret.redis_url.arn
+    encryption_key    = aws_secretsmanager_secret.encryption_key.arn
+    ses_smtp_user     = aws_secretsmanager_secret.ses_smtp_user.arn
+    ses_smtp_password = aws_secretsmanager_secret.ses_smtp_password.arn
   }
+}
+
+output "ses_email_identity_arn" {
+  description = "SES domain identity ARN (ses.tf). Post-apply, check its verification and DKIM status with `aws sesv2 get-email-identity --email-identity <domain_name>`."
+  value       = aws_sesv2_email_identity.this.arn
+}
+
+output "ses_mail_from_domain" {
+  description = "Custom MAIL FROM subdomain (ses.tf). Same get-email-identity call reports its MX/SPF status alongside DKIM."
+  value       = local.ses_mail_from_domain
+}
+
+output "ses_smtp_user_name" {
+  description = "IAM user whose derived SMTP credentials the server/worker tasks use (EMAIL_SMTP_USER/EMAIL_SMTP_PASSWORD, ecs.tf). Not a secret by itself: the credentials live in Secrets Manager (secrets_manager_secret_arns above)."
+  value       = aws_iam_user.ses_smtp.name
 }
