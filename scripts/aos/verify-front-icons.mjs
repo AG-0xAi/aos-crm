@@ -447,7 +447,12 @@ function run() {
 
   const sourcesBuild = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(root)}; rm -f ${SOURCE_TAR}; ` +
-    `cp ${JSON.stringify(linuxSourceTar)} ${SOURCE_TAR}; ` +
+    // `dd` in 4 MiB chunks, not `cp`: the archive is ~113 MB and `cp` reads a
+    // /mnt file in one large mapping, which this host failed with "cp: error
+    // reading ...: Cannot allocate memory" on the second run of the afternoon
+    // (measured 2026-10-30) while the same copy had worked an hour earlier.
+    // An intermittent gate is a gate nobody believes.
+    `dd if=${JSON.stringify(linuxSourceTar)} of=${SOURCE_TAR} bs=4M status=none; ` +
     `tar --append -f ${SOURCE_TAR} ${SOURCES_DOCKERFILE}; ` +
     `docker build ${NO_ATTESTATION} --build-arg DEPS_IMAGE=${DEPS_IMAGE} -f ${SOURCES_DOCKERFILE} ` +
     `-t ${SOURCES_IMAGE} - < ${SOURCE_TAR}; rm -f ${SOURCE_TAR}`,
