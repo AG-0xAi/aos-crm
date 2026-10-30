@@ -114,6 +114,34 @@ líneas de hace segundos.
    explícitamente (`select: { value: false }`), así que si se pierde hay que reenviar la invitación
    (`resendWorkspaceInvitation`) y leer el log otra vez.
 
+### Aviso que hay que leer antes de invitar a nadie
+
+**Una invitación pendiente es una credencial a nombre de una dirección de correo, y en este perfil
+nada prueba que quien dice tener esa dirección la tenga.** Medido el 30/10 contra el stack local
+(`crm-isolation-e2e.test.mjs`, línea `[LIMIT]`): mientras la invitación está pendiente, cualquiera
+que **conozca la dirección invitada** puede registrarse con ella (el registro de una dirección con
+invitación pendiente está permitido a propósito,
+`sign-in-up.service.ts assertSignUpWithoutWorkspaceAllowed`), la respuesta del registro **le entrega
+el token personal de la invitación**, y canjearlo **le mete en el espacio con el rol invitado**. No
+hace falta tocar el correo de nadie: basta saber la dirección.
+
+En local da igual (el puerto solo escucha en loopback). En AWS, con el dominio público, **no** da
+igual. Mitigación mientras no haya una decisión mejor:
+
+1. Invita y haz que la persona **acepte en el momento**, contigo delante si se puede. La ventana de
+   riesgo es exactamente el tiempo que la invitación pasa pendiente.
+2. **Borra toda invitación pendiente que no se haya consumido** (Settings → Members, o la mutación
+   `deleteWorkspaceInvitation`). No dejes invitaciones abiertas "para luego".
+3. Comprueba que no hay ninguna pendiente antes de exponer el despliegue:
+   `select context->>'email' from core."appToken" where type = 'INVITATION_TOKEN' and "deletedAt" is null;`
+   El 30/10 había **una** pendiente en el espacio del founder, a una dirección real: acéptala o
+   bórrala antes de abrir la beta.
+4. `IS_EMAIL_VERIFICATION_REQUIRED=true` es el control que trae Twenty para esto, pero **no está
+   medido aquí y no es gratis**: el enlace de verificación también acabaría en el log del worker (el
+   operador tendría que llevarlo a mano), y no cierra la entrega del token —que ocurre en la
+   respuesta del registro, antes de cualquier verificación—, solo (probablemente) el acceso
+   posterior. Queda como decisión del founder y trabajo de otro track.
+
 Alternativa sin rol preasignado: Settings → Members ofrece también un **enlace genérico** del espacio
 (el `inviteHash`); sirve para que entre cualquiera que lo tenga, y después el operador le cambia el
 rol a Admin en la misma pantalla. Se usa solo si el paso 1 no es posible, porque un enlace genérico
