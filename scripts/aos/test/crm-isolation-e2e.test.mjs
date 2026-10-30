@@ -53,6 +53,15 @@ const METADATA = '/metadata';
 const HEALTH_TIMEOUT_MS = 180_000;
 const SETUP_TIMEOUT_MS = 600_000;
 const DESTRUCTION_TIMEOUT_MS = 300_000;
+// Opening a workspace and activating it provision a data schema with every
+// standard object in it, and the socket stays idle while the server does that
+// work. Measured on this host on 2026-10-30: the two of them took ~50 s per
+// workspace with the host to itself and blew past lib.mjs's 60 s inactivity
+// deadline with another track's container running, which failed the whole
+// suite in setup -- a cap on the server's work read as a hang. These two calls
+// get a deadline sized to the work; every assertion keeps the 60 s default,
+// because an answer that already exists and takes a minute IS a problem.
+const PROVISIONING_TIMEOUT_MS = 300_000;
 const SEARCH_INDEX_TIMEOUT_MS = 60_000;
 // Unique per run: the subdomain of a workspace is unique per deployment, so a
 // fixed one would collide with a leftover from an interrupted run.
@@ -149,6 +158,7 @@ async function createSyntheticWorkspace(side) {
       ' signUpInNewWorkspace(input: $input) { loginToken { token } workspace { id workspaceUrls { subdomainUrl } } } }',
     { input: { displayName: nameOf(side), subdomain } },
     operatorFounderToken,
+    { timeoutMs: PROVISIONING_TIMEOUT_MS },
   );
   assert.equal(created.errors, undefined, `the operator could not open workspace ${side}: ${gqlErrors(created)}`);
   const workspace = created.data.signUpInNewWorkspace.workspace;
@@ -165,7 +175,8 @@ async function createSyntheticWorkspace(side) {
   // data schema and standard objects, and the token minted before it carries no
   // workspace member (same step the runtime e2e documents).
   const pendingToken = await exchangeLoginToken(created.data.signUpInNewWorkspace.loginToken.token, origin);
-  const activated = await graphql(METADATA, 'mutation { activateWorkspace(data: {}) { id activationStatus } }', {}, pendingToken);
+  const activated = await graphql(METADATA, 'mutation { activateWorkspace(data: {}) { id activationStatus } }', {}, pendingToken,
+    { timeoutMs: PROVISIONING_TIMEOUT_MS });
   assert.equal(activated.errors, undefined, `activating workspace ${side} failed: ${gqlErrors(activated)}`);
   assert.equal(activated.data.activateWorkspace.activationStatus, 'ACTIVE');
 

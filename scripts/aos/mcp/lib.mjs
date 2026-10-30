@@ -109,7 +109,12 @@ export function httpAbsolute(url, { method = 'GET', headers = {}, timeoutMs = 15
   });
 }
 
-export async function graphql(pathname, query, variables, token) {
+// `timeoutMs` is optional and additive: every existing caller keeps http()'s
+// own 60 s inactivity deadline, which is right for a call that answers from
+// data that already exists. It is here for the few mutations that PROVISION --
+// a workspace's data schema and standard objects -- where the socket is idle
+// while the server works and 60 s is a cap on the server's work, not on a hang.
+export async function graphql(pathname, query, variables, token, { timeoutMs } = {}) {
   const res = await http(pathname, {
     method: 'POST',
     headers: {
@@ -117,6 +122,7 @@ export async function graphql(pathname, query, variables, token) {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
+    ...(timeoutMs ? { timeoutMs } : {}),
   });
   let parsed;
   try {
