@@ -1296,8 +1296,7 @@ const createSettingsRouteElements = ({
           settingsPermission={PermissionFlagType.WORKSPACE}
         />
       }
-    >
-    </Route>
+    ></Route>
   </>
 );
 

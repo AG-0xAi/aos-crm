@@ -42,7 +42,9 @@ const renderCard = (serverBaseUrl: string) => {
 };
 
 const claudeLink = () =>
-  screen.queryByRole('link', { name: /Open Claude/ }) as HTMLAnchorElement | null;
+  screen.queryByRole('link', {
+    name: /Open Claude/,
+  }) as HTMLAnchorElement | null;
 
 describe('McpConnectAssistant', () => {
   it('prefills the Claude connector with the name Betty and this workspace MCP URL', () => {
@@ -90,9 +92,7 @@ describe('McpConnectAssistant', () => {
 
     expect(claudeLink()).toBeNull();
     expect(screen.getByText('http://localhost:3000/mcp')).toBeInTheDocument();
-    expect(
-      screen.getByText(/need a public HTTPS address/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/need a public HTTPS address/)).toBeInTheDocument();
     expect(
       screen.getByText(/Available once this workspace is served over HTTPS/),
     ).toBeInTheDocument();
@@ -102,9 +102,9 @@ describe('McpConnectAssistant', () => {
     renderCard('not a url');
 
     expect(claudeLink()).toBeNull();
-    expect(
-      screen.getByLabelText('MCP URL not available'),
-    ).toHaveTextContent('—');
+    expect(screen.getByLabelText('MCP URL not available')).toHaveTextContent(
+      '—',
+    );
     expect(
       screen.getByText(/did not report a server address/),
     ).toBeInTheDocument();

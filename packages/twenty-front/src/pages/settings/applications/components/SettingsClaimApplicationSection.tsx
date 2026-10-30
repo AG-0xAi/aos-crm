@@ -233,9 +233,7 @@ export const SettingsClaimApplicationSection = () => {
               isDefined(claimErrorDocumentationUrl) ? (
                 <Callout.Action
                   type="button"
-                  onClick={() =>
-                    openUrlInNewTab(claimErrorDocumentationUrl)
-                  }
+                  onClick={() => openUrlInNewTab(claimErrorDocumentationUrl)}
                 >{t`Read documentation`}</Callout.Action>
               ) : undefined
             }

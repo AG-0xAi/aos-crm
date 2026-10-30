@@ -32,7 +32,9 @@
    terminals, so every display use carries the axes explicitly. */
 .betty-serif {
   font-family: var(--t-font-family-display);
-  font-variation-settings: 'SOFT' 0, 'WONK' 0;
+  font-variation-settings:
+    'SOFT' 0,
+    'WONK' 0;
 }
 
 body {

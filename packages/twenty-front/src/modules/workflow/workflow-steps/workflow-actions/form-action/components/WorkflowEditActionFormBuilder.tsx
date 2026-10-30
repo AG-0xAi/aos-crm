@@ -297,9 +297,7 @@ export const WorkflowEditActionFormBuilder = ({
                 isDefined(formActionDocumentationUrl) ? (
                   <Callout.Action
                     type="button"
-                    onClick={() =>
-                      openUrlInNewTab(formActionDocumentationUrl)
-                    }
+                    onClick={() => openUrlInNewTab(formActionDocumentationUrl)}
                   >{t`Learn more`}</Callout.Action>
                 ) : undefined
               }
