@@ -8,7 +8,6 @@ import { useConnectAssistantStep } from '@/onboarding/hooks/useConnectAssistantS
 import { McpConnectAssistant } from '@/settings/mcp/components/McpConnectAssistant';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
-import { BRAND_NAME } from 'twenty-shared/constants';
 import { Button } from 'twenty-ui/primitives/input';
 import { themeCssVariables } from 'twenty-ui/theme';
 
@@ -44,7 +43,7 @@ export const InviteTeam = () => {
         </OnboardingStepAnimatedItem>
         <OnboardingStepAnimatedItem index={1}>
           <StyledOnboardingStepSubtitle>
-            {t`Ask ${BRAND_NAME} about your contacts and conversations from Claude or ChatGPT. You can also do this later from Settings.`}
+            {t`Ask Betty about your contacts and conversations from Claude or ChatGPT. You can also do this later from Settings.`}
           </StyledOnboardingStepSubtitle>
         </OnboardingStepAnimatedItem>
       </StyledOnboardingStepHeading>

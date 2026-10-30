@@ -1551,8 +1551,8 @@ msgstr "El acceso a {objectLabelPlural} se configura por roles, no registro por 
 
 #. js-lingui-id: rkbqAv
 #: src/modules/settings/mcp/utils/mcpSetup.ts
-msgid "Access your Twenty workspace through MCP"
-msgstr "Accede a tu espacio de trabajo de Twenty mediante MCP"
+msgid "Access your Betty workspace through MCP"
+msgstr "Accede a tu espacio de trabajo de Betty mediante MCP"
 
 #. js-lingui-id: CrjDqe
 #: src/pages/auth/Authorize.tsx
@@ -2267,38 +2267,38 @@ msgstr "Añadir compañeros de equipo"
 
 #. js-lingui-id: FKGcEL
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server as a remote context server in Zed."
-msgstr "Agrega el servidor MCP de Twenty como servidor de contexto remoto en Zed."
+msgid "Add the Betty MCP server as a remote context server in Zed."
+msgstr "Agrega el servidor MCP de Betty como servidor de contexto remoto en Zed."
 
 #. js-lingui-id: iA2nHX
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server from Augment Code settings."
-msgstr "Agrega el servidor MCP de Twenty desde la configuración de Augment Code."
+msgid "Add the Betty MCP server from Augment Code settings."
+msgstr "Agrega el servidor MCP de Betty desde la configuración de Augment Code."
 
 #. js-lingui-id: l+NzAk
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server from Raycast's MCP commands or settings."
-msgstr "Agrega el servidor MCP de Twenty desde los comandos o la configuración MCP de Raycast."
+msgid "Add the Betty MCP server from Raycast's MCP commands or settings."
+msgstr "Agrega el servidor MCP de Betty desde los comandos o la configuración MCP de Raycast."
 
 #. js-lingui-id: j6G/yI
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server in Gemini CLI settings."
-msgstr "Agrega el servidor MCP de Twenty en la configuración de Gemini CLI."
+msgid "Add the Betty MCP server in Gemini CLI settings."
+msgstr "Agrega el servidor MCP de Betty en la configuración de Gemini CLI."
 
 #. js-lingui-id: /OyhlM
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty MCP server to your LibreChat configuration file."
-msgstr "Agrega el servidor MCP de Twenty a tu archivo de configuración de LibreChat."
+msgid "Add the Betty MCP server to your LibreChat configuration file."
+msgstr "Agrega el servidor MCP de Betty a tu archivo de configuración de LibreChat."
 
 #. js-lingui-id: K0DXoj
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add the Twenty remote server with LM Studio's install link."
-msgstr "Agrega el servidor remoto de Twenty con el enlace de instalación de LM Studio."
+msgid "Add the Betty remote server with LM Studio's install link."
+msgstr "Agrega el servidor remoto de Betty con el enlace de instalación de LM Studio."
 
 #. js-lingui-id: BTFMKE
 #: src/pages/settings/communications/SettingsWorkspaceCommunicationGroupChannelDetail.tsx
-msgid "Add these records at your DNS provider. Twenty checks them automatically."
-msgstr "Añade estos registros en tu proveedor de DNS. Twenty los verifica automáticamente."
+msgid "Add these records at your DNS provider. Betty checks them automatically."
+msgstr "Añade estos registros en tu proveedor de DNS. Betty los verifica automáticamente."
 
 #. js-lingui-id: 5+ttxv
 #: src/modules/settings/accounts/components/SettingsAccountsBlocklistInput.tsx
@@ -2323,8 +2323,8 @@ msgstr "Agregar tema"
 
 #. js-lingui-id: 4D/zWv
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Add Twenty as a Streamable HTTP extension in Goose."
-msgstr "Agrega Twenty como una extensión HTTP Streamable en Goose."
+msgid "Add Betty as a Streamable HTTP extension in Goose."
+msgstr "Agrega Betty como una extensión HTTP Streamable en Goose."
 
 #. js-lingui-id: XnwceV
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationRedirectURIsInput.tsx
@@ -4226,8 +4226,8 @@ msgstr "Instalar automáticamente esta aplicación en cada espacio de trabajo nu
 
 #. js-lingui-id: MHsVk5
 #: src/pages/settings/ai/components/SettingsAiModelTiersPreview.tsx
-msgid "Automatically selected by Twenty for this mode."
-msgstr "Seleccionado automáticamente por Twenty para este modo."
+msgid "Automatically selected by Betty for this mode."
+msgstr "Seleccionado automáticamente por Betty para este modo."
 
 #. js-lingui-id: XFGV21
 #: src/pages/settings/applications/tabs/SettingsApplicationAutoUpdateSection.tsx
@@ -4461,8 +4461,8 @@ msgstr "Período de facturación"
 
 #. js-lingui-id: xF/NXI
 #: src/modules/settings/billing/hooks/useBillingPortalSession.ts
-msgid "Billing portal session error. Please retry or contact Twenty team"
-msgstr "Error en la sesión del portal de facturación. Por favor, reintenta o contacta al equipo de Twenty"
+msgid "Billing portal session error. Please retry or contact Betty team"
+msgstr "Error en la sesión del portal de facturación. Por favor, reintenta o contacta al equipo de Betty"
 
 #. js-lingui-id: H++SIW
 #: src/modules/settings/billing/hooks/useBillingSubscriptionChangeWording.ts
@@ -4742,8 +4742,8 @@ msgstr "por {trimmedAuthor}"
 
 #. js-lingui-id: 8Pfllj
 #: src/modules/auth/sign-in-up/components/FooterNote.tsx
-msgid "By using Twenty, you agree to the"
-msgstr "Al utilizar Twenty, aceptas la"
+msgid "By using Betty, you agree to the"
+msgstr "Al utilizar Betty, aceptas la"
 
 #. js-lingui-id: 7l+dLC
 #: src/modules/marketplace/constants/PermissionFlagSummaryConfigs.ts
@@ -5423,8 +5423,8 @@ msgstr "Se comprueba solo cuando se guarda el registro al que pertenece esta reg
 #. js-lingui-id: SxwQE8
 #: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
 #: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
-msgid "Checkout session error. Please retry or contact Twenty team"
-msgstr "Error en la sesión de pago. Por favor, reintente o contacte al equipo de Twenty"
+msgid "Checkout session error. Please retry or contact Betty team"
+msgstr "Error en la sesión de pago. Por favor, reintente o contacte al equipo de Betty"
 
 #. js-lingui-id: SviKkE
 #: src/modules/localization/hooks/useLocaleOptions.ts
@@ -6331,13 +6331,13 @@ msgstr "Configura el servidor remoto en la configuración MCP de Amazon Q Develo
 
 #. js-lingui-id: g1/8jH
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Configure the Twenty MCP server manually in Cascade."
-msgstr "Configura manualmente el servidor MCP de Twenty en Cascade."
+msgid "Configure the Betty MCP server manually in Cascade."
+msgstr "Configura manualmente el servidor MCP de Betty en Cascade."
 
 #. js-lingui-id: XiyvRh
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Configure the Twenty MCP server manually in Cline."
-msgstr "Configura manualmente el servidor MCP de Twenty en Cline."
+msgid "Configure the Betty MCP server manually in Cline."
+msgstr "Configura manualmente el servidor MCP de Betty en Cline."
 
 #. js-lingui-id: qA9AGQ
 #: src/modules/settings/domains/components/SettingsDomainRecords.tsx
@@ -7104,8 +7104,8 @@ msgstr "Contar por"
 
 #. js-lingui-id: EEqRLn
 #: src/modules/settings/workspace/components/ClickTrackingSwitch.tsx
-msgid "Count clicks by routing campaign links through Twenty before the original page."
-msgstr "Cuenta los clics redirigiendo los enlaces de la campaña a través de Twenty antes de la página original."
+msgid "Count clicks by routing campaign links through Betty before the original page."
+msgstr "Cuenta los clics redirigiendo los enlaces de la campaña a través de Betty antes de la página original."
 
 #. js-lingui-id: vQJINq
 #: src/modules/object-record/record-board/record-board-column/utils/getAggregateOperationLabel.ts
@@ -10692,8 +10692,8 @@ msgstr "Error al cancelar el cambio de plan."
 
 #. js-lingui-id: QmR+2U
 #: src/modules/settings/billing/hooks/useEndSubscriptionTrialPeriod.ts
-msgid "Error while ending trial period. Please contact Twenty team."
-msgstr "Error al finalizar el período de prueba. Por favor, póngase en contacto con el equipo de Twenty."
+msgid "Error while ending trial period. Please contact Betty team."
+msgstr "Error al finalizar el período de prueba. Por favor, póngase en contacto con el equipo de Betty."
 
 #. js-lingui-id: 5g78zo
 #: src/pages/settings/members/SettingsWorkspaceMember.tsx
@@ -10828,7 +10828,7 @@ msgstr "cada minuto"
 #. js-lingui-id: SpXUci
 #: src/modules/applications/utils/getStandardApplicationReadme.ts
 msgid ""
-"Every Twenty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.\n"
+"Every Betty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.\n"
 "\n"
 "## ✨ What you get\n"
 "\n"
@@ -10840,7 +10840,7 @@ msgid ""
 "\n"
 "## 📌 Good to know\n"
 "\n"
-"- Installed on every workspace and maintained by Twenty\n"
+"- Installed on every workspace and maintained by Betty\n"
 "- Cannot be uninstalled: the rest of the workspace is built on it\n"
 "- Your own objects, fields and layouts live in the **Custom** app\n"
 "\n"
@@ -10848,7 +10848,7 @@ msgid ""
 "\n"
 "**Free**: no credits, no metering."
 msgstr ""
-"Todos los espacios de trabajo de Twenty incluyen esta aplicación. Define la estructura de tu CRM: los objetos principales, cómo se relacionan entre sí y las vistas y páginas de registro en las que trabaja tu equipo. Las aplicaciones del Marketplace, los agentes de IA y tus propias personalizaciones se basan en ella.\n"
+"Todos los espacios de trabajo de Betty incluyen esta aplicación. Define la estructura de tu CRM: los objetos principales, cómo se relacionan entre sí y las vistas y páginas de registro en las que trabaja tu equipo. Las aplicaciones del Marketplace, los agentes de IA y tus propias personalizaciones se basan en ella.\n"
 "\n"
 "## ✨ Lo que obtienes\n"
 "\n"
@@ -10860,7 +10860,7 @@ msgstr ""
 "\n"
 "## 📌 Es bueno saberlo\n"
 "\n"
-"- Se instala en todos los espacios de trabajo y Twenty lo mantiene\n"
+"- Se instala en todos los espacios de trabajo y Betty lo mantiene\n"
 "- No se puede desinstalar: el resto del espacio de trabajo se basa en ella\n"
 "- Tus propios objetos, campos y diseños se encuentran en la aplicación **Personalizada**\n"
 "\n"
@@ -10902,7 +10902,7 @@ msgid ""
 "\n"
 "- Created with your workspace and unique to it\n"
 "- Cannot be uninstalled: it holds your workspace's customizations\n"
-"- Customizations you make from the Twenty interface are saved here automatically\n"
+"- Customizations you make from the Betty interface are saved here automatically\n"
 "\n"
 "## 💳 Billing\n"
 "\n"
@@ -10920,7 +10920,7 @@ msgstr ""
 "\n"
 "- Se crea con tu espacio de trabajo y es exclusivo de este\n"
 "- No se puede desinstalar: contiene las personalizaciones de tu espacio de trabajo\n"
-"- Las personalizaciones que realizas desde la interfaz de Twenty se guardan aquí automáticamente\n"
+"- Las personalizaciones que realizas desde la interfaz de Betty se guardan aquí automáticamente\n"
 "\n"
 "## 💳 Facturación\n"
 "\n"
@@ -13249,8 +13249,8 @@ msgstr "Cita destacada"
 
 #. js-lingui-id: 1ETc0T
 #: src/pages/settings/community/SettingsCommunity.tsx
-msgid "Hire a partner to help you implement and customize Twenty."
-msgstr "Contrata a un socio para que te ayude a implementar y personalizar Twenty."
+msgid "Hire a partner to help you implement and customize Betty."
+msgstr "Contrata a un socio para que te ayude a implementar y personalizar Betty."
 
 #. js-lingui-id: i0qMbr
 #: src/modules/ai/components/AiChatNewThreadPageActions.tsx
@@ -16395,8 +16395,8 @@ msgstr "El modelo es obligatorio"
 
 #. js-lingui-id: iaurWj
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
-msgid "Model used when you chat with Twenty"
-msgstr "Modelo usado cuando chateas con Twenty"
+msgid "Model used when you chat with Betty"
+msgstr "Modelo usado cuando chateas con Betty"
 
 #. js-lingui-id: //nm2/
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
@@ -18635,8 +18635,8 @@ msgstr "Uno por ejecución"
 
 #. js-lingui-id: 1WZTTl
 #: src/pages/settings/enterprise/SettingsEnterprise.tsx
-msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Twenty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
-msgstr "Una suscripción proporciona una clave de Organización que impulsa una instancia de producción y una posible instancia de ensayo o prueba. Para ejecutar un entorno de ensayo o prueba, instala Twenty en un segundo servidor, actívalo con esta misma clave de Organización y registra ese servidor como instancia de desarrollo. Las instancias de desarrollo desbloquean funciones premium sin facturación adicional y no cuentan para tus plazas de producción."
+msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Betty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
+msgstr "Una suscripción proporciona una clave de Organización que impulsa una instancia de producción y una posible instancia de ensayo o prueba. Para ejecutar un entorno de ensayo o prueba, instala Betty en un segundo servidor, actívalo con esta misma clave de Organización y registra ese servidor como instancia de desarrollo. Las instancias de desarrollo desbloquean funciones premium sin facturación adicional y no cuentan para tus plazas de producción."
 
 #. js-lingui-id: JzXn58
 #: src/pages/settings/applications/utils/getClaimErrorContent.ts
@@ -18781,8 +18781,8 @@ msgstr "Abrir chats en"
 
 #. js-lingui-id: n0vVgf
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Open Claude with the Twenty connector name and MCP URL prefilled."
-msgstr "Abre Claude con el nombre del conector de Twenty y la URL MCP rellenados previamente."
+msgid "Open Claude with the Betty connector name and MCP URL prefilled."
+msgstr "Abre Claude con el nombre del conector de Betty y la URL MCP rellenados previamente."
 
 #. js-lingui-id: uIKeEf
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowRunStepAiAgentConversationButton.tsx
@@ -18791,8 +18791,8 @@ msgstr "Abrir conversación"
 
 #. js-lingui-id: +n2jpB
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Open Cursor's MCP installer with the Twenty remote server config."
-msgstr "Abre el instalador MCP de Cursor con la configuración del servidor remoto de Twenty."
+msgid "Open Cursor's MCP installer with the Betty remote server config."
+msgstr "Abre el instalador MCP de Cursor con la configuración del servidor remoto de Betty."
 
 #. js-lingui-id: pZZH4Q
 #: src/modules/auth/sign-in-up/components/EmailVerificationSent.tsx
@@ -18872,8 +18872,8 @@ msgstr "Abrir registros en una página dedicada"
 
 #. js-lingui-id: q170S2
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Open Replit with the Twenty remote server config."
-msgstr "Abre Replit con la configuración del servidor remoto de Twenty."
+msgid "Open Replit with the Betty remote server config."
+msgstr "Abre Replit con la configuración del servidor remoto de Betty."
 
 #. js-lingui-id: d8DZWS
 #: src/modules/keyboard-shortcut-menu/constants/KeyboardShortcutsGeneral.ts
@@ -18897,8 +18897,8 @@ msgstr "Abrir panel lateral"
 
 #. js-lingui-id: sBd/cl
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
-msgid "Open Twenty's official ChatGPT integration for your workspace."
-msgstr "Abre la integración oficial de ChatGPT de Twenty para tu espacio de trabajo."
+msgid "Open Betty's official ChatGPT integration for your workspace."
+msgstr "Abre la integración oficial de ChatGPT de Betty para tu espacio de trabajo."
 
 #. js-lingui-id: tirDue
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -19355,8 +19355,8 @@ msgstr "Nombre de la página"
 
 #. js-lingui-id: NRvxzv
 #: src/pages/not-found/NotFound.tsx
-msgid "Page Not Found | Twenty"
-msgstr "Página no encontrada | Twenty"
+msgid "Page Not Found | Betty"
+msgstr "Página no encontrada | Betty"
 
 #. js-lingui-id: QbrUIo
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -24629,8 +24629,8 @@ msgstr "Suscripción activada."
 #: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
 #: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
 #: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
-msgid "Subscription error. Please retry or contact Twenty team"
-msgstr "Error de suscripción. Por favor, reintenta o contacta al equipo de Twenty"
+msgid "Subscription error. Please retry or contact Betty team"
+msgstr "Error de suscripción. Por favor, reintenta o contacta al equipo de Betty"
 
 #. js-lingui-id: kSY/ji
 #: src/modules/settings/billing/hooks/useApplyBillingSubscriptionChange.ts
@@ -25179,8 +25179,8 @@ msgstr "La región de AWS para Bedrock"
 
 #. js-lingui-id: bEyeZg
 #: src/modules/applications/utils/getStandardApplicationDescription.ts
-msgid "The base data model every Twenty workspace runs on."
-msgstr "El modelo de datos base sobre el que se ejecuta cada espacio de trabajo de Twenty."
+msgid "The base data model every Betty workspace runs on."
+msgstr "El modelo de datos base sobre el que se ejecuta cada espacio de trabajo de Betty."
 
 #. js-lingui-id: 832YJ9
 #: src/modules/validation-rules/constants/ValidationRuleKeywords.ts
@@ -25361,8 +25361,8 @@ msgstr "La página que buscas ha desaparecido o nunca existió. Volvamos a la pi
 
 #. js-lingui-id: Ya1wb4
 #: src/pages/settings/legal/SettingsLegalDpaNew.tsx
-msgid "The PDF is pre-signed by Twenty and executed with your legal entity and authorized signatory."
-msgstr "El PDF está prefirmado por Twenty y se formaliza con tu entidad legal y el firmante autorizado."
+msgid "The PDF is pre-signed by Betty and executed with your legal entity and authorized signatory."
+msgstr "El PDF está prefirmado por Betty y se formaliza con tu entidad legal y el firmante autorizado."
 
 #. js-lingui-id: Ir4tSJ
 #: src/modules/page-layout/widgets/call-recording/utils/getCallRecordingStatusDisplayConfiguration.ts
@@ -25656,8 +25656,8 @@ msgstr "Esta aplicación no está instalada en este espacio de trabajo. Es posib
 #. js-lingui-id: 5j3WfU
 #: src/modules/marketplace/components/SettingsApplicationInstallPermissionValidationModal.tsx
 #: src/pages/settings/applications/SettingsAvailableApplicationDetails.tsx
-msgid "This application is not vetted by Twenty. Use at your own risk."
-msgstr "Esta aplicación no está verificada por Twenty. Úsala bajo tu propio riesgo."
+msgid "This application is not vetted by Betty. Use at your own risk."
+msgstr "Esta aplicación no está verificada por Betty. Úsala bajo tu propio riesgo."
 
 #. js-lingui-id: X7w5n6
 #: src/pages/settings/applications/tabs/SettingsApplicationRegistrationDistributionTab.tsx
@@ -26650,23 +26650,23 @@ msgstr "Turquesa"
 
 #. js-lingui-id: 8pmRvi
 #: src/pages/onboarding/SyncEmails.tsx
-msgid "Twenty adds the people you email and meet, and keeps them up to date without manual data entry."
-msgstr "Twenty añade a las personas a las que envías correos electrónicos y con las que te reúnes, y mantiene sus datos actualizados sin introducirlos manualmente."
+msgid "Betty adds the people you email and meet, and keeps them up to date without manual data entry."
+msgstr "Betty añade a las personas a las que envías correos electrónicos y con las que te reúnes, y mantiene sus datos actualizados sin introducirlos manualmente."
 
 #. js-lingui-id: JnaRPe
 #: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/ColumnGrid.tsx
-msgid "Twenty fields"
-msgstr "Campos de Twenty"
+msgid "Betty fields"
+msgstr "Campos de Betty"
 
 #. js-lingui-id: pNo8xt
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
-msgid "Twenty fills each level with the best model that meets your requirements"
-msgstr "Twenty completa cada nivel con el mejor modelo que cumple tus requisitos"
+msgid "Betty fills each level with the best model that meets your requirements"
+msgstr "Betty completa cada nivel con el mejor modelo que cumple tus requisitos"
 
 #. js-lingui-id: qUadjH
 #: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
-msgid "Twenty works better with your team"
-msgstr "Twenty funciona mejor con tu equipo"
+msgid "Betty works better with your team"
+msgstr "Betty funciona mejor con tu equipo"
 
 #. js-lingui-id: YIjS4q
 #: src/modules/ai/components/SettingsAgentModelCapabilities.tsx
@@ -28736,8 +28736,8 @@ msgstr ""
 
 #. js-lingui-id: nTuObL
 #: src/pages/auth/SignInUp.tsx
-msgid "Welcome to Twenty"
-msgstr "Bienvenido a Twenty"
+msgid "Welcome to Betty"
+msgstr "Bienvenido a Betty"
 
 #. js-lingui-id: t8ZvkC
 #: src/modules/onboarding/constants/WelcomeTitleMessage.ts
@@ -29738,3 +29738,69 @@ msgstr "Acercar"
 #: src/modules/settings/data-model/graph-overview/components/SettingsDataModelOverview.tsx
 msgid "Zoom out"
 msgstr "Alejar"
+
+msgid "Connect your assistant"
+msgstr "Conecta tu asistente"
+
+msgid "Ask Betty about your contacts and conversations from Claude or ChatGPT. You can also do this later from Settings."
+msgstr "Pregúntale a Betty por tus contactos y conversaciones desde Claude o ChatGPT. También puedes hacerlo más tarde desde Ajustes."
+
+msgid "Go to the CRM"
+msgstr "Ir al CRM"
+
+msgid "Your workspace MCP URL"
+msgstr "La URL MCP de tu espacio"
+
+msgid "MCP URL not available"
+msgstr "URL MCP no disponible"
+
+msgid "This deployment did not report a server address, so there is no MCP URL to connect yet."
+msgstr "Esta instalación no indicó una dirección de servidor, así que todavía no hay una URL MCP que conectar."
+
+msgid "Claude and ChatGPT fetch this URL from their own servers, so they need a public HTTPS address. This one is not reachable from outside this machine yet."
+msgstr "Claude y ChatGPT piden esta URL desde sus propios servidores, así que necesitan una dirección HTTPS pública. Esta todavía no se alcanza desde fuera de este equipo."
+
+msgid "Opens Claude with the connector named Betty and this workspace's MCP URL already filled in."
+msgstr "Abre Claude con el conector llamado Betty y la URL MCP de este espacio ya rellenada."
+
+msgid "Open Claude"
+msgstr "Abrir Claude"
+
+msgid "Available once this workspace is served over HTTPS."
+msgstr "Disponible cuando este espacio se sirva por HTTPS."
+
+msgid "ChatGPT has no preset link, so add the MCP URL above by hand:"
+msgstr "ChatGPT no tiene enlace prellenado, así que añade a mano la URL MCP de arriba:"
+
+msgid "Open chatgpt.com/plugins and select the plus button, then \"Add custom MCP server\"."
+msgstr "Abre chatgpt.com/plugins, pulsa el botón de más y elige «Add custom MCP server»."
+
+msgid "Name it Betty."
+msgstr "Ponle el nombre Betty."
+
+msgid "Under \"Connection\", paste the MCP URL above as the Server URL."
+msgstr "En «Connection», pega la URL MCP de arriba como Server URL."
+
+msgid "For authentication choose \"OAuth\"."
+msgstr "Como autenticación elige «OAuth»."
+
+msgid "Accept the warning with \"I understand and want to continue\", then \"Create as a plugin\"."
+msgstr "Acepta el aviso con «I understand and want to continue» y después «Create as a plugin»."
+
+msgid "Install the plugin, then call it in a chat by typing @ and picking Betty."
+msgstr "Instala el plugin y después llámalo en un chat escribiendo @ y eligiendo Betty."
+
+msgid "OpenAI's guide"
+msgstr "Guía de OpenAI"
+
+msgid "The same two choices offered right after the workspace was created."
+msgstr "Las dos mismas opciones que se ofrecen justo después de crear el espacio."
+
+msgid "Source code ({version})"
+msgstr "Código fuente ({version})"
+
+msgid "source code link not configured on this server ({version})"
+msgstr "enlace al código fuente sin configurar en este servidor ({version})"
+
+msgid "version not reported"
+msgstr "versión no informada"

@@ -1,6 +1,5 @@
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
-import { BRAND_NAME } from 'twenty-shared/constants';
 import { isDefined } from 'twenty-shared/utils';
 import { IconExternalLink } from 'twenty-ui/icon';
 import { Card } from 'twenty-ui/primitives/surfaces';
@@ -183,7 +182,7 @@ export const McpConnectAssistant = () => {
               <StyledChoiceTitle>{t`Claude`}</StyledChoiceTitle>
             </StyledChoiceHeader>
             <StyledDescription>
-              {t`Opens Claude with the connector named ${BRAND_NAME} and this workspace's MCP URL already filled in.`}
+              {t`Opens Claude with the connector named Betty and this workspace's MCP URL already filled in.`}
             </StyledDescription>
             {isDefined(claudeInstallLink) ? (
               <StyledAction
@@ -213,11 +212,11 @@ export const McpConnectAssistant = () => {
             </StyledDescription>
             <StyledSteps>
               <li>{t`Open chatgpt.com/plugins and select the plus button, then "Add custom MCP server".`}</li>
-              <li>{t`Name it ${BRAND_NAME}.`}</li>
+              <li>{t`Name it Betty.`}</li>
               <li>{t`Under "Connection", paste the MCP URL above as the Server URL.`}</li>
               <li>{t`For authentication choose "OAuth".`}</li>
               <li>{t`Accept the warning with "I understand and want to continue", then "Create as a plugin".`}</li>
-              <li>{t`Install the plugin, then call it in a chat by typing @ and picking ${BRAND_NAME}.`}</li>
+              <li>{t`Install the plugin, then call it in a chat by typing @ and picking Betty.`}</li>
             </StyledSteps>
             <StyledAction
               href={MCP_SETUP.clientDocsUrls.chatGpt}
