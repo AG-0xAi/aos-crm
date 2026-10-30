@@ -42,6 +42,13 @@ Elegir puertos libres con preflight. Candidatos para revisar: 127.0.0.1:43000 pa
 
 Crear el primer usuario en una instancia vacía y bajo acceso local controlado, con password seguro. Mantener `IS_MULTIWORKSPACE_ENABLED=false` y comprobar que no se pueden abrir workspaces nuevos tras el alta; verificar también invitaciones y cualquier registro de usuarios sin workspace. No usar las cuentas demo del seeder como administrador final.
 
+> **Superado por CRM-014 (30/10/2026).** El perfil local ya **no** es de un solo espacio: corre el
+> perfil beta de AWS, con `IS_MULTIWORKSPACE_ENABLED=true` y
+> `IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS=true`, de modo que los espacios los abre solo un
+> administrador del servidor y cada espacio vive en su propio subdominio. Lo que sigue en pie de este
+> párrafo es el resto: contraseña fuerte, nada de cuentas demo, y comprobar el alta ejecutándola.
+> El procedimiento del operador está en [../product/BETA_RUNBOOK.md](../product/BETA_RUNBOOK.md).
+
 ## Verificación que falta
 
 El gate deberá contener comandos reales ejecutados sobre Linux: construcción de shared/server/front, typechecks directos sin caché engañosa, tests enfocados de privacidad/configuración y smoke HTTP. Después: migraciones sobre DB exclusiva, arranque de worker, navegador, login, CRUD, relaciones y persistencia tras reinicio. Captura de tráfico desde el primer arranque en servidor/worker/browser.
@@ -90,7 +97,11 @@ Lo que **no** está hecho y no debe darse por hecho:
 ### Puertos y URL efectiva
 
 El perfil por defecto publica `127.0.0.1:43000` y escribe un `AOS_CRM_SERVER_URL` que
-coincide. Antes, un puerto personalizado **sin** `AOS_CRM_SERVER_URL` pasaba el gate: la
+coincide en el puerto. Desde CRM-014 ese valor es `http://localhost:43000` y **no**
+`http://127.0.0.1:43000`: con multi-espacio activo el espacio de cada peticion se resuelve
+por el subdominio del host, una IP literal no tiene subdominios que un navegador resuelva, y
+`local.ps1` bloquea el arranque si el host no es `localhost` (el puerto publicado sigue
+atado a `127.0.0.1`). Antes, un puerto personalizado **sin** `AOS_CRM_SERVER_URL` pasaba el gate: la
 comprobación trataba una URL vacía como "nada que contradecir", mientras Compose sustituye
 un literal fijo. La aplicación habría construido sus enlaces sobre el puerto equivocado.
 Ahora `local.ps1` lee el valor por defecto directamente de `compose.yaml` y compara la
@@ -154,14 +165,21 @@ Se crea una sola vez, por el flujo real de autenticación (`signUp` →
 `signUpInNewWorkspace` → `getAuthTokensFromLoginToken`), con una contraseña de 36 bytes
 aleatorios criptográficos. Queda en `deploy/local/.env` (ignorado por Git), **nunca se
 imprime** y ninguna herramienta la devuelve: los scripts solo informan de booleanos y
-categorías. Con `IS_MULTIWORKSPACE_ENABLED=false` y el workspace ya creado, un segundo alta
-pública queda **rechazada por el servidor**, y eso se comprueba ejecutando el alta, no
-leyendo la variable de entorno (`getSignUpWithoutWorkspaceDecision` devuelve `refused`
-cuando ya existe un workspace y el multiworkspace está apagado).
+categorías. Un alta pública sin invitación queda **rechazada por el servidor**, y eso se
+comprueba ejecutando el alta, no leyendo la variable de entorno. Desde CRM-014 el motivo del
+rechazo cambió: con multi-espacio activo y la creación limitada a administradores,
+`getSignUpWithoutWorkspaceDecision` devuelve `requiresDestination` (antes `refused`), así que
+lo que rechaza el alta es no tener invitación pendiente ni espacio de destino. El efecto
+observable es el mismo y los tests lo miden ejecutándolo; el matiz importa porque una
+dirección **con** invitación pendiente sí puede registrarse — ver el aviso del
+[runbook de la beta](../product/BETA_RUNBOOK.md).
 
-Por el mismo motivo, `EMAIL_DRIVER=LOGGER` escribe el correo completo (HTML y texto) en el
-log del servidor: cualquier invitación o reset deja su enlace en los logs técnicos. No se
-disparó ninguna invitación en este track y los logs no se copian a ningún artefacto.
+Por el mismo motivo, `EMAIL_DRIVER=LOGGER` escribe el correo completo (HTML y texto) en un
+log: cualquier invitación o reset deja su enlace en los logs técnicos. Es el log del
+**worker** y no el del servidor (`EmailService.send` encola un `EmailSenderJob` y el worker
+lo ejecuta), medido en CRM-014; y se lee con `--tail`, porque en este host
+`docker compose logs --since <duración>` devuelve vacío incluso para líneas de hace
+segundos. Los logs no se copian a ningún artefacto.
 
 ### Puerto y URL efectiva, ahora medidos en ejecución
 
