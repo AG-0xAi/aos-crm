@@ -1236,6 +1236,24 @@ export class ConfigVariables {
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.ADVANCED_SETTINGS,
     description:
+      'Help centre this deployment links to from Settings. The Documentation entry stays hidden while this is unset.',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  HELP_CENTER_URL?: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description:
+      'Source code of the build this server is running, offered to users under AGPL section 13. Point it at the exact commit when the deployment knows it.',
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  SOURCE_CODE_URL?: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description:
       'Minimum enriched company employee count required to show the book-a-call onboarding step. Leave unset or set to 0 to disable the step. The step also requires CALENDAR_BOOKING_PAGE_ID.',
     isHiddenInAdminPanel: true,
     type: ConfigVariableType.NUMBER,

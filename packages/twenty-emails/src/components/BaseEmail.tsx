@@ -22,9 +22,9 @@ export const BaseEmail = ({ children, width, locale }: BaseEmailProps) => {
       <Html lang={locale}>
         <BaseHead i18n={i18nInstance} />
         <Container width={width || 290}>
-          <Logo i18n={i18nInstance} />
+          <Logo />
           {children}
-          <Footer i18n={i18nInstance} />
+          <Footer />
         </Container>
       </Html>
     </I18nProvider>

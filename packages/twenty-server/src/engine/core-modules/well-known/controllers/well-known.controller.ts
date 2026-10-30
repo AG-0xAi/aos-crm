@@ -2,6 +2,7 @@ import { Controller, Get, Header, Req, UseGuards } from '@nestjs/common';
 
 import { type Request } from 'express';
 import { ApiPath } from 'twenty-shared/types';
+import { readConfiguredHttpUrl } from 'twenty-shared/utils';
 
 import { buildApiCatalog } from 'src/engine/core-modules/well-known/utils/build-api-catalog.util';
 import { buildMcpServerCard } from 'src/engine/core-modules/well-known/utils/build-mcp-server-card.util';
@@ -42,6 +43,13 @@ export class WellKnownController {
   )
   @Header('Cache-Control', DISCOVERY_CACHE_CONTROL)
   getApiCatalog(@Req() request: Request): string {
-    return JSON.stringify(buildApiCatalog(getRequestBaseUrl(request)), null, 2);
+    return JSON.stringify(
+      buildApiCatalog(
+        getRequestBaseUrl(request),
+        readConfiguredHttpUrl(this.twentyConfigService.get('HELP_CENTER_URL')),
+      ),
+      null,
+      2,
+    );
   }
 }

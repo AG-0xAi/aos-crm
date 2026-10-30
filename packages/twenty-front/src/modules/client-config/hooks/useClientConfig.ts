@@ -7,6 +7,8 @@ import { appVersionState } from '@/client-config/states/appVersionState';
 import { authProvidersState } from '@/client-config/states/authProvidersState';
 import { billingState } from '@/client-config/states/billingState';
 import { calendarBookingPageIdState } from '@/client-config/states/calendarBookingPageIdState';
+import { helpCenterUrlState } from '@/client-config/states/helpCenterUrlState';
+import { sourceCodeUrlState } from '@/client-config/states/sourceCodeUrlState';
 import { canManageFeatureFlagsState } from '@/client-config/states/canManageFeatureFlagsState';
 import { captchaState } from '@/client-config/states/captchaState';
 import { isBookCallOnboardingStepEnabledState } from '@/client-config/states/isBookCallOnboardingStepEnabledState';
@@ -112,6 +114,8 @@ export const useClientConfig = (): UseClientConfigResult => {
   );
 
   const setCalendarBookingPageId = useSetAtomState(calendarBookingPageIdState);
+  const setHelpCenterUrl = useSetAtomState(helpCenterUrlState);
+  const setSourceCodeUrl = useSetAtomState(sourceCodeUrlState);
 
   const setIsBookCallOnboardingStepEnabled = useSetAtomState(
     isBookCallOnboardingStepEnabledState,
@@ -235,6 +239,8 @@ export const useClientConfig = (): UseClientConfigResult => {
         }));
 
         setCalendarBookingPageId(clientConfig?.calendarBookingPageId ?? null);
+        setHelpCenterUrl(clientConfig?.helpCenterUrl);
+        setSourceCodeUrl(clientConfig?.sourceCodeUrl);
         setIsBookCallOnboardingStepEnabled(
           clientConfig?.isBookCallOnboardingStepEnabled ?? false,
         );
@@ -285,6 +291,8 @@ export const useClientConfig = (): UseClientConfigResult => {
       setAuthProviders,
       setBilling,
       setCalendarBookingPageId,
+      setHelpCenterUrl,
+      setSourceCodeUrl,
       setCanManageFeatureFlags,
       setCaptcha,
       setClientConfigApiStatus,

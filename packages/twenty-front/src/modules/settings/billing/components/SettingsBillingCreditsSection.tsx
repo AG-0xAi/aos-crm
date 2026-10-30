@@ -14,7 +14,7 @@ import { useCurrentResourceCredit } from '@/settings/billing/hooks/useCurrentRes
 import { useGetResourceCreditUsage } from '@/settings/billing/hooks/useGetResourceCreditUsage';
 import { useSplitPhaseItemsInPrices } from '@/settings/billing/hooks/useSplitPhaseItemsInPrices';
 import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { useDialog } from '@/ui/layout/dialog/hooks/useDialog';
 import { isSubscriptionPaymentOverdue } from '@/settings/billing/utils/isSubscriptionPaymentOverdue';
 import { useSubscriptionStatus } from '@/workspace/hooks/useSubscriptionStatus';
@@ -234,9 +234,9 @@ export const SettingsBillingCreditsSection = ({
   const resourceCreditPrices = getResourceCreditPricesByInterval(
     currentBillingSubscription.interval,
   );
-  const creditsDocumentationUrl = getDocumentationUrl({
-    path: DOCUMENTATION_PATHS.USER_GUIDE_BILLING_CAPABILITIES_CREDITS,
-  });
+  const creditsDocumentationUrl = useHelpCenterUrl(
+    DOCUMENTATION_PATHS.USER_GUIDE_BILLING_CAPABILITIES_CREDITS,
+  );
 
   return (
     <Section.Root>
@@ -337,12 +337,14 @@ export const SettingsBillingCreditsSection = ({
           size="sm"
           variant="outline"
         >{t`View usage`}</NavigationButton>
-        <Button
-          startIcon={<IconExternalLink />}
-          size="sm"
-          onClick={() => openUrlInNewTab(creditsDocumentationUrl)}
-          variant="outline"
-        >{t`How credits work`}</Button>
+        {isDefined(creditsDocumentationUrl) && (
+          <Button
+            startIcon={<IconExternalLink />}
+            size="sm"
+            onClick={() => openUrlInNewTab(creditsDocumentationUrl)}
+            variant="outline"
+          >{t`How credits work`}</Button>
+        )}
       </StyledCreditUsageFooterActions>
     </Section.Root>
   );

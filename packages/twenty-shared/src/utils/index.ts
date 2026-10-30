@@ -352,6 +352,7 @@ export { normalizeAllowedIframeOrigin } from './url/normalizeAllowedIframeOrigin
 export { normalizeDomain } from './url/normalizeDomain';
 export { normalizeUrl } from './url/normalizeUrl';
 export { normalizeUrlOrigin } from './url/normalizeUrlOrigin';
+export { readConfiguredHttpUrl } from './url/readConfiguredHttpUrl';
 export { safeDecodeURIComponent } from './url/safeDecodeURIComponent';
 export { uuidToBase36 } from './uuidToBase36';
 export { buildValidationRuleEvaluationContext } from './validation-rule/buildValidationRuleEvaluationContext';

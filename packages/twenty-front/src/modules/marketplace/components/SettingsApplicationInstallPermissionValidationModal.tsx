@@ -234,7 +234,7 @@ export const SettingsApplicationInstallPermissionValidationModal = ({
                     status="warning"
                     layout="compact"
                     icon={<IconAlertTriangle aria-hidden="true" />}
-                  >{t`This application is not vetted by Twenty. Use at your own risk.`}</InlineBanner>
+                  >{t`This application is not vetted by Betty. Use at your own risk.`}</InlineBanner>
                 </StyledNotVettedBannerContainer>
               )}
 

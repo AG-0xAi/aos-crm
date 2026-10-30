@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { msg } from '@lingui/core/macro';
 import { SendApprovedAccessDomainValidation, renderEmail } from 'twenty-emails';
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { FileFolder, SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import { Repository } from 'typeorm';
@@ -125,7 +126,7 @@ export class ApprovedAccessDomainService {
     const i18n = this.i18nService.getI18nInstance(sender.locale);
 
     await this.emailService.send({
-      from: `${sender.name.firstName} ${sender.name.lastName} (via Twenty) <${this.twentyConfigService.get('EMAIL_FROM_ADDRESS')}>`,
+      from: `${sender.name.firstName} ${sender.name.lastName} (via ${BRAND_NAME}) <${this.twentyConfigService.get('EMAIL_FROM_ADDRESS')}>`,
       to,
       subject: i18n._(msg`Approve your access domain`),
       text,

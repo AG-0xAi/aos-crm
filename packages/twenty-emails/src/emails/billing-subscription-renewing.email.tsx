@@ -64,7 +64,7 @@ BillingSubscriptionRenewingEmail.PreviewProps = {
   userName: 'John Doe',
   workspaceDisplayName: 'Acme Inc.',
   renewsAt: new Date('2027-07-02'),
-  link: 'https://acme.twenty.com/settings/billing',
+  link: 'https://acme.betty.management/settings/billing',
   locale: 'en',
 } as BillingSubscriptionRenewingEmailProps;
 

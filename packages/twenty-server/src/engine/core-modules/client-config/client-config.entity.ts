@@ -425,6 +425,14 @@ export class ClientConfig {
   @Field(() => String, { nullable: true })
   calendarBookingPageId?: string;
 
+  // Absent, never an empty string: the front hides the Documentation entry and
+  // the source-code link on absence, so "configured" has to be unambiguous.
+  @Field(() => String, { nullable: true })
+  helpCenterUrl?: string;
+
+  @Field(() => String, { nullable: true })
+  sourceCodeUrl?: string;
+
   @Field(() => Boolean)
   isBookCallOnboardingStepEnabled: boolean;
 

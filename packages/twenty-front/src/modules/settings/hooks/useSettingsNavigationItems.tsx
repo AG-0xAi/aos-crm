@@ -2,17 +2,17 @@ import { SettingsPath } from 'twenty-shared/types';
 
 import { useAuth } from '@/auth/hooks/useAuth';
 import { currentUserState } from '@/auth/states/currentUserState';
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { billingState } from '@/client-config/states/billingState';
 import { supportChatState } from '@/client-config/states/supportChatState';
 import { permissionFlagMapSelector } from '@/settings/roles/states/permissionFlagMapSelector';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { useIsFeatureEnabled } from '@/workspace/hooks/useIsFeatureEnabled';
 import { type NavigationDrawerItemModifier } from '@/ui/navigation/navigation-drawer/types/NavigationDrawerItemModifier';
 import { type NavigationDrawerItemIndentationLevel } from '@/ui/navigation/navigation-drawer/types/NavigationDrawerItemIndentationLevel';
 import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { t } from '@lingui/core/macro';
 import { isNonEmptyString } from '@sniptt/guards';
+import { isDefined } from 'twenty-shared/utils';
 import {
   IconAppWindow,
   IconApps,
@@ -61,7 +61,7 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
   const billing = useAtomStateValue(billingState);
   const { signOut } = useAuth();
   const supportChat = useAtomStateValue(supportChatState);
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
+  const helpCenterUrl = useHelpCenterUrl();
 
   const isBillingEnabled = billing?.isBillingEnabled ?? false;
   const currentUser = useAtomStateValue(currentUserState);
@@ -198,12 +198,6 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
           isHidden: !isAdminEnabled,
         },
         {
-          label: t`Community`,
-          path: SettingsPath.Community,
-          Icon: IconUsers,
-          isHidden: !permissionFlagMap[PermissionFlagType.WORKSPACE],
-        },
-        {
           label: t`Support`,
           onClick: () => window.FrontChat?.('show'),
           Icon: IconMessage,
@@ -211,11 +205,11 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
         },
         {
           label: t`Documentation`,
-          onClick: () =>
-            openUrlInNewTab(
-              getDocumentationUrl({ locale: currentWorkspaceMember?.locale }),
-            ),
+          onClick: () => openUrlInNewTab(helpCenterUrl ?? ''),
           Icon: IconHelpCircle,
+          // No help centre configured: an entry that opens nothing is worse
+          // than no entry (CRM-019 R2).
+          isHidden: !isDefined(helpCenterUrl),
         },
         {
           label: t`Logout`,

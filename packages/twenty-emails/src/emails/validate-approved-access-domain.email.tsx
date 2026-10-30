@@ -9,10 +9,10 @@ import { HighlightedText } from 'src/components/HighlightedText';
 import { Link } from 'src/components/Link';
 import { MainText } from 'src/components/MainText';
 import { Title } from 'src/components/Title';
-import { DEFAULT_WORKSPACE_LOGO } from 'src/constants/DefaultWorkspaceLogo';
 import { capitalize } from 'src/utils/capitalize';
 import { createI18nInstance } from 'src/utils/i18n.utils';
 import { type APP_LOCALES } from 'twenty-shared/translations';
+import { BRAND_ASSET_PATHS } from 'twenty-shared/constants';
 import { getImageAbsoluteURI } from 'twenty-shared/utils';
 
 type SendApprovedAccessDomainValidationProps = {
@@ -66,7 +66,7 @@ export const SendApprovedAccessDomainValidation = ({
       </MainText>
       <HighlightedContainer>
         <Img
-          src={workspaceLogo ?? DEFAULT_WORKSPACE_LOGO}
+          src={workspaceLogo ?? `${serverUrl}${BRAND_ASSET_PATHS.emailIcon}`}
           width={40}
           height={40}
           alt={workspace.name ?? i18n._('Workspace logo')}
@@ -80,18 +80,18 @@ export const SendApprovedAccessDomainValidation = ({
 };
 
 SendApprovedAccessDomainValidation.PreviewProps = {
-  link: 'https://app.twenty.com/validate-domain',
+  link: 'https://app.betty.management/validate-domain',
   domain: 'example.com',
   workspace: {
     name: 'Acme Inc.',
-    logo: 'https://fakeimg.pl/200x200/?text=ACME&font=lobster',
+    logo: 'https://example.invalid/acme-logo.png',
   },
   sender: {
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
   },
-  serverUrl: 'https://app.twenty.com',
+  serverUrl: 'https://app.betty.management',
   locale: 'en',
 };
 

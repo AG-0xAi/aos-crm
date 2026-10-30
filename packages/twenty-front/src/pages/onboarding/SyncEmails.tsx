@@ -6,7 +6,7 @@ import { isMicrosoftCalendarEnabledState } from '@/client-config/states/isMicros
 import { isMicrosoftMessagingEnabledState } from '@/client-config/states/isMicrosoftMessagingEnabledState';
 import { OnboardingSkipDialog } from '@/onboarding/components/OnboardingSkipDialog';
 import { OnboardingSkipDialogAvatars } from '@/onboarding/components/OnboardingSkipDialogAvatars';
-import { ONBOARDING_NETWORK_PREVIEW_PEOPLE } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
+import { ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
 import { ONBOARDING_SKIP_DIALOG_IDS } from '@/onboarding/constants/OnboardingSkipDialogIds';
 import { SyncEmailsAutoSkipEffect } from '@/onboarding/effect-components/SyncEmailsAutoSkipEffect';
 import { useOnboardingStepEnterHotkey } from '@/onboarding/hooks/useOnboardingStepEnterHotkey';
@@ -143,16 +143,12 @@ export const SyncEmails = () => {
         dialogId={ONBOARDING_SKIP_DIALOG_IDS.syncEmails}
         visual={
           <OnboardingSkipDialogAvatars
-            avatars={ONBOARDING_NETWORK_PREVIEW_PEOPLE.map((person) => ({
-              id: person.id,
-              name: '',
-              src: person.avatarUrl,
-              shape: 'circle',
-            }))}
+            avatars={[]}
+            emptySeatsCount={ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT}
           />
         }
         title={t`Start with your whole network`}
-        description={t`Twenty adds the people you email and meet, and keeps them up to date without manual data entry.`}
+        description={t`Betty adds the people you email and meet, and keeps them up to date without manual data entry.`}
         actions={providerActions}
         onSkip={() => void handleSkipConfirm()}
       />

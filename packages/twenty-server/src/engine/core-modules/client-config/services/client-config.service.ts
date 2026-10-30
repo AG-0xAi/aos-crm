@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { isNonEmptyString } from '@sniptt/guards';
-import { isDefined } from 'twenty-shared/utils';
+import { isDefined, readConfiguredHttpUrl } from 'twenty-shared/utils';
 
 import { readIsCompanyEnrichmentEnabled } from 'src/engine/core-modules/company-enrichment/utils/read-is-company-enrichment-enabled.util';
 import { readBookCallStepMinEmployeeCount } from 'src/engine/core-modules/onboarding/utils/read-book-call-step-min-employee-count.util';
@@ -296,6 +296,12 @@ export class ClientConfigService {
       isEmailingDomainInDemoMode,
       allowRequestsToTwentyIcons: this.twentyConfigService.get(
         'ALLOW_REQUESTS_TO_TWENTY_ICONS',
+      ),
+      helpCenterUrl: readConfiguredHttpUrl(
+        this.twentyConfigService.get('HELP_CENTER_URL'),
+      ),
+      sourceCodeUrl: readConfiguredHttpUrl(
+        this.twentyConfigService.get('SOURCE_CODE_URL'),
       ),
       calendarBookingPageId: isNonEmptyString(calendarBookingPageId)
         ? calendarBookingPageId

@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { isNonEmptyString } from '@sniptt/guards';
-import { type AxiosInstance } from 'axios';
 import uniqBy from 'lodash.uniqby';
-import { TWENTY_COMPANIES_BASE_URL } from 'twenty-shared/constants';
 import {
   type ConnectedAccountProvider,
   type FieldActorSource,
@@ -11,7 +9,6 @@ import {
 import { isDefined, normalizeDomain } from 'twenty-shared/utils';
 import { type DeepPartial, In } from 'typeorm';
 
-import { SecureHttpClientService } from 'src/engine/core-modules/secure-http-client/secure-http-client.service';
 import { WorkspaceOrmManager } from 'src/engine/twenty-orm/workspace-orm.manager';
 import { type WorkspaceRepository } from 'src/engine/twenty-orm/repository/workspace-repository';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
@@ -32,16 +29,7 @@ export type CompanyToCreate = {
 
 @Injectable()
 export class CreateCompanyService {
-  private readonly httpService: AxiosInstance;
-
-  constructor(
-    private readonly workspaceOrmManager: WorkspaceOrmManager,
-    private readonly secureHttpClientService: SecureHttpClientService,
-  ) {
-    this.httpService = this.secureHttpClientService.getHttpClient({
-      baseURL: TWENTY_COMPANIES_BASE_URL,
-    });
-  }
+  constructor(private readonly workspaceOrmManager: WorkspaceOrmManager) {}
 
   async createOrRestoreCompanies(
     companies: CompanyToCreate[],
@@ -269,9 +257,7 @@ export class CreateCompanyService {
     company: CompanyToCreate,
     position: number,
   ): Promise<DeepPartial<CompanyWorkspaceEntity>> {
-    const { name, city } = await this.getCompanyInfoFromDomainName(
-      company.domainName,
-    );
+    const name = getCompanyNameFromDomainName(company.domainName ?? '');
     const createdByName = computeDisplayName(
       company.createdByWorkspaceMember?.name,
     );
@@ -289,9 +275,9 @@ export class CreateCompanyService {
           provider: company.createdByContext.provider,
         },
       },
-      address: {
-        addressCity: city,
-      },
+      // No city: CRM-019 (R2) removed the twenty-companies.com lookup that used
+      // to supply it, and the name now comes from the domain alone. An empty
+      // address field is the honest result -- the user fills it in.
       position,
     };
   }
@@ -328,26 +314,4 @@ export class CreateCompanyService {
     return lastCompanyPosition ?? 0;
   }
 
-  private async getCompanyInfoFromDomainName(
-    domainName: string | undefined,
-  ): Promise<{
-    name: string;
-    city: string;
-  }> {
-    try {
-      const response = await this.httpService.get(`/${domainName}`);
-
-      const data = response.data;
-
-      return {
-        name: data.name ?? getCompanyNameFromDomainName(domainName ?? ''),
-        city: data.city,
-      };
-    } catch {
-      return {
-        name: getCompanyNameFromDomainName(domainName ?? ''),
-        city: '',
-      };
-    }
-  }
 }

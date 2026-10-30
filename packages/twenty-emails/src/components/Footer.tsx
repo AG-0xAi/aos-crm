@@ -1,5 +1,6 @@
-import { type I18n } from '@lingui/core';
-import { Column, Container, Row } from 'react-email';
+import { Container, Row } from 'react-email';
+import { BRAND_DOMAIN, BRAND_NAME } from 'twenty-shared/constants';
+
 import { Link } from 'src/components/Link';
 import { ShadowText } from 'src/components/ShadowText';
 
@@ -7,58 +8,20 @@ const footerContainerStyle = {
   marginTop: '12px',
 };
 
-type FooterProps = {
-  i18n: I18n;
-};
-
-export const Footer = ({ i18n }: FooterProps) => {
+// Only Betty's own site: the upstream footer linked Twenty's website, GitHub
+// and two documentation sites (CRM-019 R2). The link text is the domain itself,
+// so it needs no separate label. The operator line is deliberately the brand
+// and nothing more -- a company name, address or subscription-preferences link
+// would be an invention until the founder sets them.
+export const Footer = () => {
   return (
     <Container style={footerContainerStyle}>
       <Row>
-        <Column>
-          <ShadowText>
-            <Link
-              href="https://twenty.com/"
-              value={i18n._('Website')}
-              aria-label={i18n._("Visit Twenty's website")}
-            />
-          </ShadowText>
-        </Column>
-        <Column>
-          <ShadowText>
-            <Link
-              href="https://github.com/twentyhq/twenty"
-              value={i18n._('Github')}
-              aria-label={i18n._("Visit Twenty's GitHub repository")}
-            />
-          </ShadowText>
-        </Column>
-        <Column>
-          <ShadowText>
-            <Link
-              href="https://docs.twenty.com/getting-started/introduction"
-              value={i18n._('User guide')}
-              aria-label={i18n._("Read Twenty's user guide")}
-            />
-          </ShadowText>
-        </Column>
-        <Column>
-          <ShadowText>
-            <Link
-              href="https://docs.twenty.com/"
-              value={i18n._('Developers')}
-              aria-label={i18n._("Visit Twenty's developer documentation")}
-            />
-          </ShadowText>
-        </Column>
+        <ShadowText>
+          <Link href={`https://${BRAND_DOMAIN}`} value={BRAND_DOMAIN} />
+        </ShadowText>
       </Row>
-      <ShadowText>
-        <>
-          {i18n._('Twenty.com, Public Benefit Corporation')}
-          <br />
-          {i18n._('San Francisco / Paris')}
-        </>
-      </ShadowText>
+      <ShadowText>{BRAND_NAME}</ShadowText>
     </Container>
   );
 };

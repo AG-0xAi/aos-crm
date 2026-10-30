@@ -13,7 +13,7 @@ export const getCustomApplicationReadme =
 
 - Created with your workspace and unique to it
 - Cannot be uninstalled: it holds your workspace's customizations
-- Customizations you make from the Twenty interface are saved here automatically
+- Customizations you make from the Betty interface are saved here automatically
 
 ## 💳 Billing
 

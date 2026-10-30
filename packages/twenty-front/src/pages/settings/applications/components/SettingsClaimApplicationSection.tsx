@@ -1,10 +1,8 @@
 import { ApplicationDisplay } from '@/applications/components/ApplicationDisplay';
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { TooltipDelay } from '@/ui/layout/tooltip/constants/TooltipDelay';
-import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useLazyQuery, useMutation } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { i18n } from '@lingui/core';
@@ -82,7 +80,6 @@ export const SettingsClaimApplicationSection = () => {
   const { t } = useLingui();
   const { enqueueToast } = useToast();
 
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,6 +103,8 @@ export const SettingsClaimApplicationSection = () => {
   const claimError = isDefined(claimErrorCode)
     ? getClaimErrorContent(claimErrorCode)
     : null;
+
+  const claimErrorDocumentationUrl = useHelpCenterUrl(claimError?.docPath);
 
   const canSyncCatalog = useHasPermissionFlag(
     PermissionFlagType.MARKETPLACE_APPS,
@@ -231,17 +230,14 @@ export const SettingsClaimApplicationSection = () => {
             title={t`Could not claim this application`}
             description={i18n._(claimError.message)}
             action={
-              <Callout.Action
-                type="button"
-                onClick={() =>
-                  openUrlInNewTab(
-                    getDocumentationUrl({
-                      locale: currentWorkspaceMember?.locale,
-                      path: claimError.docPath,
-                    }),
-                  )
-                }
-              >{t`Read documentation`}</Callout.Action>
+              isDefined(claimErrorDocumentationUrl) ? (
+                <Callout.Action
+                  type="button"
+                  onClick={() =>
+                    openUrlInNewTab(claimErrorDocumentationUrl)
+                  }
+                >{t`Read documentation`}</Callout.Action>
+              ) : undefined
             }
             closeLabel={t`Close`}
             onDismiss={dismissClaimError}

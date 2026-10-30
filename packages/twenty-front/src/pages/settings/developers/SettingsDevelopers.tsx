@@ -1,5 +1,8 @@
 import { NavigationButton } from '@/ui/input/components/NavigationButton';
 
+import { currentUserState } from '@/auth/states/currentUserState';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+
 import { SettingsPageLayout } from '@/settings/components/layout/SettingsPageLayout';
 import { SettingsTabBar } from '@/settings/components/layout/SettingsTabBar';
 import { useSettingsActiveTabId } from '@/settings/components/layout/useSettingsActiveTabId';
@@ -63,6 +66,15 @@ const StyledTableContainer = styled.div<{ isMobile?: boolean }>`
 export const SettingsDevelopers = () => {
   const isMobile = useIsMobile();
   const { t } = useLingui();
+  const currentUser = useAtomStateValue(currentUserState);
+
+  // CRM-019 (R2): the Apps catalogue and the CLI instructions tell the reader
+  // to publish packages to npm and run them against this server. That is the
+  // server operator's job, not a workspace member's, so the two tabs only exist
+  // for a server admin.
+  const isServerAdmin =
+    (currentUser?.canImpersonate || currentUser?.canAccessFullAdminPanel) ??
+    false;
 
   const tabs = [
     {
@@ -75,16 +87,20 @@ export const SettingsDevelopers = () => {
       title: t`Webhooks`,
       Icon: IconWebhook,
     },
-    {
-      id: SETTINGS_DEVELOPERS_TABS.TABS_IDS.APPS,
-      title: t`Apps`,
-      Icon: IconApps,
-    },
-    {
-      id: SETTINGS_DEVELOPERS_TABS.TABS_IDS.CLI,
-      title: t`CLI`,
-      Icon: IconTerminal2,
-    },
+    ...(isServerAdmin
+      ? [
+          {
+            id: SETTINGS_DEVELOPERS_TABS.TABS_IDS.APPS,
+            title: t`Apps`,
+            Icon: IconApps,
+          },
+          {
+            id: SETTINGS_DEVELOPERS_TABS.TABS_IDS.CLI,
+            title: t`CLI`,
+            Icon: IconTerminal2,
+          },
+        ]
+      : []),
   ];
 
   const activeTab: TabKey =
@@ -93,8 +109,12 @@ export const SettingsDevelopers = () => {
       tabs.map((tab) => tab.id),
     ) as TabKey) ?? SETTINGS_DEVELOPERS_TABS.TABS_IDS.API;
 
-  const isAppsTab = activeTab === SETTINGS_DEVELOPERS_TABS.TABS_IDS.APPS;
-  const isCliTab = activeTab === SETTINGS_DEVELOPERS_TABS.TABS_IDS.CLI;
+  // Gated on the same flag as the tab itself: a hand-typed ?tab=cli must not
+  // reach the instructions either.
+  const isAppsTab =
+    isServerAdmin && activeTab === SETTINGS_DEVELOPERS_TABS.TABS_IDS.APPS;
+  const isCliTab =
+    isServerAdmin && activeTab === SETTINGS_DEVELOPERS_TABS.TABS_IDS.CLI;
 
   return (
     <SettingsPageLayout

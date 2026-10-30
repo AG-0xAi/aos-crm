@@ -53,7 +53,7 @@ export const ClickTrackingSwitch = ({ divider }: ClickTrackingSwitchProps) => {
         <SettingsOptionCardContentSwitch
           Icon={IconClick}
           title={t`Track link clicks`}
-          description={t`Count clicks by routing campaign links through Twenty before the original page.`}
+          description={t`Count clicks by routing campaign links through Betty before the original page.`}
           divider={divider}
           checked={currentWorkspace.isCampaignClickTrackingEnabled}
           disabled={loading}

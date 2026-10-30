@@ -15,6 +15,21 @@ export const BRAND_ASSET_PATHS = {
   appIcon: '/brand/logo/betty-app-icon.svg',
   favicon: '/brand/logo/betty-favicon.svg',
   icon512: '/brand/logo/icon-512.png',
+  // Mail clients do not render SVG, so e-mail uses raster only.
+  emailIcon: '/brand/logo/favicon-180.png',
+} as const;
+
+// Brand manual 3.2. Only values needed outside the front's theme tokens live
+// here: e-mail HTML cannot read CSS custom properties.
+export const BRAND_COLORS = {
+  charcoal: '#35362E',
+  terracotta: '#C87452',
+  terracottaInk: '#96442D',
+  ivory: '#F9F5EC',
+  paperWhite: '#FFFDF9',
+  mutedText: '#725F50',
+  beige: '#EADDCA',
+  taupe: '#BDA58D',
 } as const;
 
 // AGPL section 13: a user interacting with the deployed build must be offered

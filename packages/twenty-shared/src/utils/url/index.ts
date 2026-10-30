@@ -14,4 +14,5 @@ export * from './normalizeDomain';
 export * from './normalizeUrl';
 export * from './normalizeUrlOrigin';
 export * from './buildSignedPath';
+export * from './readConfiguredHttpUrl';
 export * from './safeDecodeURIComponent';

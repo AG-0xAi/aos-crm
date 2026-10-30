@@ -1,4 +1,3 @@
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { SettingsAccountsMessageChannelDetails } from '@/settings/accounts/components/SettingsAccountsMessageChannelDetails';
 import { useDeleteEmailGroupChannel } from '@/settings/accounts/hooks/useDeleteEmailGroupChannel';
 import { useMyMessageChannels } from '@/settings/accounts/hooks/useMyMessageChannels';
@@ -12,11 +11,10 @@ import { SettingsSkeletonLoader } from '@/settings/components/SettingsSkeletonLo
 import { SettingsPageLayout } from '@/settings/components/layout/SettingsPageLayout';
 import { SettingsEmailingDomainDnsRecords } from '@/settings/emailing-domains/components/SettingsEmailingDomainDnsRecords';
 import { SettingsEmailingDomainVerifyButton } from '@/settings/emailing-domains/components/SettingsEmailingDomainVerifyButton';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { ConfirmationDialog } from '@/ui/layout/dialog/components/ConfirmationDialog';
 import { useDialog } from '@/ui/layout/dialog/hooks/useDialog';
-import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
@@ -63,11 +61,13 @@ const StyledSendingDomainColumn = styled.div`
 
 export const SettingsWorkspaceCommunicationGroupChannelDetail = () => {
   const { t } = useLingui();
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
   const navigateSettings = useNavigateSettings();
   const { messageChannelId } = useParams<{ messageChannelId: string }>();
   const { channels, loading } = useMyMessageChannels();
   const { copyToClipboard } = useCopyToClipboard();
+  const forwardingDocumentationUrl = useHelpCenterUrl(
+    '/user-guide/calendar-emails/how-tos/forward-a-shared-inbox-from-any-mail-provider',
+  );
   const { openDialog } = useDialog();
   const { enqueueToast } = useToast();
   const { deleteEmailGroupChannel, loading: deleting } =
@@ -189,18 +189,15 @@ export const SettingsWorkspaceCommunicationGroupChannelDetail = () => {
                 title={t`Set up forwarding and DNS`}
                 description={t`Follow the guide for your email provider.`}
                 action={
-                  <Button
-                    size="sm"
-                    endIcon={<IconArrowUpRight />}
-                    onClick={() =>
-                      openUrlInNewTab(
-                        getDocumentationUrl({
-                          locale: currentWorkspaceMember?.locale,
-                          path: '/user-guide/calendar-emails/how-tos/forward-a-shared-inbox-from-any-mail-provider',
-                        }),
-                      )
-                    }
-                  >{t`Read documentation`}</Button>
+                  isDefined(forwardingDocumentationUrl) ? (
+                    <Button
+                      size="sm"
+                      endIcon={<IconArrowUpRight />}
+                      onClick={() =>
+                        openUrlInNewTab(forwardingDocumentationUrl)
+                      }
+                    >{t`Read documentation`}</Button>
+                  ) : undefined
                 }
               />
             }
@@ -261,7 +258,7 @@ export const SettingsWorkspaceCommunicationGroupChannelDetail = () => {
           <Section.Root>
             <Section.Header
               title={t`Sending domain`}
-              description={t`Add these records at your DNS provider. Twenty checks them automatically.`}
+              description={t`Add these records at your DNS provider. Betty checks them automatically.`}
             />
             <StyledSendingDomainColumn>
               <StyledInputRow>

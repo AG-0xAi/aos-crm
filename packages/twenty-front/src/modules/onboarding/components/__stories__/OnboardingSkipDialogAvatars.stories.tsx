@@ -3,19 +3,15 @@ import { expect, waitFor, within } from 'storybook/test';
 import { ComponentDecorator } from 'twenty-ui/testing';
 
 import { OnboardingSkipDialogAvatars } from '@/onboarding/components/OnboardingSkipDialogAvatars';
-import { ONBOARDING_NETWORK_PREVIEW_PEOPLE } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
+import { ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
 
 const meta: Meta<typeof OnboardingSkipDialogAvatars> = {
   title: 'Modules/Onboarding/OnboardingSkipDialogAvatars',
   component: OnboardingSkipDialogAvatars,
   decorators: [ComponentDecorator],
   args: {
-    avatars: ONBOARDING_NETWORK_PREVIEW_PEOPLE.map((person) => ({
-      id: person.id,
-      name: '',
-      src: person.avatarUrl,
-      shape: 'circle',
-    })),
+    avatars: [],
+    emptySeatsCount: ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT,
   },
 };
 
@@ -26,7 +22,7 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() =>
       expect(within(canvasElement).getAllByRole('presentation')).toHaveLength(
-        ONBOARDING_NETWORK_PREVIEW_PEOPLE.length,
+        ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT,
       ),
     );
   },

@@ -14,6 +14,7 @@ export { APPLICATION_MONITORING_RETENTION_IN_DAYS } from './ApplicationMonitorin
 export { BACKEND_BATCH_REQUEST_MAX_COUNT } from './BackendBatchRequestMaxCount';
 export {
   BRAND_ASSET_PATHS,
+  BRAND_COLORS,
   BRAND_DESCRIPTOR,
   BRAND_DOMAIN,
   BRAND_LICENSE_NAME,
@@ -41,7 +42,6 @@ export { DEFAULT_VIEW_GROUP_LOAD_LIMIT } from './DefaultViewGroupLoadLimit';
 export { DEFAULT_VISIBLE_ADDRESS_SUBFIELDS } from './DefaultVisibleAddressSubfields';
 export { DEFAULT_WIDGET_SIZE } from './DefaultWidgetSize';
 export { DEPRECATED_IANA_TIME_ZONE_ALIASES } from './DeprecatedIanaTimeZoneAliases';
-export { DOCUMENTATION_BASE_URL } from './DocumentationBaseUrl';
 export { DOCUMENTATION_DEFAULT_LANGUAGE } from './DocumentationDefaultLanguage';
 export { DOCUMENTATION_DEFAULT_PATH } from './DocumentationDefaultPath';
 export type { DocumentationPath } from './DocumentationPaths';
@@ -96,8 +96,6 @@ export { SUBDOMAIN_PATTERN } from './SubdomainPattern';
 export { SystemPermissionFlag } from './SystemPermissionFlag';
 export { TAG_COLORS } from './TagColors';
 export { TOOL_PERMISSION_FLAGS } from './ToolPermissionFlags';
-export { TWENTY_COMPANIES_BASE_URL } from './TwentyCompaniesBaseUrl';
-export { TWENTY_ICONS_BASE_URL } from './TwentyIconsBaseUrl';
 export { UI_SCALE_VALUES } from './UiScaleValues';
 export { VALIDATION_RULE_EMPTINESS_SUBFIELDS_BY_COMPOSITE_TYPE } from './ValidationRuleEmptinessSubfieldsByCompositeType';
 export { VALIDATION_RULE_EXPRESSION_MAX_LENGTH } from './ValidationRuleExpressionMaxLength';

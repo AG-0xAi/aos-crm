@@ -1,10 +1,11 @@
 import { styled } from '@linaria/react';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { Trans } from '@lingui/react/macro';
 
+import { LicenseNotice } from '@/auth/sign-in-up/components/LicenseNotice';
 import { useWorkspaceBypass } from '@/auth/sign-in-up/hooks/useWorkspaceBypass';
-import { getTwentyWebsiteUrl } from '@/auth/utils/getTwentyWebsiteUrl';
 import { useIsCurrentLocationOnAWorkspace } from '@/domain-manager/hooks/useIsCurrentLocationOnAWorkspace';
 import { ONBOARDING_CONTENT_BLOCK_WIDTH } from '@/onboarding/constants/OnboardingContentBlockWidth';
+import { BRAND_PRIVACY_URL, BRAND_TERMS_URL } from 'twenty-shared/constants';
 import { themeCssVariables } from 'twenty-ui/theme';
 
 const StyledCopyContainer = styled.div`
@@ -57,62 +58,59 @@ const StyledSeparator = styled.span`
   color: ${themeCssVariables.font.color.tertiary};
 `;
 
+const StyledFooter = styled.div`
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[2]};
+  max-width: 100%;
+`;
+
 export const FooterNote = () => {
   const { isOnAWorkspace } = useIsCurrentLocationOnAWorkspace();
-  const { i18n } = useLingui();
 
   const { shouldOfferBypass, shouldUseBypass, enableBypass } =
     useWorkspaceBypass();
 
   if (!isOnAWorkspace) {
     return (
-      <StyledCopyContainer>
-        <Trans>By using Twenty, you agree to the</Trans>{' '}
-        <a
-          href={getTwentyWebsiteUrl(i18n.locale, 'terms')}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Trans>Terms of Service</Trans>
-        </a>{' '}
-        <Trans>and</Trans>{' '}
-        <a
-          href={getTwentyWebsiteUrl(i18n.locale, 'privacy-policy')}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Trans>Privacy Policy</Trans>
-        </a>
-        .
-      </StyledCopyContainer>
+      <StyledFooter>
+        <StyledCopyContainer>
+          <Trans>By using Betty, you agree to the</Trans>{' '}
+          <a href={BRAND_TERMS_URL} target="_blank" rel="noopener noreferrer">
+            <Trans>Terms of Service</Trans>
+          </a>{' '}
+          <Trans>and</Trans>{' '}
+          <a href={BRAND_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+            <Trans>Privacy Policy</Trans>
+          </a>
+          .
+        </StyledCopyContainer>
+        <LicenseNotice />
+      </StyledFooter>
     );
   }
 
   return (
-    <StyledLinksContainer>
-      {shouldOfferBypass && !shouldUseBypass && (
-        <>
-          <button type="button" onClick={enableBypass}>
-            <Trans>Bypass SSO</Trans>
-          </button>
-          <StyledSeparator>•</StyledSeparator>
-        </>
-      )}
-      <a
-        href={getTwentyWebsiteUrl(i18n.locale, 'privacy-policy')}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Trans>Privacy Policy</Trans>
-      </a>
-      <StyledSeparator>•</StyledSeparator>
-      <a
-        href={getTwentyWebsiteUrl(i18n.locale, 'terms')}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Trans>Terms of Service</Trans>
-      </a>
-    </StyledLinksContainer>
+    <StyledFooter>
+      <StyledLinksContainer>
+        {shouldOfferBypass && !shouldUseBypass && (
+          <>
+            <button type="button" onClick={enableBypass}>
+              <Trans>Bypass SSO</Trans>
+            </button>
+            <StyledSeparator>•</StyledSeparator>
+          </>
+        )}
+        <a href={BRAND_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+          <Trans>Privacy Policy</Trans>
+        </a>
+        <StyledSeparator>•</StyledSeparator>
+        <a href={BRAND_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          <Trans>Terms of Service</Trans>
+        </a>
+      </StyledLinksContainer>
+      <LicenseNotice />
+    </StyledFooter>
   );
 };

@@ -17,35 +17,21 @@ describe('sanitizeURL', () => {
   });
 });
 
+// AOS-CRM CRM-019 (R2): no company-icon provider. Every caller must get
+// undefined, whatever shape the domain arrives in, so none of them can send a
+// user's domain to a third party.
 describe('getLogoUrlFromDomainName', () => {
-  test('should return the correct logo URL for a given domain', () => {
-    expect(getLogoUrlFromDomainName('example.com')).toBe(
-      'https://twenty-icons.com/example.com',
-    );
-
-    expect(getLogoUrlFromDomainName('http://example.com/')).toBe(
-      'https://twenty-icons.com/example.com',
-    );
-
-    expect(getLogoUrlFromDomainName('https://www.example.com/')).toBe(
-      'https://twenty-icons.com/example.com',
-    );
-
-    expect(getLogoUrlFromDomainName('www.example.com')).toBe(
-      'https://twenty-icons.com/example.com',
-    );
-
-    expect(getLogoUrlFromDomainName('example.com/')).toBe(
-      'https://twenty-icons.com/example.com',
-    );
-
-    expect(getLogoUrlFromDomainName('apple.com')).toBe(
-      'https://twenty-icons.com/apple.com',
-    );
-
-    expect(getLogoUrlFromDomainName('https://www.snowww.io')).toBe(
-      'https://twenty-icons.com/snowww.io',
-    );
+  test.each([
+    'example.com',
+    'http://example.com/',
+    'https://www.example.com/',
+    'www.example.com',
+    'example.com/',
+    'apple.com',
+    'https://www.snowww.io',
+    '',
+  ])('returns no provider URL for %p', (domain) => {
+    expect(getLogoUrlFromDomainName(domain)).toBeUndefined();
   });
 
   test('should handle undefined input', () => {

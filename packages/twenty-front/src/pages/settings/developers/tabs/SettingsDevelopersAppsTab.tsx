@@ -1,19 +1,17 @@
 import { useRefetchOnApplicationRegistrationChange } from '@/applications/hooks/useRefetchOnApplicationRegistrationChange';
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { TWENTY_CLI_CREATE_APP_COMMANDS } from '@/settings/developers/constants/TwentyCliCreateAppCommands';
 import { TWENTY_CLI_LOGIN_COMMAND } from '@/settings/developers/constants/TwentyCliLoginCommand';
 import { useHasPermissionFlag } from '@/settings/roles/hooks/useHasPermissionFlag';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { Table } from '@/ui/layout/table/components/Table';
 import { TableHeader } from '@/ui/layout/table/components/TableHeader';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
-import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
 import { useState } from 'react';
 import { SettingsPath } from 'twenty-shared/types';
-import { getSettingsPath } from 'twenty-shared/utils';
+import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import { CommandBlock } from 'twenty-ui/components/data-display';
 import { SearchInput } from 'twenty-ui/components/input';
 import { Section } from 'twenty-ui/components/layout';
@@ -51,7 +49,9 @@ const StyledTableRowsContainer = styled.div`
 export const SettingsDevelopersAppsTab = () => {
   const { t } = useLingui();
   const theme = useTheme();
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
+  const appsDocumentationUrl = useHelpCenterUrl(
+    '/developers/extend/apps/getting-started',
+  );
 
   const { copyToClipboard } = useCopyToClipboard();
 
@@ -101,21 +101,16 @@ export const SettingsDevelopersAppsTab = () => {
           description={t`You can either create a private app or share it to others`}
         />
         <CommandBlock commands={createCommands} actions={createCopyButton} />
-        <StyledButtonContainer>
-          <Button
-            startIcon={<IconArrowUpRight />}
-            size="sm"
-            onClick={() =>
-              openUrlInNewTab(
-                getDocumentationUrl({
-                  locale: currentWorkspaceMember?.locale,
-                  path: '/developers/extend/apps/getting-started',
-                }),
-              )
-            }
-            variant="outline"
-          >{t`Read documentation`}</Button>
-        </StyledButtonContainer>
+        {isDefined(appsDocumentationUrl) && (
+          <StyledButtonContainer>
+            <Button
+              startIcon={<IconArrowUpRight />}
+              size="sm"
+              onClick={() => openUrlInNewTab(appsDocumentationUrl)}
+              variant="outline"
+            >{t`Read documentation`}</Button>
+          </StyledButtonContainer>
+        )}
       </Section.Root>
 
       {registrations.length > 0 && (

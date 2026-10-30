@@ -7,7 +7,7 @@ import { ComponentDecorator } from 'twenty-ui/testing';
 
 import { OnboardingSkipDialog } from '@/onboarding/components/OnboardingSkipDialog';
 import { OnboardingSkipDialogAvatars } from '@/onboarding/components/OnboardingSkipDialogAvatars';
-import { ONBOARDING_NETWORK_PREVIEW_PEOPLE } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
+import { ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT } from '@/onboarding/constants/OnboardingNetworkPreviewPeople';
 import { useDialog } from '@/ui/layout/dialog/hooks/useDialog';
 import { RootDecorator } from '~/testing/decorators/RootDecorator';
 
@@ -48,17 +48,13 @@ const meta: Meta<typeof OnboardingSkipDialogExample> = {
   args: {
     visual: (
       <OnboardingSkipDialogAvatars
-        avatars={ONBOARDING_NETWORK_PREVIEW_PEOPLE.map((person) => ({
-          id: person.id,
-          name: '',
-          src: person.avatarUrl,
-          shape: 'circle',
-        }))}
+        avatars={[]}
+        emptySeatsCount={ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT}
       />
     ),
     title: 'Start with your whole network',
     description:
-      'Twenty adds the people you email and meet, and keeps them up to date without manual data entry.',
+      'Betty adds the people you email and meet, and keeps them up to date without manual data entry.',
     actions: [
       {
         label: 'Continue with Microsoft',

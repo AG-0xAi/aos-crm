@@ -1,7 +1,7 @@
 import { t } from '@lingui/core/macro';
 
 export const getStandardApplicationReadme =
-  (): string => t`Every Twenty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.
+  (): string => t`Every Betty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.
 
 ## ✨ What you get
 
@@ -13,7 +13,7 @@ export const getStandardApplicationReadme =
 
 ## 📌 Good to know
 
-- Installed on every workspace and maintained by Twenty
+- Installed on every workspace and maintained by Betty
 - Cannot be uninstalled: the rest of the workspace is built on it
 - Your own objects, fields and layouts live in the **Custom** app
 

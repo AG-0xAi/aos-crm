@@ -1,12 +1,11 @@
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { TWENTY_CLI_CREATE_APP_COMMANDS } from '@/settings/developers/constants/TwentyCliCreateAppCommands';
 import { TWENTY_CLI_LOGIN_COMMAND } from '@/settings/developers/constants/TwentyCliLoginCommand';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
-import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
+import { useHelpCenterUrl } from '@/support/hooks/useHelpCenterUrl';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
 import { type ReactNode } from 'react';
 import { doNotTranslate } from 'twenty-shared/i18n';
+import { isDefined } from 'twenty-shared/utils';
 import { CommandBlock } from 'twenty-ui/components/data-display';
 import { Section } from 'twenty-ui/components/layout';
 import { IconArrowUpRight, IconCopy } from 'twenty-ui/icon';
@@ -66,7 +65,9 @@ const SettingsDevelopersCliCommandSection = ({
 
 export const SettingsDevelopersCliTab = () => {
   const { t } = useLingui();
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
+  const cliDocumentationUrl = useHelpCenterUrl(
+    '/developers/extend/apps/operations/cli',
+  );
 
   return (
     <>
@@ -101,19 +102,14 @@ export const SettingsDevelopersCliTab = () => {
             variant="ghost"
             onClick={() => openUrlInNewTab(CLI_COMMAND_REFERENCE_URL)}
           >{t`Command reference`}</Button>
-          <Button
-            startIcon={<IconArrowUpRight />}
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              openUrlInNewTab(
-                getDocumentationUrl({
-                  locale: currentWorkspaceMember?.locale,
-                  path: '/developers/extend/apps/operations/cli',
-                }),
-              )
-            }
-          >{t`Read documentation`}</Button>
+          {isDefined(cliDocumentationUrl) && (
+            <Button
+              startIcon={<IconArrowUpRight />}
+              size="sm"
+              variant="outline"
+              onClick={() => openUrlInNewTab(cliDocumentationUrl)}
+            >{t`Read documentation`}</Button>
+          )}
         </StyledButtonContainer>
       </SettingsDevelopersCliCommandSection>
     </>
