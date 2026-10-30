@@ -10,11 +10,15 @@ locals {
 # One certificate for the apex and every workspace subdomain (CRM-013 R2):
 # the beta gives each user their own `<workspace>.<domain>` host, so a
 # per-user certificate would mean a Terraform change (and a new validation)
-# every time the operator creates a workspace. The wildcard does NOT cover
-# the apex, hence both names: `*.betty.example` matches `app.betty.example`
-# but never `betty.example`, which is the API host SERVER_URL points at
-# (ecs.tf). It also does not cover a second label (`a.b.<domain>`), which
-# this stack never serves.
+# every time the operator creates a workspace. One wildcard covers every host
+# this stack serves since CRM-018 -- `api.`, `app.` and each workspace -- so
+# moving the API off the apex needed no certificate change. The apex stays as
+# the certificate's own domain_name because the wildcard does not cover it
+# (`*.betty.example` matches `app.betty.example` but never `betty.example`)
+# and ACM cannot change it without reissuing: harmless to keep serving it on
+# the listener even after the apex record leaves for the landing. It also
+# does not cover a second label (`a.b.<domain>`), which this stack never
+# serves.
 resource "aws_acm_certificate" "this" {
   domain_name               = var.domain_name
   subject_alternative_names = ["*.${var.domain_name}"]
@@ -83,24 +87,55 @@ resource "aws_lb" "this" {
   }
 }
 
-# Apex and wildcard both alias straight to the ALB (CRM-013 R2). One wildcard
-# record is what makes a new beta user reachable without touching Terraform:
-# the server picks the workspace from the request host
+# The wildcard is what makes a new beta user reachable without touching
+# Terraform: the server picks the workspace from the request host
 # (workspace-domains.service.ts's resolveWorkspaceAndPublicDomain), so
-# `<workspace>.<domain>`, `app.<domain>` and the apex are the same ALB and the
-# same ECS service. Alias (not CNAME) because the apex of a zone cannot hold a
-# CNAME; evaluate_target_health stays false since the ALB's own target group
+# `<workspace>.<domain>`, `app.<domain>` and `api.<domain>` are the same ALB
+# and the same ECS service (CRM-013 R2).
+#
+# The apex is the one host that can leave (CRM-018 R2). Left at its default it
+# keeps aliasing the ALB exactly as before; set var.apex_a_records and it
+# becomes a plain A record at the external host instead. This is written as a
+# `dynamic "alias"` block inside the SAME resource rather than two
+# count-guarded resources on purpose: changing the resource address would make
+# Terraform plan a destroy/create of the live apex record, and R2 asks for a
+# plan that is empty with the defaults.
+#
+# Alias (not CNAME) in the default case because the apex of a zone cannot hold
+# a CNAME; evaluate_target_health stays false since the ALB's own target group
 # health check already decides what it serves.
 resource "aws_route53_record" "apex" {
   zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
 
-  alias {
-    name                   = aws_lb.this.dns_name
-    zone_id                = aws_lb.this.zone_id
-    evaluate_target_health = false
+  records = length(var.apex_a_records) > 0 ? var.apex_a_records : null
+  ttl     = length(var.apex_a_records) > 0 ? var.external_record_ttl : null
+
+  dynamic "alias" {
+    for_each = length(var.apex_a_records) > 0 ? [] : [1]
+
+    content {
+      name                   = aws_lb.this.dns_name
+      zone_id                = aws_lb.this.zone_id
+      evaluate_target_health = false
+    }
   }
+}
+
+# `www` has no record of its own by default: the wildcard above already
+# answers for it with the ALB, which is why this resource is absent from the
+# plan until var.www_cname_target is set. An explicit record wins over the
+# wildcard in Route 53, so setting it moves only `www` to the external host
+# and leaves every other subdomain on the ALB.
+resource "aws_route53_record" "www" {
+  count = var.www_cname_target == null ? 0 : 1
+
+  zone_id = local.route53_zone_id
+  name    = "www.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = var.external_record_ttl
+  records = [var.www_cname_target]
 }
 
 resource "aws_route53_record" "wildcard" {

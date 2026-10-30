@@ -38,13 +38,19 @@ dar o quitar esa marca a otra persona existe `updateServerAdminAccess` en el pan
 **URLs.** Con multi-espacio activo el espacio se deduce del *host* de la petición, no de la
 configuración:
 
-| Para qué | Local | AWS (beta, CRM-013) |
+| Para qué | Local | AWS (beta, CRM-013 + CRM-018) |
 | --- | --- | --- |
 | Acceso / selector de espacios | `http://app.localhost:43000` | `https://app.<dominio>` |
 | Espacio del operador | `http://aos-crm.localhost:43000` | `https://<subdominio>.<dominio>` |
 | Espacio de un amigo | `http://<subdominio>.localhost:43000` | `https://<subdominio>.<dominio>` |
 | Conector MCP de ese amigo | `http://<subdominio>.localhost:43000/mcp` | `https://<subdominio>.<dominio>/mcp` |
 | Pantalla de autorización | `http://<subdominio>.localhost:43000/authorize` | `https://<subdominio>.<dominio>/authorize` |
+| API (`SERVER_URL`): ficheros, OAuth, webhooks | `http://localhost:43000` | `https://api.<dominio>` |
+| La raíz `<dominio>` | no se usa | **no es del CRM** (ver §7) |
+
+Desde CRM-018 (orden del founder, 30 de octubre de 2026) **la raíz del dominio no sirve el CRM en
+AWS**: queda libre para la landing. La API se mudó a `api.<dominio>` y los espacios, el acceso y la
+pantalla de autorización siguen exactamente donde estaban. El stack local no cambia.
 
 En local el host base es `localhost` y no `127.0.0.1` a propósito: los navegadores resuelven
 `*.localhost` a loopback sin DNS ni fichero `hosts` (RFC 6761), y una IP literal no tiene
@@ -84,7 +90,8 @@ y el servidor le responde `Workspace creation is restricted to admins`; no se cr
 Este despliegue **no tiene salida de correo**: `EMAIL_DRIVER` se queda en el valor por defecto
 `LOGGER` (`config-variables.ts:531`), de modo que el "correo" de invitación se escribe en un log y no
 sale de la máquina (`email/drivers/logger.driver.ts`). Eso es lo que convierte el enlace de
-invitación en un enlace que el operador copia a mano.
+invitación en un enlace que el operador copia a mano. Es la etapa 1 de §8, y mientras siga ahí este
+procedimiento es el único que funciona.
 
 **En el log del `worker`, no del `server`.** `EmailService.send` no envía: encola un `EmailSenderJob`
 (`email/email.service.ts`), y quien lo ejecuta —y por tanto quien imprime el correo entero— es el
@@ -241,9 +248,29 @@ No la del host base. El descubrimiento OAuth se construye con el **host que pidi
   donde ya está identificado. Ahí ve qué pide el cliente y lo aprueba (`authorizeApp`,
   `auth.resolver.ts:1139`), y el código vuelve al cliente con PKCE S256.
 
-Si en cambio pegara el host base (`SERVER_URL`), el servidor detecta que ese host no sirve ninguna
-interfaz de espacio (`isApiHost`) y manda la autorización a `app.<dominio>/authorize?iss=…`. Funciona,
-pero hace al usuario pasar por el selector, así que el procedimiento es dar su propia URL.
+**Corrección (CRM-018, 30 de octubre de 2026).** Hasta ahora este runbook decía que pegar el host de
+la API «funciona, pero hace al usuario pasar por el selector». Al leer el código con detalle, **no
+funciona**, y conviene saber por qué para no perder una tarde: el servidor ve que ese host no sirve
+ninguna interfaz de espacio (`isApiHost` en `oauth-discovery.controller.ts:91-95`) y manda la
+autorización a `app.<dominio>/authorize?iss=…`; pero en `app.<dominio>` el front carga el enrutador
+sin espacio (`DomainShell.tsx:39` → `useCreateRootAppRouter.tsx`), que **no tiene ruta
+`/authorize`** — solo acceso, invitación, verificación de correo y restablecimiento. El usuario
+acaba en una página «no encontrada». Y aunque la tuviera, la mutación que concede el permiso exige
+un espacio en la sesión (`authorizeApp` con `@AuthWorkspace()`, `auth.resolver.ts:1149` y
+`auth-workspace.decorator.ts`), y `app.<dominio>` es justamente el host que el servidor traduce a
+«ningún espacio» (`get-subdomain-and-custom-domain-from-hostname.util.ts:30`).
+
+**Por eso hay una sola URL de conector y es la del espacio.** Es además la que la propia aplicación
+enseña en **Ajustes > IA**: esa pantalla la construye con el origen de la ventana del navegador, no
+con una URL configurada (`SettingsMcpSetup.tsx:49` sobre `buildMcpServerUrl`, que lee
+`REACT_APP_SERVER_BASE_URL`; cuando el servidor sirve el front inyecta `window._env_ = {}`, ver
+`render-frontend-html.util.ts:19`, así que el valor acaba siendo `window.location.origin`). Si el
+usuario está dentro de su espacio, lo que copia de Ajustes > IA y lo que dice este runbook son la
+misma URL. No hay dos respuestas.
+
+Este punto no se ha ejercitado contra el despliegue de AWS: está leído del código y medido en local
+por `crm-isolation-e2e.test.mjs`. La comprobación tras el despliegue es
+`scripts/aos/verify-public-hosts.mjs` (ver §7).
 
 Medido en `crm-isolation-e2e.test.mjs` (R3): el token OAuth que obtiene un usuario de su espacio
 **solo ve su espacio** por `/mcp` — los ids del otro espacio no se leen, no aparecen al buscar por
@@ -255,13 +282,188 @@ Límite heredado de CRM-007 y que sigue en pie: un token de acceso OAuth ya emit
 autocontenido y sobrevive a la revocación de su autorización hasta que caduca (hasta 1800 s). Para
 cortar el acceso de inmediato hay que cambiar la contraseña del usuario o quitarlo del espacio.
 
-## 7. Lo que este runbook no cubre
+## 7. Sacar el CRM de la raíz y poner ahí la landing
+
+Orden del founder del 30 de octubre de 2026: la raíz del dominio es para la landing, el CRM vive en
+sus subdominios. Son **dos pasos separados**, y el orden importa.
+
+### Paso 1 — Mover la API (se puede hacer ya, sin la landing)
+
+La API pasa de la raíz a `api.<dominio>`. No hace falta ningún DNS nuevo ni ningún certificado
+nuevo: el comodín `*.<dominio>` y el certificado comodín ya cubren ese nombre, y `api` es un
+subdominio que Twenty tiene reservado, así que ningún espacio puede llamarse así nunca
+(`twenty-shared/src/constants/ReservedSubdomains.ts`).
+
+1. Aplicar Terraform con el cambio de CRM-018 (`deploy/aws/ecs.tf`). Lo único que cambia es la
+   definición de tarea de ECS: el servicio se despliega de nuevo con `SERVER_URL=https://api.<dominio>`.
+2. Esperar a que el servicio quede estable y comprobarlo con la comprobación de abajo.
+
+**Qué se nota y qué no.** No se nota: los espacios, el acceso, los enlaces de los correos y la
+pantalla de autorización siguen igual, porque todos se construyen desde `app.<dominio>` o desde el
+subdominio del espacio, nunca desde la raíz. Sí se nota, y hay que tenerlo en cuenta:
+
+- **Los enlaces de ficheros firmados que ya se habían generado** apuntaban a la raíz
+  (`file-url.service.ts`); los nuevos apuntan a `api.<dominio>`. Mientras la raíz siga en el ALB,
+  los viejos siguen funcionando; cuando la raíz se vaya a la landing, dejan de funcionar. Son
+  enlaces de corta vida (caducan con su token), así que basta con no hacer los dos pasos el mismo
+  minuto.
+- **Webhooks de Google y Microsoft** se registran con la URL de la API
+  (`google-webhook-subscription.driver.ts`, `microsoft-webhook-subscription.driver.ts`). Esta beta
+  no los usa; si algún día se usan, hay que volver a registrarlos tras el cambio.
+
+### Paso 2 — Dar la raíz a la landing (cuando la landing esté lista)
+
+En `terraform.tfvars`, rellenar las dos variables que CRM-018 añadió y aplicar:
+
+```hcl
+apex_a_records   = ["<la dirección A que publique el host de la landing>"]
+www_cname_target = "<el destino CNAME que publique el host de la landing>"
+```
+
+Con esas dos líneas el plan toca **solo** dos registros DNS: la raíz deja de ser un alias al ALB y
+pasa a ser un registro A al host externo, y `www` pasa a tener su propio CNAME (hoy no tiene
+registro propio: lo resuelve el comodín). Sin esas dos líneas el plan no cambia nada, que es como
+está hoy.
+
+Lo que **no** se toca y conviene no tocar: los registros de correo de la raíz (MX y SPF de
+`apex_mailbox_mx_records` / `apex_mailbox_spf_value`, CRM-017) son de otro tipo y conviven con el
+registro A. Moverse la landing no afecta al correo.
+
+### Volver atrás
+
+Quitar esas dos líneas de `terraform.tfvars` y aplicar: la raíz vuelve a ser alias del ALB y el
+registro de `www` desaparece. El TTL de los registros externos es de 300 segundos
+(`var.external_record_ttl`), así que la vuelta tarda minutos, no horas. Volver atrás del paso 1 es
+igual de simple: revertir `SERVER_URL` y desplegar, pero **solo tiene sentido si la raíz todavía
+está en el ALB**.
+
+### Comprobarlo (no fiarse de que el apply dijo «ok»)
+
+```sh
+node scripts/aos/verify-public-hosts.mjs --domain <dominio> --workspace-host <subdominio>.<dominio>
+```
+
+Comprueba, contra el despliegue de verdad: que `api.<dominio>/healthz` responde 200; que el
+descubrimiento OAuth en `api.<dominio>` y en el espacio devuelve como emisor **el host que se
+pidió**; que `/mcp` sin credenciales devuelve 401 con su puntero `resource_metadata` a ese mismo
+host en los dos; y que `app.<dominio>` sirve la pantalla de acceso de verdad (busca el elemento que
+el servidor inyecta, no solo un 200). Si algo falla en su subdominio pero la raíz sí lo contesta, lo
+dice con esas palabras. Sale distinto de 0 si algo falla.
+
+Después del paso 2, añadir `--require-apex-off`: así además exige que la raíz **ya no** sirva el
+CRM. Antes del paso 2 eso es normal y el script lo dice como información, no como fallo.
+
+### Reconectar ChatGPT y Claude
+
+La URL del conector **no cambia con esta mudanza**: siempre fue y sigue siendo la del espacio,
+`https://<subdominio>.<dominio>/mcp` (§6). Quien ya lo tenga conectado no tiene que hacer nada.
+
+Quien lo tenga apuntando a la raíz (porque alguien se lo dio mal) tiene que rehacerlo: borrar el
+conector en su cliente y añadirlo de nuevo con la URL de su espacio. La forma de llegar a ella sin
+preguntar a nadie es **Ajustes > IA** dentro de su propio espacio, que muestra exactamente esa URL y
+la deja copiar. Al añadirlo, el cliente pide autorización y el usuario la aprueba en la pantalla de
+su espacio; no hay que tocar nada en el servidor.
+
+### Un aviso de seguridad que hay que leer antes del paso 2
+
+Mientras `FRONTEND_URL` siga siendo la raíz —y tiene que seguir siéndolo, es de donde el servidor
+deduce el nombre de cada espacio—, el servidor sigue teniendo el **origen de la raíz en su lista de
+orígenes de confianza** para peticiones con credenciales
+(`resolve-allowed-credentialed-origins.util.ts:85`, que la deriva de `FRONTEND_URL` sin condición).
+Hoy eso es inofensivo porque la raíz es el propio CRM. Cuando la raíz la sirva un tercero, cualquier
+script que se ejecute en la landing queda tratado como origen de confianza por la API del CRM. No
+hay interruptor de configuración que lo quite: la lista solo se puede ampliar
+(`AUTH_COOKIE_ALLOWED_ORIGINS`), no recortar. **Es una decisión para el founder** antes del paso 2:
+o se acepta (la landing es suya y controla qué scripts carga), o hace falta un cambio de código en
+ese fichero, que está fuera de lo que CRM-018 tocó.
+
+## 8. El correo: tres etapas, y el buzón del dominio
+
+Mandar y recibir son dos cosas distintas, las hace cada una un proveedor distinto, y se encienden
+por separado:
+
+- **Mandar** (invitaciones, restablecimientos, avisos) lo hace Amazon SES, que CRM-017 ya montó en
+  AWS: el dominio dado de alta, sus firmas DKIM, el remitente y un usuario con permiso para enviar y
+  nada más. Está montado pero **apagado**, a propósito.
+- **Recibir** (el buzón donde el founder lee lo que le escriben) lo hace un proveedor de correo
+  externo contratado con el dominio. SES no recibe nada.
+
+### Las tres etapas de mandar correo
+
+Cada etapa es **una línea en `terraform.tfvars` y un apply**, nunca un cambio de código ni una
+imagen nueva:
+
+| Etapa | Qué se pone en `terraform.tfvars` | Qué cambia para la gente |
+| --- | --- | --- |
+| **1. Hoy** | nada: los valores por defecto | El correo **se escribe en el log del worker** y no sale a internet, que es de lo que vive el procedimiento a mano de §2 y §4. Para entrar no hace falta tener la dirección verificada. |
+| **2. Correo de verdad** | `outbound_email_enabled = true` | Invitaciones y restablecimientos salen por SES desde el remitente del dominio, y el operador deja de copiar enlaces del log. Entrar sigue sin exigir verificación. |
+| **3. Verificación obligatoria** | y además `email_verification_required = true` | Quien no tenga su dirección verificada no puede entrar. Es el control que cierra el agujero del aviso de §2 («una invitación pendiente es una credencial»). |
+
+**La etapa 1 es la que está aplicada y la que describe el resto de este runbook.** Las etapas 2 y 3
+son decisiones del founder, y cada una tiene una condición que no depende de nosotros.
+
+### Qué hay que esperar para la etapa 2
+
+AWS tiene la cuenta de SES en el **sandbox**: en ese modo SES solo entrega a direcciones que alguien
+haya dado de alta y confirmado **una a una** en la consola de AWS. Invitar a un amigo desde el CRM
+con SES en sandbox no da un error visible en la aplicación: el correo simplemente no llega. Por eso
+la etapa 2 espera a que AWS saque la cuenta del sandbox (hay una solicitud abierta; la primera fue
+denegada). Mientras eso no pase, encenderla empeora las cosas respecto a la etapa 1, donde al menos
+el enlace está en el log y el operador lo puede pasar.
+
+### Qué hay que hacer antes de la etapa 3, y por qué en este orden
+
+En cada entrada, el servidor comprueba que la dirección del usuario esté marcada como verificada en
+la base de datos (`checkIsEmailVerified`, `auth.service.ts:260-266`). **Todas las cuentas que existen
+hoy se crearon a mano, sin correo, así que ninguna lo está.** Encender la etapa 3 antes de arreglar
+eso echa fuera de su propio espacio a todo el mundo, el operador incluido. El orden es:
+
+1. Etapa 2 encendida y probada: un correo de verdad que llega. Sin eso, el enlace de verificación no
+   tiene a dónde ir, y de eso se ocupa Terraform, que **se niega a aplicar la etapa 3 sin la 2** y lo
+   dice con ese motivo en el mensaje de error.
+2. Mirar en la base de datos quién no está verificado y marcarlo (`select email, "isEmailVerified"
+   from core."user";`). Cuando no quede ninguno en `false`, la etapa 3 es segura.
+
+### Volver atrás
+
+Quitar la línea de `terraform.tfvars` y aplicar. ECS vuelve a desplegar el servicio y el worker con
+el valor anterior; no hay que reconstruir ninguna imagen ni tocar la base de datos. De la etapa 3 se
+vuelve en minutos; de la etapa 2, los correos ya enviados ya están enviados.
+
+### Conectar el buzón del dominio
+
+El proveedor del buzón da tres cosas en su pantalla de configuración, y cada una tiene su variable:
+
+| Lo que da el proveedor | Variable de `terraform.tfvars` |
+| --- | --- |
+| Los servidores de correo entrante (registros MX de la raíz) | `apex_mailbox_mx_records` |
+| La línea SPF de la raíz | `apex_mailbox_spf_value` |
+| Sus CNAME: las firmas DKIM del proveedor y, si los publica, `autodiscover` / `autoconfig` | `apex_mailbox_cname_records` |
+
+El formato exacto, con valores de ejemplo, está en `deploy/aws/terraform.tfvars.example`. Los
+nombres del mapa van **sin el dominio**: Terraform se lo añade.
+
+Dos cosas que conviene saber antes de rellenarlo:
+
+- **Un CNAME no convive con otro registro del mismo nombre: lo sustituye.** Por eso Terraform
+  **rechaza** un CNAME en `mail` (el remitente de SES), en `_dmarc`, en un nombre con la forma de
+  las firmas DKIM que crea SES, y en `api`, `app` y `www` (los hosts del propio CRM). Si se intenta,
+  el apply se para y el mensaje dice qué registro se habría roto. Las firmas DKIM del proveedor del
+  buzón sí entran: tienen nombre de palabra, no de clave generada.
+- **El DMARC ya existe.** CRM-017 dejó `_dmarc` en modo de solo observar (`p=none`). Si el proveedor
+  del buzón pide añadir el suyo, no se añade: ya hay uno, y dos se pisan.
+
+Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
+en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
+
+## 9. Lo que este runbook no cubre
 
 - **El panel de administración del servidor** (`/settings/admin-panel`) da al operador búsqueda de
   usuarios, impersonación y variables de configuración. No forma parte de este procedimiento y no se
   ha ejercitado en CRM-014.
 - **SSO, facturación y permisos por fila** son Enterprise y esta beta no los usa.
-- **Correo saliente**: no hay. Invitaciones y restablecimientos pasan por el log del servidor y por la
-  mano del operador, que es la decisión registrada en el plan de AWS (CRM-013 R3).
+- **Correo saliente**: montado en AWS y apagado. Hoy las invitaciones y los restablecimientos siguen
+  pasando por el log del worker y por la mano del operador; encenderlo es una decisión del founder en
+  dos pasos, y está en §8 con sus condiciones.
 - **Copias de seguridad** del volumen de PostgreSQL: fuera de este track. Antes de que los amigos
   metan datos de verdad, es la siguiente pregunta que hay que resolver.

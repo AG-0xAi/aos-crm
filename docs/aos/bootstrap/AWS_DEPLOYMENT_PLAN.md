@@ -535,11 +535,12 @@ el operador tiene que asumir, no descubrir:
   logs tiene 30 días de retención por defecto (`var.log_retention_days`); tratar el acceso de
   lectura a CloudWatch como acceso a cuentas de la beta.
 
-**Superado por CRM-017 (30/10/2026):** el founder pidió que las invitaciones llegaran al correo;
-`EMAIL_DRIVER` pasa de `LOGGER` a `SMTP` sobre Amazon SES. Ver la sección CRM-017 al final de este
-documento para el dominio de envío, las credenciales SMTP y el procedimiento de salida del sandbox
-de SES. Este bloque queda como historial de la decisión original del 29/10, no como el estado
-actual.
+**Preparado para superarse, pero todavía vigente (CRM-017 + CRM-018 fix1, 30/10/2026):** el founder
+pidió que las invitaciones llegaran al correo, y CRM-017 montó SES para eso (ver su sección más
+abajo: dominio de envío, credenciales SMTP y salida del sandbox). Pero el interruptor está **apagado
+por defecto** (`var.outbound_email_enabled = false`, «CRM-018 fix1» al final), que es lo que está
+desplegado: **este bloque sigue describiendo el estado actual**, y deja de describirlo el día que el
+founder encienda la etapa 2.
 
 ### R4 — Validación (sin credenciales) y procedimiento del coordinador
 
@@ -729,9 +730,10 @@ final y a conciencia.
   (`sign-in-up.service.ts:534-552`, `.../auth/constants/max-workspaces-without-organization-key.constant.ts:1`).
   Es decir: el operador más **cuatro** amigos. Un quinto amigo exige decisión de licencia del
   founder, no un cambio de Terraform.
-- **Correo saliente ya no pasa por el operador** (CRM-017, 30/10/2026): invitaciones y
-  restablecimientos llegan por SES/SMTP. El límite real pasa a ser el sandbox de SES (ver esa
-  sección) hasta que se pida la salida a producción.
+- **Correo saliente: montado y apagado** (CRM-017 + fix1, 30/10/2026). SES está creado, pero
+  `var.outbound_email_enabled` es `false` por defecto, así que invitaciones y restablecimientos
+  **siguen pasando por el operador**. Encenderlo espera a que SES salga del sandbox; exigir
+  verificación de correo espera además a que los usuarios actuales estén verificados.
 - **El arranque del servidor en ECS sigue sin medirse**: `alb_health_check_grace_period_seconds`
   (300 s) sigue siendo una cifra conservadora, no una medición, igual que en CRM-011. Medirlo en el
   primer arranque real.
@@ -869,6 +871,10 @@ la política que ya deja leer los otros tres secretos al rol de ejecución.
 | `EMAIL_FROM_ADDRESS` | `<var.email_from_local_part>@<dominio>` (por defecto `no-reply@<dominio>`) |
 | `EMAIL_FROM_NAME` | `Betty` |
 
+> **Corregido después, antes de aplicar nada:** `EMAIL_DRIVER` no se quedó fijo en `SMTP`. Depende de
+> `var.outbound_email_enabled`, que por defecto es `false` y deja `LOGGER`, el valor que está
+> desplegado. Ver «CRM-018 fix1» al final de este documento.
+
 Las cuatro primeras existen en `config-variables.ts:515-579`; `EMAIL_FROM_NAME` también, en ese
 mismo rango (valor por defecto de upstream `"Felix from Twenty"`).
 
@@ -876,7 +882,14 @@ mismo rango (valor por defecto de upstream `"Felix from Twenty"`).
 
 `local.privacy_env` añade `IS_EMAIL_VERIFICATION_REQUIRED = "true"` (`config-variables.ts:100`,
 `false` por defecto en upstream) -- tiene sentido ahora que existe un remitente verificado de
-verdad, no antes. También `MAX_WORKSPACES = "0"`: ese contrato ("vacío o 0 = sin límite") es de
+verdad, no antes.
+
+> **Corregido después, antes de aplicar nada:** tampoco se quedó fijo en `"true"`. Depende de
+> `var.email_verification_required`, `false` por defecto, y Terraform rechaza ponerla en `true` sin
+> el correo activo. Encenderla con los usuarios actuales sin verificar les niega la entrada
+> (`checkIsEmailVerified`). Ver «CRM-018 fix1» al final de este documento.
+
+También `MAX_WORKSPACES = "0"`: ese contrato ("vacío o 0 = sin límite") es de
 CRM-015, en paralelo a este track y todavía sin aterrizar en `packages/twenty-server` en el momento
 de escribir esto; fijar la variable de entorno aquí no rompe nada porque `validateSync`
 (`config-variables.ts:2628-2634`) no exige que cada clave exista en la clase `ConfigVariables` --
@@ -1063,3 +1076,287 @@ ruta real.
 trabajo directamente sobre una ruta `/mnt/c/...` en WSL2 -- usar una ruta nativa de la distro y
 sincronizar, o aceptar varios minutos de escritura silenciosa antes de que el comando devuelva
 nada.
+
+## CRM-018 — el CRM fuera del dominio raíz (30 de octubre de 2026)
+
+Orden del founder del 30 de octubre de 2026: sacar el CRM de la raíz del dominio para publicar ahí
+la landing (en Vercel). Contrato: `.aos/pack/aos-crm/specs/api-subdominio/spec.md`. Nada se aplicó
+en este track: la validación de abajo es estática y sin credenciales, y el `apply` es del
+coordinador.
+
+Punto de partida (CRM-013): `SERVER_URL` y `FRONTEND_URL` eran los dos el ápex, y el registro A del
+ápex era un alias al ALB.
+
+### R1 — Dónde estaba la raíz en el código, y por qué basta con mover `SERVER_URL`
+
+**La decisión: `SERVER_URL=https://api.<dominio>` y `FRONTEND_URL` se queda en el ápex.** No hizo
+falta ningún cambio en el código de Twenty. El razonamiento, con las rutas que lo sostienen:
+
+`FRONTEND_URL` **nunca se emite como enlace**. Tiene exactamente dos usos:
+
+| Uso | Dónde | Qué produce |
+| --- | --- | --- |
+| `frontDomain`: el sufijo contra el que se parsea y se compone cada host | `domain-server-config.service.ts:12-17, 59-65`; `get-subdomain-and-custom-domain-from-hostname.util.ts`; `workspace-domains.service.ts:253-261` (`getTwentyWorkspaceUrl`) | `<espacio>.<dominio>` |
+| base de `getBaseUrl()`, que con multi-espacio activo le antepone `DEFAULT_SUBDOMAIN` | `domain-server-config.service.ts:19-30` | `app.<dominio>` |
+
+Por eso **no se puede** poner `FRONTEND_URL=https://app.<dominio>`: `getBaseUrl()` emitiría
+`app.app.<dominio>` y cada espacio viviría en `<espacio>.app.<dominio>`.
+
+Todo lo que produce un enlace sale de uno de esos tres sitios, y ninguno es el ápex desnudo:
+
+| Qué produce un enlace | Fichero y línea | A dónde apunta ahora |
+| --- | --- | --- |
+| Emisor OAuth y `/authorize` del descubrimiento | `application-oauth/controllers/oauth-discovery.controller.ts:26-35, 91-95` | el host de la petición; si es el de la API, `app.<dominio>/authorize?iss=…` |
+| `iss` de la introspección de tokens | `application-oauth/oauth.service.ts:576, 608` | `SERVER_URL` → `api.<dominio>` |
+| `resource_metadata` del 401 de `/mcp` | `api/mcp/guards/mcp-auth.guard.ts:26-36` | el host de la petición |
+| Enlace de invitación, de verificación y de restablecimiento | `workspace-invitation.service.ts`, `auth.service.ts:771, 1050`, `email-verification.service.ts:83` | `buildWorkspaceURL()` / `getBaseUrl()` → espacio o `app.<dominio>` |
+| `serverUrl` de las plantillas de correo | `workspace-invitation.service.ts:386`, `approved-access-domain.service.ts:117` | solo la base del **logo** del espacio (`send-invite-link.email.tsx:39`) → `api.<dominio>` |
+| URLs de ficheros firmados y de subida | `file/file-url/file-url.service.ts:109, 121`; `file-upload-target.service.ts:119` | `api.<dominio>` |
+| Callback SSO, OpenAPI, webhooks de Google/Microsoft | `sso.service.ts:191, 207`; `open-api.service.ts:99, 212`; `google-webhook-subscription.driver.ts:131`; `microsoft-webhook-subscription.driver.ts:63` | `api.<dominio>` |
+| `window._env_` del front | `frontend/utils/render-frontend-html.util.ts:19` | **vacío**: el front usa `window.location.origin` (`twenty-front/src/config/index.ts:2`) |
+| URL MCP de Ajustes > IA | `settings/mcp/components/SettingsMcpSetup.tsx:49` sobre `buildMcpServerUrl` | el origen de la ventana, es decir el espacio del usuario |
+| Cookie de sesión | `user-session/services/user-session-cookie.service.ts:56-63` | sin atributo `domain`: queda atada al host que la emitió |
+| Orígenes CORS con credenciales y comprobación CSRF | `user-session/utils/resolve-allowed-credentialed-origins.util.ts:85` | `SERVER_URL` y `FRONTEND_URL` — **ver el aviso de abajo** |
+
+Que `api` sea seguro no es casualidad: `twenty-shared/src/constants/ReservedSubdomains.ts` lo
+reserva (y también `www`), así que ningún espacio puede llamarse así. Una petición a
+`api.<dominio>` se resuelve como «subdominio `api`, que no existe» y acaba igual que el ápex hoy:
+sin espacio (`workspace-domains.service.ts:173-190`). Y el comodín y el certificado comodín ya lo
+cubren, así que la mudanza no necesitó DNS ni certificado nuevos.
+
+**Aviso de seguridad, para decidir antes de dar la raíz a la landing.**
+`resolve-allowed-credentialed-origins.util.ts:85` deriva los orígenes de confianza de `SERVER_URL`
+y `FRONTEND_URL` sin condición. Como `FRONTEND_URL` tiene que seguir siendo el ápex, el origen del
+ápex sigue en esa lista, que alimenta tanto el CORS con credenciales
+(`apply-credentialed-cors.util.ts:95-115`) como la comprobación de origen anti-CSRF
+(`is-request-origin-allowed.util.ts:40`). Hoy es inofensivo porque el ápex es el propio CRM; cuando
+lo sirva un tercero, el origen de ese tercero queda tratado como de confianza. No hay variable que
+lo quite: `AUTH_COOKIE_ALLOWED_ORIGINS` solo añade. Quitarlo exige tocar ese fichero, que es código
+compartido de Twenty y queda fuera de lo que CRM-018 modificó. **Decisión del founder.**
+
+Del mismo tipo, menor: el front guarda el último espacio usado en una cookie con `domain` igual a
+`.<dominio>` (`useLastAuthenticatedWorkspaceDomain.ts:17`), así que esa cookie se enviará también al
+host de la landing. No lleva credenciales — un id de espacio y su URL —, pero conviene saberlo.
+
+### R2 — La raíz, configurable sin tocar el resto
+
+`deploy/aws/alb-acm.tf` y `deploy/aws/variables.tf`:
+
+- `var.apex_a_records` (lista, vacía por defecto): con el valor por defecto, la raíz sigue siendo el
+  **alias A al ALB** de siempre; con valores, pasa a ser un registro A al host externo.
+- `var.www_cname_target` (string, `null` por defecto): sin valor **no existe el recurso**
+  (`count = 0`), así que `www` lo sigue resolviendo el comodín contra el ALB; con valor, un CNAME
+  explícito, que en Route 53 gana al comodín.
+- `var.external_record_ttl` (300 por defecto): TTL de esos dos registros cuando apuntan fuera. Corto
+  a propósito: es lo que hace que volver atrás tarde minutos.
+
+El alias de la raíz se escribe como un bloque `dynamic "alias"` **dentro del recurso que ya existe**,
+no como dos recursos con `count`, a propósito: cambiar la dirección del recurso haría que Terraform
+planificase destruir y recrear el registro A de la raíz en producción, y el contrato pide que con
+los valores por defecto el plan no cambie nada.
+
+Ninguna variable trae un valor real por defecto: las direcciones son del host de la landing y este
+fork es público. `terraform.tfvars.example` las deja comentadas con `REPLACE_ME`.
+
+### R3 — Validación hecha (sin credenciales de AWS, 30 de octubre de 2026)
+
+Mismo contenedor fijado por digest que CRM-011/CRM-013/CRM-017 (Terraform v1.9.8), dentro de la
+distro `AOS-CRM-Ubuntu-24.04`, sin ninguna variable `AWS_*` ni `~/.aws` (comprobado en la misma
+sesión: el conteo de variables `AWS_*` dio `0` y `~/.aws` no existe). Aplicada otra vez la lección
+de CRM-017: el contenido se sincronizó a `/tmp/crm018-tf-validate`, ruta nativa de la distro, y se
+comprobó idéntico con `diff -rq --exclude=.terraform --exclude=.terraform.lock.hcl` (sin
+diferencias).
+
+```
+$ docker run --rm -v /tmp/crm018-tf-validate:/w -w /w \
+    hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd \
+    fmt -check -recursive
+exit 0 (sin salida: todo canónico)
+
+$ ... init -backend=false
+exit 0 ("Terraform has been successfully initialized!"; aws v5.100.0, random v3.9.1)
+
+$ ... validate
+exit 0 ("Success! The configuration is valid.")
+
+$ sh scripts/scan-secrets.sh
+exit 0 (sin coincidencias)
+```
+
+**Las condiciones nuevas se midieron, no se dieron por buenas.** En `/tmp/crm018-tf-logic`, con el
+`variables.tf` real y un fichero de solo salidas que reproduce expresión por expresión lo que hace
+`alb-acm.tf` (sin proveedor ni recursos, así que `plan` corre sin credenciales):
+
+| Entrada | `apex_alias_block_count` | `apex_records` | `apex_ttl` | `www_record_count` |
+| --- | --- | --- | --- | --- |
+| valores por defecto | 1 | — (null) | — (null) | 0 |
+| `apex_a_records=["203.0.113.10"]`, `www_cname_target=landing.example.test` | 0 | `["203.0.113.10"]` | 300 | 1 |
+
+Y las tres validaciones de variable rechazan la entrada mala con `exit 1`: un nombre de host en
+`apex_a_records`, una URL en `www_cname_target` y un TTL de 5 segundos.
+
+El script de humo `scripts/aos/verify-public-hosts.mjs` trae su propia autocomprobación sin red
+(`--self-test`, `exit 0`): levanta un servidor local que imita los hosts desplegados y verifica no
+solo que los casos buenos pasan, sino que los malos fallan — un emisor que nombra otro host, un
+`resource_metadata` que nombra otro host, un `authorization_endpoint` en el ápex y un 200 que no es
+el front del CRM. Contra un dominio que no resuelve devuelve `exit 1` con las seis comprobaciones en
+`[FAIL]`: falla cerrado, no en silencio.
+
+**Lo que NO se midió:** el `plan` real contra el estado aplicado de la beta, ni ninguna de las
+comprobaciones contra el despliegue. Necesitan credenciales de AWS y el backend S3, que este track
+no tiene. La afirmación «con los valores por defecto el plan no cambia nada» se sostiene en que la
+dirección del recurso `aws_route53_record.apex` no cambia y en que `aws_route53_record.www` no tiene
+instancias por defecto; **el coordinador tiene que verlo en su `plan`** antes de aplicar.
+
+### R4 — Procedimiento del coordinador
+
+El procedimiento en lenguaje llano, con el orden de aplicación, la URL MCP única, cómo reconectar
+ChatGPT y Claude, cómo cambiar la raíz a la landing y cómo volver atrás, está en
+[../product/BETA_RUNBOOK.md](../product/BETA_RUNBOOK.md) §7. Resumen para el coordinador:
+
+1. **Primero la API.** `apply` con el cambio de `ecs.tf`: solo se redefine la tarea de ECS con
+   `SERVER_URL=https://api.<dominio>` y el servicio se vuelve a desplegar. No hay DNS nuevo. En el
+   `plan`, comprobar además que las definiciones de tarea nuevas siguen llevando `EMAIL_DRIVER` en
+   `LOGGER`, `IS_EMAIL_VERIFICATION_REQUIRED` en `false` y ningún secreto SMTP: eso es lo que dice
+   que el apply mueve la API y nada más (fix1, al final de esta sección).
+2. **Comprobarlo** con `node scripts/aos/verify-public-hosts.mjs --domain <dominio>
+   --workspace-host <espacio>.<dominio>`.
+3. **La raíz, cuando la landing esté lista.** Rellenar `apex_a_records` y `www_cname_target` en
+   `terraform.tfvars` y aplicar. El plan tiene que tocar **solo** esos dos registros; si toca algo
+   más, parar.
+4. **Comprobarlo otra vez**, ahora con `--require-apex-off`.
+5. **Volver atrás** es quitar esas dos líneas y aplicar (minutos, por el TTL de 300).
+
+Entre el paso 1 y el paso 3 conviene no apurar: los enlaces de fichero firmados emitidos antes del
+paso 1 apuntan al ápex y dejan de funcionar cuando el ápex se va (caducan solos, son de vida corta).
+
+**La URL del conector de cada usuario no cambia con esta mudanza y nunca fue la raíz:** es
+`https://<espacio>.<dominio>/mcp`, la misma que la aplicación enseña en Ajustes > IA. El runbook
+corrige además una afirmación anterior: pegar el host de la API **no** funciona como alternativa, y
+dice por qué.
+
+### Lecciones
+
+**Síntoma:** el runbook de la beta afirmaba que un usuario podía conectar su cliente MCP al host
+base de la API y que eso «funciona, pero hace pasar por el selector».
+**Causa:** se dedujo del lado del servidor (`isApiHost` manda `/authorize` a `app.<dominio>`) sin
+seguir el enlace hasta el front. En `app.<dominio>` el front monta el enrutador sin espacio
+(`DomainShell.tsx:39`), que no tiene ruta `/authorize`; y la mutación que concede el permiso exige
+un espacio en la sesión (`authorizeApp` con `@AuthWorkspace()`), cosa que ese host no da por diseño.
+**Fix:** corregida la afirmación en BETA_RUNBOOK.md §6 con las rutas de las dos puertas que la
+cierran, y dejada una sola URL de conector, la del espacio, que además coincide con la que muestra
+Ajustes > IA.
+**Regla:** una ruta de autorización no está comprobada hasta haber seguido el redirect hasta la
+pantalla que la sirve. Que el servidor emita una URL no dice que esa URL exista.
+
+**Síntoma:** la tentación de hacer el ápex configurable con dos recursos `aws_route53_record`
+guardados por `count`, uno para el alias al ALB y otro para el host externo.
+**Causa:** es la forma natural de escribirlo, pero añadir `count` a un recurso que ya está en el
+estado cambia su dirección de `aws_route53_record.apex` a `aws_route53_record.apex[0]`, y Terraform
+lo planifica como destruir y recrear — sobre el registro A de la raíz de un dominio en producción.
+**Fix:** un solo recurso con un bloque `dynamic "alias"` y `records`/`ttl` condicionales, que
+mantiene la dirección intacta.
+**Regla:** antes de meter `count` o `for_each` en un recurso ya aplicado, mirar qué le pasa a su
+dirección en el estado. Si cambia, o se evita el `count`, o hace falta un bloque `moved`.
+
+### fix1 — El correo, por etapas, y el buzón del dominio (30 de octubre de 2026)
+
+**Por qué hizo falta antes de aplicar CRM-018.** CRM-018 cambia `SERVER_URL` dentro del mismo
+`local.privacy_env` de `ecs.tf` donde CRM-017 había dejado **fijos** `EMAIL_DRIVER = "SMTP"` e
+`IS_EMAIL_VERIFICATION_REQUIRED = "true"`. Lo que está desplegado hoy usa `LOGGER` y no exige
+verificación, así que aplicar CRM-018 tal cual no habría movido solo la API: habría encendido de
+golpe la etapa 2 **y** la etapa 3 del correo, con SES todavía en el sandbox (los correos a
+direcciones no verificadas una a una no llegan) y con todos los usuarios actuales sin
+`isEmailVerified`, que es justo lo que `checkIsEmailVerified` (`auth.service.ts:260-266`, llamado en
+`:186`, `:225` y `auth.resolver.ts:1021`) usa para negar la entrada. Un cambio de DNS habría
+arrastrado un cambio de acceso.
+
+**Lo que ahora decide cada etapa**, en `deploy/aws/variables.tf`:
+
+| Variable | Tipo | Por defecto | Qué controla |
+| --- | --- | --- | --- |
+| `outbound_email_enabled` | bool | `false` | `EMAIL_DRIVER`: `SMTP` con `true`, `LOGGER` con `false` |
+| `email_verification_required` | bool | `false` | `IS_EMAIL_VERIFICATION_REQUIRED` |
+
+Los valores por defecto son **el estado desplegado hoy**, no una preferencia: con ellos el apply de
+CRM-018 cambia la API de sitio y nada más. `email_verification_required` lleva una `validation` que
+la rechaza sin `outbound_email_enabled` (Terraform >= 1.9 permite que una validación mire otra
+variable, y `versions.tf` ya exige `>= 1.9.0`): exigir verificación cuando el enlace de verificación
+solo llega al log es echar a todo el mundo fuera. `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` y
+`MAX_WORKSPACES = "0"` se quedan en las tres etapas: ninguna envía nada por sí sola.
+
+**Las credenciales SMTP viajan con el interruptor.** `local.app_secrets` inyecta
+`EMAIL_SMTP_USER`/`EMAIL_SMTP_PASSWORD` solo con `outbound_email_enabled = true`. Razón: una
+contraseña de envío que ningún driver va a usar es una credencial sentada en el entorno de tres
+familias de tareas sin motivo, y el entorno de un proceso es lo primero que lee un volcado, un
+endpoint de depuración o una fuga del contenedor. Los secretos y el permiso del rol de ejecución
+sobre ellos (`ses.tf`, `iam.tf`) **siguen siendo incondicionales**, así que encender el correo no
+necesita crear un secreto ni tocar IAM: sigue siendo una línea de `tfvars`.
+
+**El buzón del dominio.** CRM-017 ya dejaba `apex_mailbox_mx_records` y `apex_mailbox_spf_value`.
+fix1 añade `apex_mailbox_cname_records` (`map(string)`, vacío por defecto) para los CNAME que pide el
+proveedor del buzón: sus firmas DKIM y, si los publica, `autodiscover`/`autoconfig`. Las claves son
+nombres **relativos** a `domain_name` y el recurso es `for_each` keyed por nombre, no `count`, para
+que añadir o quitar uno más adelante no renumere —y por tanto no recree— los demás. Un CNAME no
+convive con un registro de otro tipo en el mismo nombre, así que la variable valida y **rechaza**:
+
+- un nombre con la forma de los DKIM de SES (32 alfanuméricos + `._domainkey`), que son los que crea
+  `aws_route53_record.ses_dkim`. Los del proveedor del buzón tienen nombre de palabra y pasan;
+- `mail`, el dominio MAIL FROM de SES, que ya tiene un MX y un TXT;
+- `_dmarc`, la política que CRM-017 dejó en `p=none`;
+- `api`, `app` y `www`, los hosts del propio CRM;
+- una clave con `domain_name` ya pegado detrás, que es el error de copiar y pegar más probable;
+- un destino escrito como URL en vez de como host.
+
+`terraform.tfvars.example` documenta el formato con valores genéricos (`example.net`), porque este
+fork es público.
+
+#### Validación de fix1 (sin credenciales, 30 de octubre de 2026)
+
+Mismo contenedor fijado por digest (Terraform v1.9.8) en la distro `AOS-CRM-Ubuntu-24.04`, conteo de
+variables `AWS_*` = `0` y `~/.aws` inexistente (comprobado en la misma sesión). Contenido copiado a
+`/tmp/crm018fix1-validate`, ruta nativa de la distro, y comprobado idéntico con `diff -rq
+--exclude=.terraform --exclude=.terraform.lock.hcl` (exit 0).
+
+```
+$ ... fmt -check -recursive        exit 0 (sin salida)
+$ ... init -backend=false          exit 0 (aws v5.100.0, random v3.9.1)
+$ ... validate                     exit 0 ("Success! The configuration is valid.")
+$ sh scripts/scan-secrets.sh       exit 0 (sin coincidencias)
+```
+
+**Las etapas se midieron con un `plan` de verdad, no se razonaron.** En `/tmp/crm018fix1-logic`, con
+el `variables.tf` real y un fichero de solo salidas que copia expresión por expresión lo que
+calculan `ecs.tf` y `ses.tf` (sin proveedor ni recursos, así que `plan` corre sin backend y sin
+credenciales):
+
+| Entrada | `email_driver` | `is_email_verification_required` | Secretos inyectados |
+| --- | --- | --- | --- |
+| valores por defecto | `LOGGER` | `false` | los 3 de siempre, sin SMTP |
+| `outbound_email_enabled=true` | `SMTP` | `false` | los 3 + `EMAIL_SMTP_USER` + `EMAIL_SMTP_PASSWORD` |
+| las dos en `true` | `SMTP` | `true` | los 3 + los 2 de SMTP |
+
+Y los rechazos, los siete con `exit 1` y con el mensaje que les toca: `email_verification_required`
+sin `outbound_email_enabled`; un CNAME en `_dmarc`, en `mail`, con forma de token DKIM de SES y en
+`api`; una clave con el dominio pegado detrás; y un destino con `https://`. El caso bueno del mapa
+sí produce los dos registros, con el dominio añadido
+(`providerkey-a._domainkey.<dominio> CNAME providerkey-a.dkim.example.net`).
+
+**Lo que sigue sin medirse:** el `plan` contra el estado aplicado de la beta. La afirmación «con los
+valores por defecto esto no cambia el correo» está medida sobre las expresiones, no sobre el estado:
+el coordinador tiene que ver en su `plan` que las definiciones de tarea nuevas llevan `LOGGER`,
+`IS_EMAIL_VERIFICATION_REQUIRED=false` y ningún secreto SMTP antes de aplicar.
+
+#### Lección
+
+**Síntoma:** un track (CRM-018) que solo tocaba DNS y una URL estaba a punto de cambiar también quién
+puede entrar en la aplicación.
+**Causa:** el track anterior (CRM-017) dejó su etapa 2 escrita como valores fijos en el bloque de
+entorno compartido, en vez de como variables apagadas. Mientras nadie aplicase, el repo y lo
+desplegado decían cosas distintas; el siguiente apply, de cualquier track que tocase ese bloque, se
+llevaba la diferencia entera por delante.
+**Fix:** las dos banderas pasan a variables cuyo valor por defecto **es el estado desplegado**, más
+una validación que impide la combinación peligrosa.
+**Regla:** una capacidad que el founder todavía no ha autorizado a encender no se escribe como valor
+fijo en un bloque compartido. Se escribe como variable con el estado actual por defecto, y entonces
+cada etapa es un `tfvars` y no una sorpresa en el apply de otro.

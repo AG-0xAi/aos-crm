@@ -14,6 +14,38 @@ budget_alert_email = "REPLACE_ME"       # who AWS Budgets notifies
 # to override that lookup -- see variables.tf.
 # route53_zone_id = "REPLACE_ME"
 
+# Apex and www stay on the ALB while these are unset, which is what the beta
+# runs today: the CRM answers at api./app./<workspace>. only (CRM-018).
+# Uncomment and fill with the values the landing host publishes to move the
+# apex and www off this stack. Nothing else changes; rolling back is removing
+# these two lines and applying again (BETA_RUNBOOK.md).
+# apex_a_records   = ["REPLACE_ME"]  # A record the landing host publishes
+# www_cname_target = "REPLACE_ME"    # CNAME target for www.<domain>
+
+# Outbound mail, in the three stages BETA_RUNBOOK.md §8 describes. Both false
+# (the default, so these two lines can stay commented) is what the beta runs
+# today: every invitation and password reset goes to the server log and the
+# operator passes it on by hand.
+#   Stage 2, once AWS takes SES out of the sandbox: outbound_email_enabled.
+#   Stage 3, once every existing user has a verified address in the database:
+#   email_verification_required. It is refused without stage 2, because the
+#   verification link would have nowhere to go but the log.
+# outbound_email_enabled      = true
+# email_verification_required = true
+
+# External mailbox at the apex (a provider like the one the founder uses, not
+# SES: SES only sends). The MX and SPF values come from the provider's own
+# setup page; the CNAME map carries its DKIM keys and, if it publishes them,
+# autodiscover/autoconfig. Keys are names relative to <domain>, so Terraform
+# appends the domain itself. Every value below is a generic example.
+# apex_mailbox_mx_records = ["5 mx1.example.net", "10 mx2.example.net"]
+# apex_mailbox_spf_value  = "v=spf1 include:_spf.example.net ~all"
+# apex_mailbox_cname_records = {
+#   "providerkey-a._domainkey" = "providerkey-a.dkim.example.net"
+#   "providerkey-b._domainkey" = "providerkey-b.dkim.example.net"
+#   "autodiscover"             = "autodiscover.example.net"
+# }
+
 server_cpu           = 512
 server_memory        = 1024
 worker_cpu           = 512

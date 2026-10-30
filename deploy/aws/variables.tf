@@ -32,9 +32,11 @@ variable "aws_region" {
 variable "domain_name" {
   description = <<-EOT
     Public domain this stack serves. It is the apex of the beta's namespace,
-    not a host: the certificate covers it and "*.<domain>", SERVER_URL and
-    FRONTEND_URL point at it (ecs.tf), and every workspace lives at
-    "<workspace>.<domain>". A hosted zone for exactly this name must exist in
+    not a host: the certificate covers it and "*.<domain>", the API lives at
+    "api.<domain>", sign-in at "app.<domain>" and every workspace at
+    "<workspace>.<domain>" (ecs.tf). Since CRM-018 the apex itself serves
+    nothing of the CRM and can be handed to an external landing with
+    apex_a_records below. A hosted zone for exactly this name must exist in
     the account (data.tf looks it up), so passing a subdomain only works if
     that subdomain is itself a delegated zone. The founder owns this decision;
     no placeholder default ships here so a real domain is never accidentally
@@ -61,6 +63,66 @@ variable "route53_zone_id" {
   EOT
   type        = string
   default     = null
+}
+
+variable "apex_a_records" {
+  description = <<-EOT
+    Addresses to answer the apex (domain_name) with, when the apex is served
+    by something outside this stack -- the Betty landing (CRM-018 R2, founder
+    30/10/2026). Empty (default) keeps the apex as the alias A record to the
+    ALB it has been since CRM-013, so the default plan is empty. Set it to the
+    A record the landing host publishes and the apex becomes a plain A record
+    pointing there; nothing else in the stack moves, because the API lives at
+    api.<domain>, sign-in at app.<domain> and each workspace at its own
+    subdomain, all of them still on the wildcard (alb-acm.tf). No real value
+    ships here: the address belongs to whoever hosts the landing, and this
+    fork is public.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for record in var.apex_a_records :
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", record))
+    ])
+    error_message = "apex_a_records must contain IPv4 addresses: it populates an A record."
+  }
+}
+
+variable "www_cname_target" {
+  description = <<-EOT
+    Hostname `www.<domain_name>` should be a CNAME to, when the landing serves
+    www as well (CRM-018 R2). Null (default) creates no www record at all, so
+    the default plan is empty and www keeps resolving through the wildcard to
+    the ALB exactly as today. Set it to the CNAME target the landing host
+    publishes: an explicit record beats the wildcard in Route 53, so only www
+    moves. No real value ships here, same reason as apex_a_records.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.www_cname_target == null ? true : can(regex("^[a-z0-9.-]+$", var.www_cname_target))
+    error_message = "www_cname_target must be a hostname, not a URL."
+  }
+}
+
+variable "external_record_ttl" {
+  description = <<-EOT
+    TTL in seconds for the apex and www records once they point outside this
+    stack (apex_a_records / www_cname_target). Alias records have no TTL, so
+    this is unused while both keep their defaults. 300 is short enough that
+    rolling the apex back to the ALB takes minutes, not hours -- which is the
+    whole rollback story for the landing switch (BETA_RUNBOOK.md).
+  EOT
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.external_record_ttl >= 60 && var.external_record_ttl <= 86400
+    error_message = "external_record_ttl must be between 60 and 86400 seconds."
+  }
 }
 
 variable "budget_amount_usd" {
@@ -329,6 +391,44 @@ variable "email_from_local_part" {
   default     = "no-reply"
 }
 
+variable "outbound_email_enabled" {
+  description = <<-EOT
+    Whether the server and the worker really send mail through SES
+    (EMAIL_DRIVER=SMTP, ecs.tf) or only write every message to their own log
+    (EMAIL_DRIVER=LOGGER, which is Twenty's own default,
+    config-variables.ts:531). False by default because that is what the beta
+    runs today and because SES is still in the sandbox, where a message to an
+    address nobody verified one by one is refused rather than delivered
+    (CRM-017). Everything SES needs exists either way -- identity, DKIM,
+    MAIL FROM, the SMTP user and its secrets (ses.tf) -- so this is a tfvars
+    change, not an apply of new infrastructure, and it is stage 2 of
+    BETA_RUNBOOK.md §8.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "email_verification_required" {
+  description = <<-EOT
+    Whether a user must have a verified email address to sign in
+    (IS_EMAIL_VERIFICATION_REQUIRED, ecs.tf). False by default, which is both
+    what the beta runs today and upstream's own default
+    (config-variables.ts:100): checkIsEmailVerified (auth.service.ts:260-266,
+    called from :186, :225 and auth.resolver.ts:1021) refuses the sign-in of
+    every user whose isEmailVerified is still false, and every account this
+    beta has was created by hand without email. Turning it on before those
+    rows are verified locks the founder and his friends out of their own
+    workspaces. Stage 3 of BETA_RUNBOOK.md §8.
+  EOT
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.email_verification_required || var.outbound_email_enabled
+    error_message = "email_verification_required = true needs outbound_email_enabled = true: with EMAIL_DRIVER=LOGGER the verification link only ever reaches the server log, so requiring verification would lock out every user who cannot read that log."
+  }
+}
+
 variable "apex_mailbox_mx_records" {
   description = <<-EOT
     Optional MX records for an external mailbox provider receiving mail at
@@ -352,4 +452,58 @@ variable "apex_mailbox_spf_value" {
   EOT
   type        = string
   default     = ""
+}
+
+variable "apex_mailbox_cname_records" {
+  description = <<-EOT
+    Optional CNAME records the same external mailbox provider asks for under
+    var.domain_name: its own DKIM keys, plus autodiscover/autoconfig when it
+    publishes them. A map of record name to target host, where the name is
+    relative to var.domain_name, lowercase and with no trailing dot --
+    { "provider-key-a._domainkey" = "provider-key-a.dkim.example.net" }.
+    Empty (default) creates no record at all. No real value ships here: the
+    names and the targets are the founder's provider's and this fork is
+    public (terraform.tfvars.example shows the shape).
+
+    A CNAME cannot coexist with a record of another type at the same name,
+    so a name that lands on one of this stack's own records does not merge
+    with it -- it breaks it. The second validation below refuses exactly
+    those names:
+      - 32 lowercase alphanumerics followed by "._domainkey": the shape of
+        SES's Easy DKIM record names (aws_route53_record.ses_dkim, ses.tf).
+        A provider's own DKIM name is a word, so "provider-key-a._domainkey"
+        passes and only a name shaped like an SES token is refused.
+      - "mail": SES's custom MAIL FROM domain, which already holds an MX and
+        a TXT record (ses.tf).
+      - "_dmarc": the DMARC policy record (ses.tf).
+      - "api", "app" and "www": the hosts this stack itself serves (ecs.tf,
+        alb-acm.tf and var.www_cname_target).
+  EOT
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for name in keys(var.apex_mailbox_cname_records) :
+      can(regex("^[a-z0-9_]([a-z0-9._-]*[a-z0-9])?$", name)) && !endswith(name, var.domain_name)
+    ])
+    error_message = "apex_mailbox_cname_records keys are record names relative to domain_name: lowercase, no trailing dot, and without domain_name itself appended (Terraform adds it)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name in keys(var.apex_mailbox_cname_records) :
+      !contains(["mail", "_dmarc", "api", "app", "www"], lower(name)) &&
+      !can(regex("^[a-z0-9]{32}\\._domainkey$", lower(name)))
+    ])
+    error_message = "apex_mailbox_cname_records would overwrite a record this stack manages: mail (SES MAIL FROM), _dmarc (DMARC policy), a name shaped like an SES Easy DKIM token, or api/app/www (the CRM's own hosts)."
+  }
+
+  validation {
+    condition = alltrue([
+      for target in values(var.apex_mailbox_cname_records) :
+      can(regex("^[a-z0-9.-]+$", target))
+    ])
+    error_message = "apex_mailbox_cname_records values must be hostnames, not URLs."
+  }
 }
