@@ -1,8 +1,43 @@
 @import './viewport-zoom.css';
 
+/* Betty's two OFL families, self-hosted from public/brand/fonts (licences next
+   to the files). Upstream only named Inter in the tokens and never shipped a
+   face, so the brand font has to be declared here or the browser falls back to
+   system sans. */
+@font-face {
+  font-family: 'Source Sans 3';
+  src: url('/brand/fonts/source-sans-3-vf.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  src: url('/brand/fonts/source-sans-3-vf-italic.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/brand/fonts/fraunces-vf.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fraunces ships WONK 1 by default and the brand manual forbids the wonky
+   terminals, so every display use carries the axes explicitly. */
+.betty-serif {
+  font-family: var(--t-font-family-display);
+  font-variation-settings: 'SOFT' 0, 'WONK' 0;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--t-font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--t-background-tertiary);

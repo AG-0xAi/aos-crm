@@ -12,6 +12,17 @@ export { ACCOUNT_TYPES } from './AccountTypes';
 export { ALLOWED_FULL_NAME_SORT_SUBFIELDS } from './AllowedFullNameSortSubfields';
 export { APPLICATION_MONITORING_RETENTION_IN_DAYS } from './ApplicationMonitoringRetentionInDays';
 export { BACKEND_BATCH_REQUEST_MAX_COUNT } from './BackendBatchRequestMaxCount';
+export {
+  BRAND_ASSET_PATHS,
+  BRAND_DESCRIPTOR,
+  BRAND_DOMAIN,
+  BRAND_LICENSE_NAME,
+  BRAND_NAME,
+  BRAND_PRIVACY_URL,
+  BRAND_SOURCE_CODE_URL,
+  BRAND_TERMS_URL,
+  BRAND_WORDMARK,
+} from './Brand';
 export { CalendarStartDay } from './CalendarStartDay';
 export { CLIENT_CONFIG_BOOTSTRAP_ELEMENT_ID } from './ClientConfigBootstrapElementId';
 export { COMMAND_MENU_CONFIRMATION_MODAL_RESULT_BROWSER_EVENT_NAME } from './CommandMenuConfirmationModalResultBrowserEventName';
