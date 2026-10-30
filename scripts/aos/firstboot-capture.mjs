@@ -52,12 +52,22 @@ function compose(args, opts = {}) {
     '-p', PROJECT, ...args], opts);
 }
 
+// The base host by NAME, not 127.0.0.1: this stack carries the beta profile,
+// where the workspace of a request is resolved from the subdomain of its host
+// and an IP literal has no subdomains to resolve (CRM-014 L1). `localhost` and
+// everything under it reach loopback without DNS or a hosts file (RFC 6761),
+// and the published port is still bound to 127.0.0.1 only. The Origin header
+// states the origin this process really dials, which is what makes it
+// same-origin and allowed to receive a session (CRM-014 L4).
+const BASE_HOST = 'localhost';
+const BASE_URL = `http://${BASE_HOST}:${PORT}`;
+
 function http(path, { method = 'GET', headers = {}, body = null, timeoutMs = 30_000 } = {}) {
   return new Promise((resolvePromise, reject) => {
     import('node:http').then(({ request }) => {
       const req = request({
-        host: '127.0.0.1', port: PORT, path, method, agent: false, timeout: timeoutMs,
-        headers: { ...headers, ...(body ? { 'content-length': Buffer.byteLength(body) } : {}) },
+        host: BASE_HOST, port: PORT, path, method, agent: false, timeout: timeoutMs,
+        headers: { origin: BASE_URL, ...headers, ...(body ? { 'content-length': Buffer.byteLength(body) } : {}) },
       }, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
@@ -163,11 +173,18 @@ async function main() {
     { email, password });
   if (signUp.errors) throw new Error(`signUp failed: ${errorsOf(signUp)}`);
   const agnostic = signUp.data.signUp.tokens.accessOrWorkspaceAgnosticToken.token;
+  // `workspace` here is a WorkspaceUrlsAndId -- id and URLs, no
+  // activationStatus: asking for one is a GraphQL error, not an empty field
+  // (measured on the first boot of 2026-10-30). The URL is the useful half
+  // anyway: on the beta profile it is the server telling us which subdomain it
+  // put this workspace on.
   const workspace = await graphql('/metadata',
-    'mutation($input: SignUpInNewWorkspaceInput) { signUpInNewWorkspace(input: $input) { workspace { id activationStatus } } }',
+    'mutation($input: SignUpInNewWorkspaceInput) { signUpInNewWorkspace(input: $input) { workspace { id workspaceUrls { subdomainUrl } } } }',
     { input: { displayName: `AOS-CRM first boot ${RUN_ID}` } }, agnostic);
   if (workspace.errors) throw new Error(`signUpInNewWorkspace failed: ${errorsOf(workspace)}`);
-  console.log(`[INFO] first workspace created (${workspace.data.signUpInNewWorkspace.workspace.activationStatus})`);
+  const created = workspace.data.signUpInNewWorkspace.workspace;
+  if (!created?.id) throw new Error('signUpInNewWorkspace answered without a workspace id');
+  console.log(`[INFO] first workspace created, and the server put it on ${created.workspaceUrls?.subdomainUrl ?? 'no subdomain URL'}`);
 
   const config2 = await http('/client-config');
   console.log(`[INFO] /client-config answered ${config2.status} on the first boot`);

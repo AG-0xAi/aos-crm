@@ -14,7 +14,11 @@
 # shows is the traffic the real profile would produce on a first boot: the same
 # application image (built from this commit), the same deploy/local/privacy.env,
 # the same image digests for PostgreSQL and Redis, the same DISABLED switches
-# and the same single-workspace setting. What it does NOT share: its data.
+# and -- since CRM-014 made it the local profile -- the same beta workspace
+# profile: multi-workspace on, creation limited to server admins, and a base
+# host whose subdomains resolve (CRM-014 L1: with a tenant resolved from the
+# host's subdomain, an IP literal boots healthy and lets nobody in). What it
+# does NOT share: its data.
 #
 # Differences from the real profile, stated because the capture is evidence:
 # `restart: "no"` (a throwaway stack must not come back by itself) and no
@@ -41,12 +45,14 @@ x-aos-crm-firstboot-app: &app
 x-aos-crm-firstboot-env: &env
   PG_DATABASE_URL: postgres://${AOS_CRM_PG_USER:-aos_crm}:${AOS_CRM_PG_PASSWORD:?set AOS_CRM_PG_PASSWORD in deploy/local/.env}@db:5432/${AOS_CRM_PG_DB:-aos_crm_local}
   REDIS_URL: redis://redis:6379
-  SERVER_URL: http://127.0.0.1:${AOS_CRM_FIRSTBOOT_PORT:-43010}
+  SERVER_URL: http://localhost:${AOS_CRM_FIRSTBOOT_PORT:-43010}
   STORAGE_TYPE: local
   ENCRYPTION_KEY: ${AOS_CRM_ENCRYPTION_KEY:?set AOS_CRM_ENCRYPTION_KEY in deploy/local/.env}
   LOGIC_FUNCTION_TYPE: DISABLED
   CODE_INTERPRETER_TYPE: DISABLED
-  IS_MULTIWORKSPACE_ENABLED: "false"
+  IS_MULTIWORKSPACE_ENABLED: "true"
+  IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS: "true"
+  DEFAULT_SUBDOMAIN: ${AOS_CRM_DEFAULT_SUBDOMAIN:-app}
 
 services:
   server:
