@@ -540,6 +540,62 @@ export function checkEmailMarkup(root = REPO_ROOT) {
   );
 }
 
+export const BRAND_PUBLIC_ROOT = 'packages/twenty-front/public';
+
+// Every brand asset path this repo names, from both places one can be written:
+// the BRAND_ASSET_PATHS registry, and the `/brand/...` literals that Linaria
+// template literals carry (a styled block cannot interpolate the registry, so
+// those paths are typed out by hand).
+export function collectBrandAssetReferences(root = REPO_ROOT) {
+  const brandSource = readFileSync(
+    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
+    'utf8',
+  );
+  const declared = [...brandSource.matchAll(/'(\/brand\/[^']+)'/g)].map(
+    (match) => ({ path: match[1], from: 'twenty-shared/constants/Brand.ts' }),
+  );
+  const referenced = SCANNED_GLOBS.flatMap((pattern) =>
+    globSync(pattern, { cwd: root }),
+  )
+    .map((p) => p.split(sep).join(posix.sep))
+    .filter(isScannedPath)
+    .flatMap((relativePath) => {
+      const source = readFileSync(resolve(root, relativePath), 'utf8');
+
+      return [...source.matchAll(/['"(](\/brand\/[^'")\s]+)['")]/g)].map(
+        (match) => ({ path: match[1], from: relativePath }),
+      );
+    });
+
+  return [...declared, ...referenced];
+}
+
+// A brand path that resolves to nothing is a missing logo in production and
+// nothing anywhere else: no build step and no type checks it, because it is a
+// runtime URL. This is the only thing standing between a typo and a blank tile.
+export function checkBrandAssetsExist(root = REPO_ROOT) {
+  const references = collectBrandAssetReferences(root);
+
+  if (references.length === 0) return ['no brand asset path was read at all'];
+
+  // One report per missing path, not one per place it is written: Brand.ts is
+  // both the registry and a scanned source, so it sees its own entries twice.
+  const missing = new Map();
+
+  for (const reference of references) {
+    if (missing.has(reference.path)) continue;
+    if (existsSync(resolve(root, BRAND_PUBLIC_ROOT, `.${reference.path}`))) {
+      continue;
+    }
+    missing.set(reference.path, reference.from);
+  }
+
+  return [...missing].map(
+    ([path, from]) =>
+      `${from} names ${path}, which does not exist under ${BRAND_PUBLIC_ROOT}`,
+  );
+}
+
 export const SOCIAL_PREVIEW_META = [
   ['property', 'og:image'],
   ['name', 'twitter:image'],
@@ -614,6 +670,7 @@ export function checkSocialPreviewMetadata(root = REPO_ROOT) {
 
 function run() {
   const markupFailures = [
+    ...checkBrandAssetsExist(),
     ...checkEmailMarkup(),
     ...checkSocialPreviewMetadata(),
   ];
@@ -661,7 +718,7 @@ function run() {
     `[PASS] no user-visible reference to Twenty, and no reference to a Twenty-branded asset file, in ${filesScanned} shipped source files (${ALLOWLIST.length} allowlisted exceptions, each with a reason).`,
   );
   console.log(
-    `[PASS] every <Row> in the e-mail package wraps its children in <Column>, and index.html names an absolute https image for both social preview cards.`,
+    `[PASS] every brand asset path this repo names exists on disk, every <Row> in the e-mail package wraps its children in <Column>, and index.html names an absolute https image for both social preview cards.`,
   );
   console.log(
     'Scope: string literals, template literals and same-line JSX text in the front, ui, shared, emails and server packages, plus index.html. It does NOT read the rendered page (see scripts/aos/verify-front-icons.mjs and scripts/aos/test/crm-brand-e2e.test.mjs) and does NOT observe network traffic (see scripts/aos/capture-traffic.mjs).',
@@ -876,6 +933,48 @@ function selfTest() {
     );
 
     assert(assets.length === 0, JSON.stringify(assets.slice(0, 5)));
+  });
+  record('every brand asset path this repo names exists on disk', () => {
+    const references = collectBrandAssetReferences();
+
+    assert(references.length >= 8, `only ${references.length} paths read`);
+    assert(
+      references.some((reference) => /\.tsx$/.test(reference.from)),
+      'no brand path was read out of a component, so the Linaria literals are unmeasured',
+    );
+    const failures = checkBrandAssetsExist();
+
+    assert(failures.length === 0, failures.join('; '));
+  });
+  record('a brand path that resolves to nothing FAILS', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-assets-'));
+
+    try {
+      const brandPath = resolve(
+        sandbox,
+        'packages/twenty-shared/src/constants/Brand.ts',
+      );
+
+      mkdirSync(dirname(brandPath), { recursive: true });
+      mkdirSync(resolve(sandbox, BRAND_PUBLIC_ROOT, 'brand/logo'), {
+        recursive: true,
+      });
+      writeFileSync(
+        resolve(sandbox, BRAND_PUBLIC_ROOT, 'brand/logo/there.svg'),
+        '<svg/>',
+      );
+      writeFileSync(
+        brandPath,
+        "export const BRAND_ASSET_PATHS = { a: '/brand/logo/there.svg', b: '/brand/logo/typo.svg' };\n",
+      );
+
+      const failures = checkBrandAssetsExist(sandbox);
+
+      assert(failures.length === 1, JSON.stringify(failures));
+      assert(/typo\.svg/.test(failures[0]), failures[0]);
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
   record('a <Row> whose direct child is not a <Column> FAILS', () => {
     // The exact shape the independent review found in Footer.tsx: a ShadowText
