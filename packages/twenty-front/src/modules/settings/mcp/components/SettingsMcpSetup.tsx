@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 
 import { LightCopyIconButton } from '@/ui/input/components/LightCopyIconButton';
 import ModelContextProtocolLogo from '@/settings/mcp/assets/model-context-protocol-logo.svg?react';
+import { McpConnectAssistant } from '@/settings/mcp/components/McpConnectAssistant';
 import { SettingsMcpSetupCard } from '@/settings/mcp/components/SettingsMcpSetupCard';
 import { buildMcpSetupCategories } from '@/settings/mcp/utils/buildMcpSetupCategories';
 import {
@@ -55,6 +56,14 @@ export const SettingsMcpSetup = () => {
 
   return (
     <StyledMcpSetupContainer>
+      <Section.Root>
+        <Section.Header
+          title={t`Connect your assistant`}
+          description={t`The same two choices offered right after the workspace was created.`}
+        />
+        <McpConnectAssistant />
+      </Section.Root>
+
       {categories.map((category) => (
         <Fragment key={category.title}>
           <Section.Root>

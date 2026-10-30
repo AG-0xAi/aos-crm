@@ -1,6 +1,6 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
+
 export const MCP_SETUP = {
-  chatGptTwentyAppUrl:
-    'https://chatgpt.com/apps/twenty/asdk_app_6a0ac8d7e28c8191a58ea65bb0ca3d5c',
   tooltipIds: {
     claudeInstallDisabled: 'mcp-claude-install-disabled',
     replitInstallDisabled: 'mcp-replit-install-disabled',
@@ -10,13 +10,17 @@ export const MCP_SETUP = {
     value: 'Bearer <YOUR_API_KEY>',
   },
   server: {
-    name: 'twenty',
-    displayName: 'Twenty',
+    name: 'betty',
+    displayName: BRAND_NAME,
   },
   clientDocsUrls: {
     augment: 'https://docs.augmentcode.com/setup-augment/mcp',
     amazonQ:
       'https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/qdev-mcp.html',
+    // OpenAI's current guide for adding a custom MCP server from the ChatGPT
+    // Plugins page. Checked 2026-10-30: it no longer requires turning on a
+    // separate "developer mode" first.
+    chatGpt: 'https://developers.openai.com/api/docs/guides/custom-mcp-server',
     cline: 'https://docs.cline.bot/mcp/mcp-overview',
     geminiCli: 'https://geminicli.com/docs/tools/mcp-server/',
     jetbrains: 'https://www.jetbrains.com/help/ai-assistant/mcp.html',

@@ -11,7 +11,7 @@ import {
   isHttpsUrl,
 } from '@/settings/mcp/utils/mcpSetup';
 
-const mcpServerUrl = 'https://api.twenty.com/mcp';
+const mcpServerUrl = 'https://api.betty.management/mcp';
 
 const decodeBase64JsonParam = (link: string, paramName: string) => {
   const params = new URLSearchParams(link.split('?')[1]);
@@ -26,14 +26,16 @@ const decodeBase64JsonParam = (link: string, paramName: string) => {
 
 describe('buildMcpServerUrl', () => {
   it('appends /mcp after trimming trailing slashes', () => {
-    expect(buildMcpServerUrl('https://api.twenty.com///')).toBe(mcpServerUrl);
+    expect(buildMcpServerUrl('https://api.betty.management///')).toBe(
+      mcpServerUrl,
+    );
   });
 });
 
 describe('isHttpsUrl', () => {
   it('returns true only for valid HTTPS urls', () => {
     expect(isHttpsUrl(mcpServerUrl)).toBe(true);
-    expect(isHttpsUrl('http://api.twenty.com/mcp')).toBe(false);
+    expect(isHttpsUrl('http://api.betty.management/mcp')).toBe(false);
     expect(isHttpsUrl('not a url')).toBe(false);
   });
 });
@@ -42,7 +44,7 @@ describe('buildMcpConfig', () => {
   it('builds the remote MCP JSON config', () => {
     expect(JSON.parse(buildMcpConfig(mcpServerUrl))).toEqual({
       mcpServers: {
-        twenty: {
+        betty: {
           url: mcpServerUrl,
           headers: {
             Authorization: 'Bearer <YOUR_API_KEY>',
@@ -73,7 +75,7 @@ describe('buildClaudeInstallLink', () => {
       true,
     );
     expect(params.get('modal')).toBe('add-custom-connector');
-    expect(params.get('connectorName')).toBe('Twenty');
+    expect(params.get('connectorName')).toBe('Betty');
     expect(params.get('connectorUrl')).toBe(mcpServerUrl);
   });
 });
@@ -83,7 +85,7 @@ describe('buildCursorInstallLink', () => {
     const link = buildCursorInstallLink(mcpServerUrl);
 
     expect(link.startsWith('https://cursor.com/en/install-mcp?')).toBe(true);
-    expect(new URLSearchParams(link.split('?')[1]).get('name')).toBe('twenty');
+    expect(new URLSearchParams(link.split('?')[1]).get('name')).toBe('betty');
     expect(decodeBase64JsonParam(link, 'config')).toEqual(
       buildRemoteMcpServerConfig(mcpServerUrl),
     );
@@ -99,7 +101,7 @@ describe('buildVsCodeInstallLink', () => {
     );
 
     expect(payload).toEqual({
-      name: 'twenty',
+      name: 'betty',
       type: 'http',
       url: mcpServerUrl,
       headers: {
@@ -116,8 +118,8 @@ describe('buildGooseInstallLink', () => {
 
     expect(link.startsWith('goose://extension?')).toBe(true);
     expect(params.get('type')).toBe('streamable_http');
-    expect(params.get('id')).toBe('twenty');
-    expect(params.get('name')).toBe('Twenty');
+    expect(params.get('id')).toBe('betty');
+    expect(params.get('name')).toBe('Betty');
     expect(params.get('url')).toBe(mcpServerUrl);
     expect(params.get('header')).toBe('Authorization=Bearer <YOUR_API_KEY>');
   });
@@ -129,7 +131,7 @@ describe('buildReplitInstallLink', () => {
 
     expect(link.startsWith('https://replit.com/integrations?')).toBe(true);
     expect(decodeBase64JsonParam(link, 'mcp')).toEqual({
-      displayName: 'Twenty',
+      displayName: 'Betty',
       baseUrl: mcpServerUrl,
       headers: [
         {
@@ -146,7 +148,7 @@ describe('buildLmStudioInstallLink', () => {
     const link = buildLmStudioInstallLink(mcpServerUrl);
 
     expect(link.startsWith('lmstudio://add_mcp?')).toBe(true);
-    expect(new URLSearchParams(link.split('?')[1]).get('name')).toBe('twenty');
+    expect(new URLSearchParams(link.split('?')[1]).get('name')).toBe('betty');
     expect(decodeBase64JsonParam(link, 'config')).toEqual(
       buildRemoteMcpServerConfig(mcpServerUrl),
     );
