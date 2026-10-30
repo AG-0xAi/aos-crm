@@ -310,12 +310,20 @@ async function openRecord(page, singular, id) {
 async function openRecordAndWaitFor(page, singular, id, text) {
   let last = 'never loaded';
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    await openRecord(page, singular, id);
     try {
+      await openRecord(page, singular, id);
       await page.getByText(text, { exact: false }).first().waitFor({ timeout: 20_000 });
       return;
-    } catch {
-      last = (await page.locator('[data-testid="top-bar-title"]').first().innerText()).slice(0, 60);
+    } catch (error) {
+      // openRecord's own waits (frame title, fields widget) can be the slow
+      // part right after a restart, not just the record's text -- a locator
+      // read attempted here can itself throw on a frame that never rendered,
+      // so this falls back to the raw error instead of compounding it.
+      try {
+        last = (await page.locator('[data-testid="top-bar-title"]').first().innerText({ timeout: 5_000 })).slice(0, 60);
+      } catch {
+        last = `page did not render: ${String(error?.message ?? error).slice(0, 60)}`;
+      }
       await page.waitForTimeout(2_000);
     }
   }
