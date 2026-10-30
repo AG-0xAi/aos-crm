@@ -42,6 +42,15 @@ const PERSON_FIRST_NAME = `Marta ${MARKER}`;
 const OPPORTUNITY_NAME = `Oportunidad ${MARKER}`;
 const SHORT_WAIT_MS = 1_500;
 const LOCATOR_TIMEOUT_MS = 30_000;
+// Navigation gets its own deadline because Playwright's default 30 s is a
+// deadline on WORK here, not on an answer. Measured inside this very image on
+// 2026-10-30 with the host otherwise idle: `/healthz` answers in 176 ms, and
+// reaching `domcontentloaded` on the app's own page takes 11-13 s -- under 3x
+// headroom, which two runs that afternoon spent (every `page.goto` of the
+// create phase timed out at 30 s while the server was answering `/` in 0.2 s
+// and another session had the 4-core distro at load 6). A page that never
+// loads still fails, inside the phase budget the host test enforces.
+const NAVIGATION_TIMEOUT_MS = Number(process.env.AOS_CRM_BROWSER_NAV_TIMEOUT_MS || 90_000);
 
 const checks = [];
 let sandbox = null;
@@ -544,6 +553,7 @@ async function main() {
     if (!externalRequests.includes(metadata)) externalRequests.push(metadata);
   });
   const page = await context.newPage();
+  page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
   sandbox = sandboxEvidence();
   page.on('console', (message) => {
     if (message.type() !== 'error') return;

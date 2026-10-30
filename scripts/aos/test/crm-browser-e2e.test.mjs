@@ -65,6 +65,14 @@ const RUN_MARKER = `crm005-${randomUUID().slice(0, 8)}`;
 const IMAGE_TAG = `aos-crm-local/browser-acceptance:gate-${process.pid}-${randomUUID().slice(0, 8)}`;
 const CONTAINER_NAME = `aos-crm-browser-gate-${process.pid}`;
 const HEALTH_TIMEOUT_MS = 240_000;
+// Coming back from a restart is not the same wait as finding a stack that is
+// already up: this image's entrypoint runs migrations and registers cron jobs,
+// and Nest comes up several times before the port answers. Measured on this
+// host on 2026-10-30: `compose restart server worker` at 10:29 UTC, `Nest
+// application successfully started` at 10:37:48 UTC -- about eight minutes, so
+// the 240 s above could only ever fail. A server that never comes back still
+// fails this test, inside the suite's own gate budget.
+const RESTART_HEALTH_TIMEOUT_MS = 900_000;
 const PHASE_TIMEOUT_MS = 420_000;
 const WORKER_TIMELINE_TIMEOUT_MS = 120_000;
 
@@ -220,9 +228,16 @@ after(async () => {
     if (!id || !adminToken) continue;
     const mutation = `destroy${singular[0].toUpperCase()}${singular.slice(1)}`;
     try {
-      await graphql('/graphql', `mutation($id: UUID!) { ${mutation}(id: $id) { id } }`, { id }, adminToken);
-    } catch {
-      // Reported by the assertions above; a cleanup error must not hide them.
+      const destroyed = await graphql('/graphql', `mutation($id: UUID!) { ${mutation}(id: $id) { id } }`, { id }, adminToken);
+      // Said out loud, never thrown: a cleanup error must not hide the
+      // assertions, but it must not be invisible either. Measured on
+      // 2026-10-30: when a test failed because the restarted server had not
+      // come back yet, these three mutations failed too and the empty catch
+      // left one synthetic company, person and opportunity in the founder's
+      // workspace per failed run.
+      if (destroyed.errors) console.error(`[CLEANUP] ${singular} ${id} survived: ${JSON.stringify(destroyed.errors.map((e) => e.message))}`);
+    } catch (error) {
+      console.error(`[CLEANUP] ${singular} ${id} survived: ${String(error?.message ?? error).slice(0, 200)}`);
     }
   }
   if (linuxRoot) wsl(['docker', 'image', 'rm', IMAGE_TAG], { timeout: 60_000 });
@@ -295,7 +310,7 @@ test('the records and relations survive restarting server and worker, read back 
   assert.equal(before, '1', 'the company is gone before the restart even started');
   const restart = compose(['restart', 'server', 'worker'], { timeout: 300_000 });
   assert.equal(restart.status, 0, `docker compose restart server worker exited ${restart.status}: ${(restart.stderr || '').slice(-300)}`);
-  await waitForHealthy(HEALTH_TIMEOUT_MS);
+  await waitForHealthy(RESTART_HEALTH_TIMEOUT_MS);
 
   const verifyPhase = runBrowserPhase('verify', { ids });
   assertPhasePassed(verifyPhase, 'verify');
