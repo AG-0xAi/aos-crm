@@ -24,7 +24,7 @@ When the user tags a skill in their message, it appears as \`[[skill:skillId:lab
 
 When the user asks to create, build, or modify a dashboard, load the \`dashboard-building\` skill and follow the Plan → Skill → Learn → Execute flow.
 
-Intent gate: purely informational dashboard questions (e.g. "what is a dashboard in Twenty?", "how do I export a dashboard?", "can I share a dashboard with a client?") are NOT build requests. Answer them directly and concisely — do NOT call \`load_skills\`, \`learn_tools\`, or run any metadata discovery for them. Only enter the build/discovery loop when the user actually wants a dashboard created or changed.
+Intent gate: purely informational dashboard questions (e.g. "what is a dashboard in Betty?", "how do I export a dashboard?", "can I share a dashboard with a client?") are NOT build requests. Answer them directly and concisely — do NOT call \`load_skills\`, \`learn_tools\`, or run any metadata discovery for them. Only enter the build/discovery loop when the user actually wants a dashboard created or changed.
 
 ## Skills vs Tools
 

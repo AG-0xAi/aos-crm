@@ -1,5 +1,6 @@
 /* @license Enterprise */
 
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -325,7 +326,7 @@ export class BillingReminderService {
     switch (reminder.type) {
       case 'trial-ending':
         return {
-          subject: msg`Your Twenty trial is ending soon`,
+          subject: msg`Your ${BRAND_NAME} trial is ending soon`,
           emailTemplate: BillingTrialEndingEmail({
             userName,
             workspaceDisplayName,
@@ -339,7 +340,7 @@ export class BillingReminderService {
         };
       case 'trial-converting':
         return {
-          subject: msg`A heads up before your Twenty trial ends`,
+          subject: msg`A heads up before your ${BRAND_NAME} trial ends`,
           emailTemplate: BillingTrialConvertingEmail({
             userName,
             workspaceDisplayName,
@@ -351,7 +352,7 @@ export class BillingReminderService {
         };
       case 'subscription-renewing':
         return {
-          subject: msg`Your Twenty plan renews soon`,
+          subject: msg`Your ${BRAND_NAME} plan renews soon`,
           emailTemplate: BillingSubscriptionRenewingEmail({
             userName,
             workspaceDisplayName,

@@ -389,7 +389,7 @@ export const TWENTY_ICON_DICTIONARY = [
     iconName: 'IconBrandTypescript',
     tablerName: 'brand-typescript',
     keywords: ['serverless function', 'logic function', 'TypeScript function'],
-    useWhen: 'Representing Twenty serverless or logic functions.',
+    useWhen: 'Representing Betty serverless or logic functions.',
     avoidWhen: 'Representing generic source code or non-TypeScript tools.',
   },
   {
@@ -483,7 +483,7 @@ export const TWENTY_ICON_DICTIONARY = [
     iconName: 'IconTerminal2',
     tablerName: 'terminal-2',
     keywords: ['CLI', 'command line', 'terminal', 'twenty command'],
-    useWhen: 'Representing the Twenty command line tool or its commands.',
+    useWhen: 'Representing the Betty command line tool or its commands.',
     avoidWhen:
       'Representing execution logs, runtime output, or the command menu.',
   },
@@ -609,7 +609,7 @@ export const TWENTY_ICON_DICTIONARY = [
     category: 'general',
     iconName: 'IconApps',
     tablerName: 'apps',
-    keywords: ['app', 'application', 'Twenty app'],
+    keywords: ['app', 'application', 'Betty app'],
     useWhen: 'Representing an application or the apps platform.',
     avoidWhen: 'Representing a widget, integration, or one navigation item.',
   },
@@ -637,7 +637,7 @@ export const TWENTY_ICON_DICTIONARY = [
       'admin settings',
     ],
     useWhen:
-      'Representing the Twenty admin panel or instance-level administration.',
+      'Representing the Betty admin panel or instance-level administration.',
     avoidWhen:
       'Representing infrastructure health, server status, or workspace settings.',
   },

@@ -133,7 +133,7 @@ export class TwoFactorAuthenticationService {
         workspaceId,
       });
 
-      const issuer = `Twenty${workspaceDisplayName ? ` - ${workspaceDisplayName}` : ''}`;
+      const issuer = `Betty${workspaceDisplayName ? ` - ${workspaceDisplayName}` : ''}`;
       const reuseUri = authenticator.keyuri(userEmail, issuer, existingSecret);
 
       return reuseUri;
@@ -172,7 +172,7 @@ export class TwoFactorAuthenticationService {
       TOTP_DEFAULT_CONFIGURATION,
     ).initiate(
       userEmail,
-      `Twenty${workspaceDisplayName ? ` - ${workspaceDisplayName}` : ''}`,
+      `Betty${workspaceDisplayName ? ` - ${workspaceDisplayName}` : ''}`,
     );
 
     return {

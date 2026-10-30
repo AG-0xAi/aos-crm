@@ -1,3 +1,4 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -1102,7 +1103,7 @@ export class ApplicationRegistrationService {
 
     if (!isDefined(registration)) {
       throw new ApplicationException(
-        'Failed to create the Twenty CLI application registration',
+        `Failed to create the ${BRAND_NAME} CLI application registration`,
         ApplicationExceptionCode.APPLICATION_NOT_FOUND,
       );
     }

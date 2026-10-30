@@ -15,9 +15,9 @@ export const STANDARD_FLAT_AGENT_METADATA_BUILDERS_BY_AGENT_NAME = {
         name: 'helper',
         label: 'Helper',
         description:
-          'AI agent specialized in helping users learn how to use Twenty CRM',
+          'AI agent specialized in helping users learn how to use Betty',
         icon: 'IconHelp',
-        prompt: `You are a Helper Agent for Twenty. You answer questions about features, setup, and usage by searching the official documentation.
+        prompt: `You are a Helper Agent for Betty. You answer questions about features, setup and usage from what the workspace itself shows you.
 
 Core workflow:
 1. Use search_help_center tool to find relevant documentation
@@ -39,7 +39,7 @@ Response format:
 - Include important notes or prerequisites
 - Use markdown for readability
 
-Always base answers on official Twenty documentation. Be patient and helpful.`,
+This deployment has no documentation site, so never invent menus, buttons or steps: if you cannot confirm something, say so. Be patient and helpful.`,
         modelId: AUTO_SELECT_WORKSPACE_DEFAULT_MODEL_ID,
         responseFormat: { type: 'text' },
         isCustom: false,

@@ -1,0 +1,587 @@
+#!/usr/bin/env node
+// CRM-019 (R4): the brand guard. Fails when a user-visible string says
+// "Twenty", or when any shipped code names a Twenty-hosted URL, outside an
+// explicit allowlist where every entry carries a reason.
+//
+// What this exists to measure. CRM-019 renamed 40 translatable messages, the
+// document title, the e-mail templates and every link that left for a Twenty
+// host. None of that stays renamed on its own: the next upstream merge brings
+// new `t`...`` strings, and a single "Twenty" in a Section.Header is invisible
+// in a 900-file diff. This reads the source the build actually ships and makes
+// that a red gate instead of a code review someone has to remember to do.
+//
+// It is a STATIC scanner: it reads files, never builds, never starts anything,
+// needs no Docker and no network. It therefore proves nothing about the
+// rendered page -- that is the unit suites inside
+// scripts/aos/verify-front-icons.mjs and the browser path in
+// scripts/aos/test/crm-brand-e2e.test.mjs.
+//
+//   node scripts/aos/verify-brand.mjs
+//   node scripts/aos/verify-brand.mjs --self-test
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { globSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, posix, resolve, sep } from 'node:path';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// The bus is one `.aos/` for the whole project and it is gitignored, so a
+// worktree under `<main>/.aos/worktrees/<runId>` has no `.aos/verify.json` of
+// its own. `git rev-parse --git-common-dir` points at the main checkout's
+// `.git` from either place, which is how the gate file is found from both.
+export function resolveGateFile(root = REPO_ROOT) {
+  const local = resolve(root, '.aos/verify.json');
+
+  if (existsSync(local)) return local;
+
+  const commonGitDir = execFileSync(
+    'git',
+    ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+    { encoding: 'utf8' },
+  ).trim();
+  const shared = resolve(commonGitDir, '..', '.aos/verify.json');
+
+  if (existsSync(shared)) return shared;
+
+  throw new Error(
+    `no .aos/verify.json next to ${root} nor beside the shared git dir ${commonGitDir}`,
+  );
+}
+
+// The packages whose code reaches a user: the app, its design system, the
+// isomorphic layer they share, and the transactional e-mails. twenty-docs,
+// twenty-website and twenty-zapier are upstream's own properties and are not
+// deployed by this project.
+export const SCANNED_GLOBS = [
+  'packages/twenty-front/src/**/*.{ts,tsx}',
+  'packages/twenty-front/index.html',
+  'packages/twenty-ui/src/**/*.{ts,tsx}',
+  'packages/twenty-shared/src/**/*.ts',
+  'packages/twenty-emails/src/**/*.{ts,tsx}',
+  'packages/twenty-server/src/**/*.ts',
+];
+
+// Test fixtures, mocks, stories and generated catalogues are not shipped text.
+// Lingui catalogues in particular are regenerated from the source strings, so
+// scanning them would report the same message twice -- once where it is
+// written, once where it is translated -- and the first report is the useful
+// one.
+export const SKIPPED_PATH_FRAGMENTS = [
+  '/locales/',
+  '/generated/',
+  '/generated-metadata/',
+  '/generated-admin/',
+  '/__tests__/',
+  '/__mocks__/',
+  '/__stories__/',
+  '/__snapshots__/',
+  '/testing/',
+  '/test-utils/',
+  '.spec.ts',
+  '.test.ts',
+  '.test.tsx',
+  '.stories.tsx',
+];
+
+// A Twenty-owned host in any shipped string. Deliberately wider than
+// twenty.com: the icon provider was twenty-icons.com, telemetry is
+// twenty-telemetry.com and the placeholder images were on twentyhq.github.io.
+export const TWENTY_HOST_PATTERN =
+  /https?:\/\/[a-z0-9.-]*\btwenty(hq|-[a-z]+)?\b[a-z0-9.-]*\.[a-z]{2,}/gi;
+
+// The product name as a WORD, so TwentyOrm, isTwentyStandardApplication and
+// twenty-shared do not trip it -- those are code identifiers and package
+// names, which the contract says keep their upstream names.
+export const TWENTY_WORD_PATTERN = /(^|[^A-Za-z0-9_-])Twenty([^A-Za-z0-9_-]|$)/;
+
+// Every exception, with the reason it is one. No wildcards: an entry names one
+// file and the exact text it excuses, so an entry that stops matching is a
+// failure (see the self-test) rather than cover for the next string that
+// creeps in.
+export const ALLOWLIST = [
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template.constant.ts',
+    match: 'Twenty',
+    reason:
+      "Twenty Inc.'s own Data Processing Agreement. Rewriting a legal instrument to say Betty would assert a contract that does not exist; the page is unreachable from the navigation. Founder decision before any launch with billing on.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template-version.constant.ts',
+    match: 'Twenty Data Processing Agreement (DPA)',
+    reason: "The title of Twenty Inc.'s own DPA template. Same reason as the template itself.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/config/dpa-region-config.constant.ts',
+    match: 'Twenty.com',
+    reason:
+      "Twenty Inc.'s legal entities (Twenty.com PBC and Twenty.com SAS) as the DPA's processor. A legal entity name is a fact, not branding.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/services/dpa.service.ts',
+    match: 'Twenty does not host or process Customer Personal Data',
+    reason:
+      'States correctly that Twenty Inc. is not the processor for a self-hosted deployment. Renaming it would reverse its meaning.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/utils/resolve-dpa.util.ts',
+    match: 'pre-signed by Twenty',
+    reason:
+      "Names who pre-signed Twenty Inc.'s template. Betty signs nothing here; claiming otherwise would forge a signature block.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/utils/resolve-dpa.util.ts',
+    match: 'This Twenty instance is self-hosted',
+    reason:
+      'The invalid-agreement banner, stating correctly that Twenty Inc. is not the processor of a self-hosted deployment.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/twenty-config/config-variables.ts',
+    match: 'The Processor entity (Twenty.com PBC)',
+    reason:
+      'Describes which legal entity the DPA names per region. Same reason as the DPA module.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/constants/person-data-seeds.constant.ts',
+    match: 'twenty',
+    reason:
+      'Development seed data (nx database:seed), never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/constants/seeder-workspaces.constant.ts',
+    match: 'twenty',
+    reason: 'Development seed workspaces, never created by a real sign-up.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/constants/agent-chat-seeds.constant.ts',
+    match: 'Twenty field',
+    reason: 'Development seed chat transcript, never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/utils/get-page-layout-widget-data-seeds.util.ts',
+    match: 'Twenty Star History',
+    reason: 'Development seed dashboard widget, never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/utils/seed-agents.util.ts',
+    match: 'Twenty',
+    reason: 'Development seed agent transcript, never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-agent-chat-pending-input.workspace-service.ts',
+    match: 'Twenty',
+    reason:
+      'Development seed chat transcript, never installed by a real workspace. The whole file is seed text, so the match is the bare word on purpose.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-workflow-pending-input.workspace-service.ts',
+    match: 'Twenty subscription renews',
+    reason: 'Development seed workflow draft, never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-workflow-pending-input.workspace-service.ts',
+    match: 'Your Twenty renewal on October 31',
+    reason: 'Development seed workflow draft, never installed by a real workspace.',
+  },
+  {
+    file: 'packages/twenty-server/src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1792741864752-backfill-standard-application-default-role.command.ts',
+    match: 'Twenty standard application',
+    reason:
+      "An already-published upgrade command. The upstream convention (docs/aos/upstream/CLAUDE.md) is never to rewrite committed command logic, and the string is the command's own description in server logs.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/workspace-migration/services/workspace-migration-flat-entity-maps.service.ts',
+    match: 'Twenty standard application not found in workspace',
+    reason:
+      'Internal invariant failure naming the twenty-standard-application entity, which is a code identifier the contract keeps. Not shown to a user.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/workspace-manager/twenty-standard-application/constants/twenty-cli-application-registration.constant.ts',
+    match: 'Twenty CLI',
+    reason:
+      "The registered name and description of the real `twenty` npm CLI's OAuth application. Renaming it would stop matching the tool users actually install.",
+  },
+  {
+    file: 'packages/twenty-ui/src/icon/constants/TwentyIconDictionary.ts',
+    match: 'figma.com/design/xt8O9mFeLl46C5InWwoMrN/Twenty',
+    reason:
+      "The upstream Figma file this icon dictionary is generated from, kept as provenance. Figma-hosted, not Twenty-hosted, and it is not rendered anywhere.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/telemetry/telemetry.service.ts',
+    match: 'https://twenty-telemetry.com/api/v2',
+    reason:
+      'Upstream telemetry endpoint. CRM-003 pinned TELEMETRY_ENABLED=false and verify-privacy.mjs asserts publish() returns before it builds a client, so this string is never dialled. Kept as the single place a reader finds the destination.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/twenty-config/config-variables.ts',
+    match: 'https://twenty.com/api/enterprise',
+    reason:
+      'Default ENTERPRISE_API_URL. CRM-003 verified neither refreshValidityToken nor reportSeats fetches without ENTERPRISE_KEY, which this deployment does not set.',
+  },
+  {
+    file: 'packages/twenty-server/src/engine/api/mcp/constants/mcp-excluded-tool-names.constant.ts',
+    match: 'https://docs.twenty.com/mcp',
+    reason:
+      "A comment recording WHY search_help_center is excluded from MCP. CRM-019 also removed the request itself from the tool, so this names a destination the code no longer has.",
+  },
+  {
+    file: 'packages/twenty-shared/src/utils/image/getLogoUrlFromDomainName.ts',
+    match: 'https://twenty-icons.com/<domain>',
+    reason:
+      'A comment recording the provider URL this function used to build, so the next reader knows what returning undefined is protecting.',
+  },
+  {
+    file: 'packages/twenty-emails/src/components/Footer.tsx',
+    match: "upstream footer linked Twenty's website",
+    reason: 'A comment recording what the footer used to link.',
+  },
+  {
+    file: 'packages/twenty-front/src/modules/settings/billing/hooks/useStripeAppearance.ts',
+    match: 'Twenty theme',
+    reason: 'A comment about the theme token format, not user-visible text.',
+  },
+  {
+    file: 'packages/twenty-front/src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx',
+    match: "Twenty's own hosted ChatGPT app",
+    reason: 'A comment recording the card CRM-019 removed.',
+  },
+  {
+    file: 'packages/twenty-front/src/pages/settings/applications/components/SettingsClaimApplicationSection.tsx',
+    match: 'twenty-app',
+    reason:
+      'The real npm keyword an app must publish under, and the matching example package name. Changing it would print an instruction that does not work.',
+  },
+  {
+    file: 'packages/twenty-front/src/modules/settings/developers/constants/TwentyCliCreateAppCommands.ts',
+    match: 'npx twenty@latest',
+    reason:
+      'The real npm package name of the app CLI. Commands have to be runnable; the tab that prints them is server-admin only (R2).',
+  },
+  {
+    file: 'packages/twenty-front/src/modules/settings/developers/constants/TwentyCliLoginCommand.ts',
+    match: 'npx twenty@latest',
+    reason: 'Same CLI package name, same server-admin-only tab.',
+  },
+  {
+    file: 'packages/twenty-front/src/pages/settings/developers/tabs/SettingsDevelopersCliTab.tsx',
+    match: 'npx twenty@latest',
+    reason: 'Same CLI package name, same server-admin-only tab.',
+  },
+  {
+    file: 'packages/twenty-front/src/pages/settings/developers/tabs/SettingsDevelopersCliTab.tsx',
+    match: 'https://github.com/twentyhq/twenty/blob/main/packages/twenty-cli/docs/commands.md',
+    reason:
+      "The CLI's own command reference. It documents the npm package above, is hosted by GitHub rather than by Twenty, and the tab is server-admin only.",
+  },
+];
+
+export function isScannedPath(relativePath) {
+  const normalized = `/${relativePath.split(sep).join('/')}`;
+
+  return !SKIPPED_PATH_FRAGMENTS.some((fragment) =>
+    normalized.includes(fragment),
+  );
+}
+
+// Everything a reader of the running app can end up looking at: the text of a
+// translatable message, a JSX text node, and any string literal that is not a
+// module specifier. Import paths are excluded by construction (the contract
+// keeps package names), and so is a `//` or `/* */` comment, which no user
+// sees -- comments that name an old destination on purpose are the reason the
+// allowlist exists for the few that remain.
+export function extractUserFacingStrings(source, { isHtml = false } = {}) {
+  if (isHtml) {
+    return [
+      ...[...source.matchAll(/<title>([^<]*)<\/title>/g)].map((m) => m[1]),
+      ...[...source.matchAll(/content="([^"]*)"/g)].map((m) => m[1]),
+      ...[...source.matchAll(/href="([^"]*)"/g)].map((m) => m[1]),
+      ...[...source.matchAll(/>([^<>{}]*[A-Za-z]{3}[^<>{}]*)</g)].map((m) =>
+        m[1].trim(),
+      ),
+    ].filter((value) => value !== '');
+  }
+
+  const strings = [];
+
+  for (const rawLine of source.split('\n')) {
+    const line = rawLine.trim();
+
+    // Module specifiers and comment lines are not user-visible text.
+    if (
+      line.startsWith('import ') ||
+      line.startsWith('export * from') ||
+      line.startsWith('export {') ||
+      line.startsWith('export type {') ||
+      line.startsWith('//') ||
+      line.startsWith('*') ||
+      line.startsWith('/*')
+    ) {
+      continue;
+    }
+
+    // from '...' on its own line (multi-line import tails)
+    if (/^}?\s*from\s+['"]/.test(line)) continue;
+
+    for (const match of line.matchAll(/'((?:[^'\\]|\\.)*)'/g)) strings.push(match[1]);
+    for (const match of line.matchAll(/"((?:[^"\\]|\\.)*)"/g)) strings.push(match[1]);
+    for (const match of line.matchAll(/`((?:[^`\\]|\\.)*)`/g)) strings.push(match[1]);
+
+    // JSX text between tags on the same line, e.g. <Trans>By using X</Trans>
+    for (const match of line.matchAll(/>([^<>{}]*[A-Za-z]{3}[^<>{}]*)</g)) {
+      strings.push(match[1].trim());
+    }
+  }
+
+  return strings.filter((value) => value !== '');
+}
+
+export function findViolations({ relativePath, source }) {
+  const isHtml = relativePath.endsWith('.html');
+  const violations = [];
+
+  for (const value of extractUserFacingStrings(source, { isHtml })) {
+    // A path or a module specifier that survived the line filters.
+    if (/^(\.\.?\/|@\/|~\/|src\/|packages\/|twenty-[a-z-]+\/)/.test(value)) {
+      continue;
+    }
+
+    for (const url of value.match(TWENTY_HOST_PATTERN) ?? []) {
+      violations.push({ kind: 'twenty-host', text: url, inside: value });
+    }
+
+    if (TWENTY_WORD_PATTERN.test(` ${value} `)) {
+      violations.push({ kind: 'twenty-name', text: 'Twenty', inside: value });
+    }
+  }
+
+  return violations.map((violation) => ({ ...violation, file: relativePath }));
+}
+
+export function isAllowed(violation, allowlist = ALLOWLIST) {
+  return allowlist.some(
+    (entry) =>
+      entry.file === violation.file &&
+      (violation.inside.includes(entry.match) ||
+        violation.text.includes(entry.match)),
+  );
+}
+
+export function scanRepository({ root = REPO_ROOT, allowlist = ALLOWLIST } = {}) {
+  const files = SCANNED_GLOBS.flatMap((pattern) =>
+    globSync(pattern, { cwd: root }),
+  )
+    .map((p) => p.split(sep).join(posix.sep))
+    .filter(isScannedPath)
+    .sort();
+
+  const violations = [];
+
+  for (const relativePath of files) {
+    const source = readFileSync(resolve(root, relativePath), 'utf8');
+
+    for (const violation of findViolations({ relativePath, source })) {
+      if (!isAllowed(violation, allowlist)) violations.push(violation);
+    }
+  }
+
+  return { filesScanned: files.length, violations };
+}
+
+function run() {
+  const { filesScanned, violations } = scanRepository();
+
+  if (filesScanned === 0) {
+    console.error(
+      '[FAIL] the brand guard matched no files at all, so it measured nothing',
+    );
+    process.exit(1);
+  }
+
+  if (violations.length > 0) {
+    for (const violation of violations.slice(0, 50)) {
+      console.error(
+        `[FAIL] ${violation.file}: ${violation.kind} ${JSON.stringify(violation.text)} in ${JSON.stringify(violation.inside.slice(0, 120))}`,
+      );
+    }
+    if (violations.length > 50) {
+      console.error(`[FAIL] ... and ${violations.length - 50} more`);
+    }
+    console.error(
+      `[FAIL] ${violations.length} user-visible reference(s) to Twenty across ${filesScanned} scanned files. Rename them, or add an allowlist entry with a reason in scripts/aos/verify-brand.mjs.`,
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `[PASS] no user-visible reference to Twenty in ${filesScanned} shipped source files (${ALLOWLIST.length} allowlisted exceptions, each with a reason).`,
+  );
+  console.log(
+    'Scope: string literals, template literals and same-line JSX text in the front, ui, shared, emails and server packages, plus index.html. It does NOT read the rendered page (see scripts/aos/verify-front-icons.mjs) and does NOT observe network traffic (see scripts/aos/capture-traffic.mjs).',
+  );
+}
+
+function selfTest() {
+  let failures = 0;
+  const record = (name, body) => {
+    try {
+      body();
+      console.log(`[PASS] ${name}`);
+    } catch (error) {
+      console.log(`[FAIL] ${name}: ${error.message}`);
+      failures++;
+    }
+  };
+  const assert = (condition, message) => {
+    if (!condition) throw new Error(message);
+  };
+  const scan = (source, relativePath = 'packages/twenty-front/src/fixture.tsx') =>
+    findViolations({ relativePath, source });
+
+  record('a seeded visible "Twenty" in a Lingui message FAILS the guard', () => {
+    const found = scan('const title = t`Welcome to Twenty`;');
+    assert(found.length === 1, `expected 1 violation, got ${found.length}`);
+    assert(found[0].kind === 'twenty-name', found[0].kind);
+  });
+  record('the same message saying Betty passes', () => {
+    assert(scan('const title = t`Welcome to Betty`;').length === 0, 'Betty was flagged');
+  });
+  record('a seeded "Twenty" in JSX text FAILS', () => {
+    const found = scan('<Trans>By using Twenty, you agree to the</Trans>');
+    assert(found.length >= 1, 'JSX text was not read');
+  });
+  record('a seeded "Twenty" in a prop string FAILS', () => {
+    for (const source of [
+      '<Section.Header title="Twenty fields" />',
+      "const message = 'Please contact Twenty team';",
+      'const subject = msg`Join your team on Twenty`;',
+      "i18n._('Twenty logo')",
+    ]) {
+      assert(scan(source).length >= 1, `not flagged: ${source}`);
+    }
+  });
+  record('a seeded Twenty-hosted URL FAILS, for every host family that leaked', () => {
+    for (const url of [
+      'https://docs.twenty.com/getting-started',
+      'https://twenty-icons.com/acme.com',
+      'https://twenty-telemetry.com/api/v2',
+      'https://twentyhq.github.io/placeholder-images/x.png',
+      'https://app.twenty.com/images/icons/x.png',
+    ]) {
+      const found = scan(`const url = '${url}';`);
+      assert(
+        found.some((violation) => violation.kind === 'twenty-host'),
+        `not flagged as a host: ${url}`,
+      );
+    }
+  });
+  record('code identifiers, package names and import paths are NOT flagged', () => {
+    for (const source of [
+      "import { BRAND_NAME } from 'twenty-shared/constants';",
+      "import { isTwentyStandardApplication } from '@/applications/utils/isTwentyStandardApplication';",
+      'const x = isTwentyStandardApplication(app);',
+      'type WhatIsTwentyProps = { i18n: I18n };',
+      'export class TwentyConfigService {}',
+      "} from 'twenty-ui/theme';",
+      '// the upstream Twenty footer linked three sites',
+    ]) {
+      assert(scan(source).length === 0, `false positive: ${source}`);
+    }
+  });
+  record('index.html text, title, meta and hrefs are read', () => {
+    const html = '<title>Twenty</title><meta property="og:title" content="Twenty" />';
+    const found = findViolations({
+      relativePath: 'packages/twenty-front/index.html',
+      source: html,
+    });
+    assert(found.length >= 2, `expected the title and the meta, got ${found.length}`);
+  });
+  record("this repo's own index.html says Betty and nothing else", () => {
+    const found = findViolations({
+      relativePath: 'packages/twenty-front/index.html',
+      source: readFileSync(
+        resolve(REPO_ROOT, 'packages/twenty-front/index.html'),
+        'utf8',
+      ),
+    });
+    assert(found.length === 0, `index.html still names Twenty: ${JSON.stringify(found)}`);
+  });
+  record('the allowlist is explicit: no wildcards, no bare directories', () => {
+    for (const entry of ALLOWLIST) {
+      assert(!/[*?]/.test(entry.file), `wildcard in allowlist file: ${entry.file}`);
+      assert(entry.match.length >= 6, `allowlist match too broad: ${entry.match}`);
+      assert(
+        typeof entry.reason === 'string' && entry.reason.length > 30,
+        `allowlist entry without a real reason: ${entry.file}`,
+      );
+    }
+  });
+  record('every allowlist entry still names a file that exists and text it still excuses', () => {
+    for (const entry of ALLOWLIST) {
+      statSync(resolve(REPO_ROOT, entry.file));
+      const source = readFileSync(resolve(REPO_ROOT, entry.file), 'utf8');
+      assert(
+        source.includes(entry.match),
+        `stale allowlist entry: ${entry.file} no longer contains ${JSON.stringify(entry.match)}`,
+      );
+    }
+  });
+  record('an allowlist entry excuses only its own file', () => {
+    const entry = ALLOWLIST[0];
+    const violation = {
+      file: 'packages/twenty-front/src/other.tsx',
+      text: 'Twenty',
+      inside: entry.match,
+    };
+    assert(!isAllowed(violation, [entry]), 'the allowlist leaked across files');
+  });
+  record('generated catalogues, tests, mocks and stories are out of scope', () => {
+    for (const path of [
+      'packages/twenty-front/src/locales/es-ES.po',
+      'packages/twenty-front/src/locales/generated/en.ts',
+      'packages/twenty-front/src/modules/x/__tests__/y.test.tsx',
+      'packages/twenty-front/src/modules/x/__mocks__/y.ts',
+      'packages/twenty-front/src/modules/x/__stories__/y.stories.tsx',
+      'packages/twenty-front/src/testing/mock-data/users.ts',
+      'packages/twenty-server/src/x/y.spec.ts',
+    ]) {
+      assert(!isScannedPath(path), `should be skipped: ${path}`);
+    }
+    for (const path of [
+      'packages/twenty-front/src/pages/auth/SignInUp.tsx',
+      'packages/twenty-emails/src/components/Footer.tsx',
+      'packages/twenty-server/src/engine/core-modules/auth/services/sign-in-up.service.ts',
+    ]) {
+      assert(isScannedPath(path), `should be scanned: ${path}`);
+    }
+  });
+  record('the guard is declared in the gate with its self-test', () => {
+    const verify = JSON.parse(readFileSync(resolveGateFile(), 'utf8'));
+    assert(
+      verify.commands.includes('node scripts/aos/verify-brand.mjs'),
+      'the brand guard is not in .aos/verify.json',
+    );
+    assert(
+      verify.commands.includes('node scripts/aos/verify-brand.mjs --self-test'),
+      'the brand guard self-test is not in .aos/verify.json',
+    );
+  });
+
+  console.log(
+    failures === 0 ? 'self-test: ALL PASSED' : `self-test: ${failures} FAILED`,
+  );
+  process.exit(failures === 0 ? 0 : 1);
+}
+
+// Only act when this file IS the entry point, resolved by real path rather
+// than by the name it was invoked under (CRM-004 fix5's lesson). Other
+// verifiers import resolveGateFile from here, and an import must not run a
+// scan.
+const invokedPath = process.argv[1]
+  ? resolve(process.argv[1])
+  : null;
+
+if (invokedPath === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--self-test')) selfTest();
+  else run();
+}

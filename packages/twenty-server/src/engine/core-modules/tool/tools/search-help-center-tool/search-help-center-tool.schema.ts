@@ -1,9 +1,12 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { z } from 'zod';
 
 export const SearchHelpCenterInputZodSchema = z.object({
   query: z
     .string()
-    .describe('The search query to find relevant help articles about Twenty'),
+    .describe(
+      `The search query to find relevant help articles about ${BRAND_NAME}`,
+    ),
 });
 
 export type SearchHelpCenterInput = z.infer<

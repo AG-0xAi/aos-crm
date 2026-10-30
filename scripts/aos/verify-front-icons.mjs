@@ -31,6 +31,8 @@ import { globSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
+import { resolveGateFile } from './verify-brand.mjs';
+
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DISTRO = process.env.AOS_CRM_DISTRO || 'AOS-CRM-Ubuntu-24.04';
 const SOURCES_DOCKERFILE = 'scripts/aos/front-icons-sources.Dockerfile';
@@ -77,6 +79,11 @@ export const SPECS = [
   'src/modules/onboarding/components/import-contacts/__tests__/OnboardingImportPreviewCompanies.test.tsx',
   'src/modules/navigation-menu-item/display/link/components/__tests__/LinkIconWithLinkOverlay.test.tsx',
   'src/modules/object-metadata/utils/__tests__/getImageIdentifierFieldValue.test.ts',
+  // CRM-019 (R4): the component the new onboarding step and Settings > AI >
+  // MCP both render, and the MCP link builders whose connector name and server
+  // key the brand change moved.
+  'src/modules/settings/mcp/components/__tests__/McpConnectAssistant.test.tsx',
+  'src/modules/settings/mcp/utils/__tests__/mcpSetup.test.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
 
@@ -116,8 +123,14 @@ export const AMBIENT_PROGRAM_FILES = ['src/**/*.d.ts', 'setupTests.ts'];
 // include the jotai/cookie-storage chain that TS7016 hit). The whole-project
 // run, its remaining diagnostics and their causes are reported in
 // docs/aos/bootstrap/FUNCTIONAL_EVIDENCE.md instead of silently dropped.
-export const TYPECHECK_INCLUDE = [FLAG_STATE_FILE, ...GUARDED_COMPONENTS];
-const SCOPED_TSCONFIG = 'tsconfig.aos-crm005.json';
+// CRM-019 widened this from the four files CRM-005 changed to the whole
+// project. CRM-005 scoped it because a full run reported TS7016 in six
+// untouched upstream files whose @types only twenty-server declares -- and the
+// sources image now restores exactly those declarations, so the narrowing has
+// no reason left. CRM-019 also touches ~60 front files, which a hand-kept list
+// would drift from within one track.
+export const TYPECHECK_INCLUDE = ['src/**/*'];
+const SCOPED_TSCONFIG = 'tsconfig.aos-gate.json';
 
 // Exactly what the official Dockerfile's `front-deps` stage COPYs, plus the
 // Dockerfile itself. Rebuilt from a tar of these paths on EVERY run: "the tag
@@ -184,6 +197,12 @@ const MARKERS = {
   jest: 'AOS_FRONT_JEST_EXIT',
   tsgo: 'AOS_FRONT_TSGO_EXIT',
   canary: 'AOS_FRONT_CANARY_EXIT',
+  // CRM-019: the repo's own formatter over the same sources. tsgo accepts
+  // plenty that `nx lint twenty-front` rejects, and formatting drift from a
+  // large hand-written diff is the red a reviewer finds too late. Only oxfmt,
+  // not oxlint: twenty-front's .oxlintrc.json names a jsPlugin built from
+  // twenty-oxlint-rules, which this image does not build.
+  lint: 'AOS_FRONT_LINT_EXIT',
 };
 
 export function readMarker(output, name) {
@@ -223,8 +242,9 @@ export function judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerSt
   const jestExit = readMarker(output, MARKERS.jest);
   const tsgoExit = readMarker(output, MARKERS.tsgo);
   const canaryExit = readMarker(output, MARKERS.canary);
-  if (jestExit === null || tsgoExit === null || canaryExit === null) {
-    return { ok: false, detail: `the container did not report all three markers (jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit})` };
+  const lintExit = readMarker(output, MARKERS.lint);
+  if (jestExit === null || tsgoExit === null || canaryExit === null || lintExit === null) {
+    return { ok: false, detail: `the container did not report all four markers (jest=${jestExit}, tsgo=${tsgoExit}, canary=${canaryExit}, lint=${lintExit})` };
   }
   const summary = parseJestSummary(output);
   // The markers travel with the summary failure: the container's tail is what
@@ -237,6 +257,9 @@ export function judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerSt
   }
   if (tsgoExit !== 0) {
     return { ok: false, detail: `tsgo rejected twenty-front (exit ${tsgoExit})` };
+  }
+  if (lintExit !== 0) {
+    return { ok: false, detail: `oxfmt reported unformatted sources in twenty-front (exit ${lintExit}); fix with: npx nx lint twenty-front --configuration=fix` };
   }
   // A compiler that accepts a deliberately mistyped file is a compiler that
   // measured nothing, however clean its verdict on the real code.
@@ -334,6 +357,7 @@ function containerScript() {
     `npx tsgo -p ${SCOPED_TSCONFIG} > /tmp/canary.log 2>&1; echo "${MARKERS.canary}=$?"`,
     'tail -2 /tmp/canary.log',
     `rm -f ${canary} ${SCOPED_TSCONFIG}`,
+    `npx oxfmt --check src/; echo "${MARKERS.lint}=$?"`,
     'exit 0',
   ].join('\n');
 }
@@ -421,11 +445,12 @@ function selfTest() {
   const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
   const measured = { depsBuildStatus: 0, sourcesBuildStatus: 0, containerStatus: 0 };
   const clean = [
-    'Test Suites: 4 passed, 4 total',
-    'Tests:       14 passed, 14 total',
+    `Test Suites: ${EXPECTED_SUITES} passed, ${EXPECTED_SUITES} total`,
+    'Tests:       20 passed, 20 total',
     `${MARKERS.jest}=0`,
     `${MARKERS.tsgo}=0`,
     `${MARKERS.canary}=2`,
+    `${MARKERS.lint}=0`,
   ].join('\n');
 
   record('a clean run with both builds, the container, jest, tsgo and a rejected canary passes', () => {
@@ -433,12 +458,17 @@ function selfTest() {
     assert(r.ok, r.detail);
   });
   record('a failing suite is rejected', () => {
-    const r = judgeFrontRun({ ...measured, output: clean.replace('Test Suites: 4 passed, 4 total', 'Test Suites: 1 failed, 3 passed, 4 total') });
+    const r = judgeFrontRun({ ...measured, output: clean.replace(`Test Suites: ${EXPECTED_SUITES} passed, ${EXPECTED_SUITES} total`, `Test Suites: 1 failed, ${EXPECTED_SUITES - 1} passed, ${EXPECTED_SUITES} total`) });
     assert(!r.ok, 'expected a failing suite to be rejected');
   });
+  record('unformatted sources fail even with jest and tsgo green', () => {
+    const r = judgeFrontRun({ ...measured, output: clean.replace(`${MARKERS.lint}=0`, `${MARKERS.lint}=1`) });
+    assert(!r.ok, 'expected a non-zero oxfmt exit to fail');
+    assert(/oxfmt reported unformatted sources/.test(r.detail), r.detail);
+  });
   record('a run that matched fewer suites than this gate claims is rejected, not read as green', () => {
-    for (const summary of ['Test Suites: 0 total\nTests:       0 total', 'Test Suites: 3 passed, 3 total\nTests:       9 passed, 9 total']) {
-      const r = judgeFrontRun({ ...measured, output: `${summary}\n${MARKERS.jest}=0\n${MARKERS.tsgo}=0\n${MARKERS.canary}=2` });
+    for (const summary of ['Test Suites: 0 total\nTests:       0 total', `Test Suites: ${EXPECTED_SUITES - 1} passed, ${EXPECTED_SUITES - 1} total\nTests:       9 passed, 9 total`]) {
+      const r = judgeFrontRun({ ...measured, output: `${summary}\n${MARKERS.jest}=0\n${MARKERS.tsgo}=0\n${MARKERS.canary}=2\n${MARKERS.lint}=0` });
       assert(!r.ok, `expected "${summary.split('\n')[0]}" to be rejected`);
     }
   });
@@ -484,7 +514,8 @@ function selfTest() {
     assert(!r.ok, 'expected a non-zero jest exit to fail');
   });
 
-  record('the four suites this gate claims to run exist in the checkout', () => {
+  record('every suite this gate claims to run exists in the checkout', () => {
+    assert(SPECS.length >= 6, `expected at least six suites, got ${SPECS.length}`);
     for (const spec of SPECS) {
       execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])',
         resolve(REPO_ROOT, 'packages', 'twenty-front', spec)]);
@@ -577,12 +608,22 @@ function selfTest() {
     assert(/defaultValue:\s*false/.test(state),
       `${FLAG_STATE_FILE} no longer defaults to false: the first render would request icons before /client-config answers`);
   });
-  record('the typechecked program contains every file this track changes and every suite it runs', () => {
+  record('the typechecked program covers the whole project, and every file this gate names resolves inside it', () => {
     const config = scopedTsconfig('src/aos-crm-canary-x.ts');
     assert(config.extends === './tsconfig.json',
       "the scoped program no longer extends twenty-front's own tsconfig, so it is not the project's own strictness");
+    // CRM-019: a file list would drift from a track that touches sixty files,
+    // so the program is the project. A narrowing here has to fail.
+    assert(config.include.includes('src/**/*'),
+      'the typechecked program is narrowed again: a changed file outside the list would go unchecked');
+    const front = resolve(REPO_ROOT, 'packages', 'twenty-front');
+    const covered = new Set(
+      config.include
+        .flatMap((entry) => globSync(entry, { cwd: front }))
+        .map((relative) => relative.split('\\').join('/')),
+    );
     for (const relative of [FLAG_STATE_FILE, ...GUARDED_COMPONENTS, ...SPECS]) {
-      assert(config.include.includes(relative), `${relative} is not in the typechecked program`);
+      assert(covered.has(relative), `${relative} is not inside the typechecked program`);
       execFileSync('node', ['-e', 'require("fs").statSync(process.argv[1])',
         resolve(REPO_ROOT, 'packages', 'twenty-front', relative)]);
     }
@@ -638,7 +679,7 @@ function selfTest() {
       'deploy/local/privacy.env no longer pins ALLOW_REQUESTS_TO_TWENTY_ICONS=false');
   });
   record('the run has its own deadlines, and all of them plus the teardown fit inside the gate budget', () => {
-    const verify = JSON.parse(readFileSync(resolve(REPO_ROOT, '.aos/verify.json'), 'utf8'));
+    const verify = JSON.parse(readFileSync(resolveGateFile(), 'utf8'));
     const budget = verify.timeoutsMs['verify-front-icons.mjs'];
     assert(budget > 0, '.aos/verify.json declares no budget for this command');
     assert(verify.commands.includes('node scripts/aos/verify-front-icons.mjs'), 'this command is not in the gate');

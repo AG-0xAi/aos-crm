@@ -1,3 +1,4 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { ApolloClient, ApolloLink, type ErrorLike } from '@apollo/client';
 import {
   CombinedGraphQLErrors,
@@ -31,7 +32,7 @@ import {
 import isEmpty from 'lodash.isempty';
 import { getGenericOperationName, isDefined } from 'twenty-shared/utils';
 
-const logger = loggerLink(() => 'Twenty');
+const logger = loggerLink(() => BRAND_NAME);
 
 export interface Options {
   uri: string;

@@ -1,3 +1,4 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { existsSync, readFileSync } from 'fs';
@@ -153,7 +154,7 @@ export class FrontendService {
       response
         .status(503)
         .type('text')
-        .send('Unable to load Twenty. Please try again.');
+        .send(`Unable to load ${BRAND_NAME}. Please try again.`);
     }
   }
 }

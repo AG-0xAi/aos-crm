@@ -1,5 +1,7 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
+
 // Python helper that gets prepended to user code for MCP access
-export const TWENTY_MCP_HELPER = `# Auto-injected Twenty MCP helper - provides access to Twenty tools
+export const TWENTY_MCP_HELPER = `# Auto-injected ${BRAND_NAME} MCP helper - provides access to ${BRAND_NAME} tools
 import os
 import json
 
@@ -69,7 +71,7 @@ class TwentyMCP:
             # companies == {'records': [...], 'count': '5'}
         """
         if not self._available:
-            raise RuntimeError('Twenty MCP bridge not available. Missing requests library or credentials.')
+            raise RuntimeError('${BRAND_NAME} MCP bridge not available. Missing requests library or credentials.')
 
         if name in self._MCP_NATIVE_TOOLS:
             return self._raw_mcp_call(name, arguments)

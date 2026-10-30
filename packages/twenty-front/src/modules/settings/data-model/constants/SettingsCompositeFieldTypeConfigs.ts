@@ -1,3 +1,4 @@
+import { BRAND_DOMAIN, BRAND_NAME } from 'twenty-shared/constants';
 import { type MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { COMPOSITE_FIELD_SUB_FIELD_LABEL_MESSAGES } from '@/settings/data-model/constants/CompositeFieldSubFieldLabelMessages';
@@ -184,11 +185,11 @@ export const SETTINGS_COMPOSITE_FIELD_TYPE_CONFIGS = {
       {
         primaryLinkUrl: 'twenty.com',
         primaryLinkLabel: '',
-        secondaryLinks: [{ url: 'twenty.com', label: 'Twenty' }],
+        secondaryLinks: [{ url: BRAND_DOMAIN, label: BRAND_NAME }],
       },
       {
         primaryLinkUrl: 'github.com/twentyhq/twenty',
-        primaryLinkLabel: 'Twenty Repo',
+        primaryLinkLabel: `${BRAND_NAME} Repo`,
         secondaryLinks: [{ url: 'twenty.com', label: '' }],
       },
       {

@@ -1,3 +1,4 @@
+import { BRAND_NAME } from 'twenty-shared/constants';
 import {
   BadRequestException,
   Controller,
@@ -60,7 +61,7 @@ export class OAuthPropagatorController {
 
     if (!isValidDomain) {
       throw new ForbiddenException(
-        `${redirectUrl.hostname} is not a valid Twenty domain`,
+        `${redirectUrl.hostname} is not a valid ${BRAND_NAME} domain`,
       );
     }
 

@@ -172,7 +172,7 @@ export const useNavigationMenuItemAddOptions = ({
           onClick: () => {
             addItem({
               type: NavigationMenuItemType.LINK,
-              name: 'Twenty',
+              name: BRAND_NAME,
               link: `https://${BRAND_DOMAIN}`,
               color: DEFAULT_NAVIGATION_MENU_ITEM_COLOR_LINK,
             });

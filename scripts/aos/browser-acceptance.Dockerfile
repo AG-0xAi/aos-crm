@@ -35,6 +35,9 @@ RUN node -e "const v = require('playwright/package.json').version; \
     console.log('playwright ' + v + ' with browsers from ' + process.env.PLAYWRIGHT_BROWSERS_PATH);"
 
 COPY browser-acceptance.mjs /aos/browser-acceptance.mjs
+# CRM-019 adds the brand acceptance to the SAME image: one pinned browser, one
+# build, two suites (scripts/aos/test/crm-brand-e2e.test.mjs).
+COPY brand-acceptance.mjs /aos/brand-acceptance.mjs
 
 USER pwuser
 WORKDIR /aos
