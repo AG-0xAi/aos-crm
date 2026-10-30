@@ -83,19 +83,19 @@ describe('LinkIconWithLinkOverlay favicon requests', () => {
     expect(getByTestId('link-overlay-icon')).toBeInTheDocument();
   });
 
-  it('does render the synthetic host favicon when the flag is explicitly on, with no request performed', () => {
+  // CRM-019 (R2) removed the provider itself, so "the flag is on" is no longer
+  // a state in which a request can happen: getLogoUrlFromDomainName returns
+  // undefined for every domain. This case keeps the flag ON on purpose -- it is
+  // what proves the absence is the deployment's, not the flag's -- and asserts
+  // the component still renders, so it cannot pass by rendering nothing.
+  it('renders no provider favicon even with the flag explicitly on: this deployment has no provider', () => {
     jotaiStore.set(allowRequestsToTwentyIconsState.atom, true);
 
     const { container, queryByTestId } = renderIcon(SYNTHETIC_LINK.on);
 
-    const images = providerImages(container);
-    expect(images.length).toBe(1);
-    expect(images[0]).toBe(
-      `https://${ICON_PROVIDER_HOST}/enlace-encendido.invalid`,
-    );
-    expect(queryByTestId('default-icon')).not.toBeInTheDocument();
-    // jsdom does not load <img> subresources, and nothing else in this render
-    // performs a request.
+    expect(providerImages(container)).toEqual([]);
+    // The component fell back to its own icon rather than rendering nothing.
+    expect(queryByTestId('default-icon')).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

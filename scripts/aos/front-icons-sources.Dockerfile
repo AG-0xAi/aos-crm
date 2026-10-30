@@ -71,6 +71,12 @@ RUN set -e; \
 # The workspace-root jest preset twenty-front's jest.config.mjs extends. Not
 # part of the official front-deps stage (the image never runs tests), and
 # without it jest exits with "Preset ../../jest.preset.js not found".
+# The formatter config, resolved by oxfmt from the file location. Without it the
+# theme-token generator formats its output with oxfmt's DEFAULTS, so its
+# --check run reports every generated file as stale against artifacts that were
+# formatted with this config (measured 2026-10-30).
+COPY .oxfmtrc.jsonc /app/.oxfmtrc.jsonc
+
 COPY jest.preset.js /app/jest.preset.js
 
 COPY packages/twenty-front /app/packages/twenty-front

@@ -199,6 +199,10 @@ const DEPS_BUILD_TIMEOUT_MS = Number(process.env.AOS_CRM_FRONT_DEPS_TIMEOUT_MS |
 const SOURCES_BUILD_TIMEOUT_MS = Number(process.env.AOS_CRM_FRONT_SOURCES_TIMEOUT_MS || 900_000);
 const RUN_TIMEOUT_MS = Number(process.env.AOS_CRM_FRONT_RUN_TIMEOUT_MS || 840_000);
 const CLEANUP_TIMEOUT_MS = Number(process.env.AOS_CRM_CLEANUP_TIMEOUT_MS || 30_000);
+// The container runs five steps now, and forty lines of tail is jest's output
+// alone: it hid the typecheck diagnostics behind it (measured 2026-10-30, a run
+// reported tsgo=2 with no error in sight).
+const FAILURE_TAIL_LINES = 250;
 
 // Markers, not exit codes of a shell pipeline: the container runs three things
 // and `sh -c` would report only the last one.
@@ -455,7 +459,7 @@ function run() {
   }
   ownImages.push(SOURCES_IMAGE);
 
-  console.log(`[INFO] running the four icon-flag suites and the twenty-front typecheck (container ${CONTAINER_NAME}, no network)`);
+  console.log(`[INFO] running ${SPECS.length} suites, the twenty-front typecheck, the formatter check and the theme-token drift check (container ${CONTAINER_NAME}, no network)`);
   const res = wsl(['docker', 'run', '--rm', '--name', CONTAINER_NAME, '--network', 'none', SOURCES_IMAGE,
     'sh', '-c', containerScript(),
   ], { timeout: RUN_TIMEOUT_MS });
@@ -465,7 +469,7 @@ function run() {
   const output = `${res.stdout || ''}\n${res.stderr || ''}`;
   const verdict = judgeFrontRun({ depsBuildStatus, sourcesBuildStatus, containerStatus: res.status, output });
   if (!verdict.ok) {
-    const tail = output.split('\n').filter((l) => l.trim()).slice(-40);
+    const tail = output.split('\n').filter((l) => l.trim()).slice(-FAILURE_TAIL_LINES);
     console.error(tail.length ? tail.join('\n') : '(the container produced no output at all)');
     if (res.error) console.error(`spawn error: ${res.error.code || res.error.message}`);
     fail(`frontend icon flag: ${verdict.detail}`);
@@ -706,6 +710,10 @@ function selfTest() {
       .split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
     assert(/COPY jest\.preset\.js \/app\/jest\.preset\.js/.test(instructions),
       'the workspace-root jest preset is no longer copied in; jest would fail with "Preset ../../jest.preset.js not found"');
+    assert(instructions.includes('COPY .oxfmtrc.jsonc /app/.oxfmtrc.jsonc'),
+      "the formatter config is no longer copied in; the theme-token drift check would format with oxfmt's defaults and report every generated file as stale");
+    assert(ARCHIVE_PATHS.includes('.oxfmtrc.jsonc'),
+      'the formatter config is copied in the Dockerfile but not archived into the context');
     assert(ARCHIVE_PATHS.includes('jest.preset.js'), 'the jest preset is copied in the Dockerfile but not archived into the context');
     assert(ARCHIVE_PATHS.includes('packages/twenty-server/package.json'),
       "twenty-server's manifest is read for the @types specs but not archived into the context");

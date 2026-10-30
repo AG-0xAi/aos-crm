@@ -107,17 +107,20 @@ describe('OnboardingImportPreviewCompanies icon requests', () => {
     }
   });
 
-  it('does request every previewed domain when the flag is explicitly on, and the requests are intercepted', () => {
+  // CRM-019 (R2) removed the provider itself, so "the flag is on" is no longer
+  // a state in which a request can happen: getLogoUrlFromDomainName returns
+  // undefined for every domain. This case keeps the flag ON on purpose -- it is
+  // what proves the absence is the deployment's, not the flag's -- and asserts
+  // the component still renders, so it cannot pass by rendering nothing.
+  it('requests nothing even with the flag explicitly on: this deployment has no provider', () => {
     jotaiStore.set(allowRequestsToTwentyIconsState.atom, true);
 
     const { container } = renderPreview();
 
-    const requested = urlsNamingTheProvider(container);
-    expect(requested.length).toBe(IMPORT_CONTACTS_PREVIEW_COMPANIES.length);
+    expect(urlsNamingTheProvider(container)).toEqual([]);
+    expect(IMPORT_CONTACTS_PREVIEW_COMPANIES.length).toBeGreaterThan(0);
     for (const company of IMPORT_CONTACTS_PREVIEW_COMPANIES) {
-      expect(requested.some((url) => url.includes(company.domainName))).toBe(
-        true,
-      );
+      expect(container.textContent).toContain(company.name);
     }
     expect(fetchSpy).not.toHaveBeenCalled();
   });

@@ -48,20 +48,23 @@ describe('getImageIdentifierFieldValue', () => {
   });
 
   describe('LINKS', () => {
-    it('returns the favicon url when requests to twenty-icons are allowed', () => {
+    // CRM-019 (R2): there is no icon provider on this deployment, so a LINKS
+    // identifier resolves to null whatever the official flag says. The flag
+    // case is kept to prove the absence does not depend on it.
+    it('returns null even when requests to twenty-icons are allowed', () => {
       expect(
         getImageIdentifierFieldValue(
-          buildRecord({ primaryLinkUrl: 'twenty.com' }),
+          buildRecord({ primaryLinkUrl: 'betty.management' }),
           buildFieldMetadataItem(FieldMetadataType.LINKS),
           true,
         ),
-      ).toBe('https://twenty-icons.com/twenty.com');
+      ).toBe(null);
     });
 
     it('returns null when requests to twenty-icons are not allowed', () => {
       expect(
         getImageIdentifierFieldValue(
-          buildRecord({ primaryLinkUrl: 'twenty.com' }),
+          buildRecord({ primaryLinkUrl: 'betty.management' }),
           buildFieldMetadataItem(FieldMetadataType.LINKS),
           false,
         ),

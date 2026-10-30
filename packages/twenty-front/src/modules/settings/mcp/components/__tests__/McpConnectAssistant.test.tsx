@@ -10,6 +10,7 @@
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { render, screen } from '@testing-library/react';
+import { ToastProvider } from 'twenty-ui/components/feedback';
 import { ThemeProvider } from 'twenty-ui/theme';
 
 import { McpConnectAssistant } from '@/settings/mcp/components/McpConnectAssistant';
@@ -27,11 +28,15 @@ jest.mock('~/config', () => ({
 const renderCard = (serverBaseUrl: string) => {
   config.serverBaseUrl = serverBaseUrl;
 
+  // ToastProvider because the copy button's useCopyToClipboard reads the toast
+  // store; without it the hook throws before anything renders.
   return render(
     <I18nProvider i18n={i18n}>
-      <ThemeProvider colorScheme="light">
-        <McpConnectAssistant />
-      </ThemeProvider>
+      <ToastProvider>
+        <ThemeProvider colorScheme="light">
+          <McpConnectAssistant />
+        </ThemeProvider>
+      </ToastProvider>
     </I18nProvider>,
   );
 };
