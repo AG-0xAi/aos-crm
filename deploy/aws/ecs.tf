@@ -60,13 +60,24 @@ locals {
     # workspace. Upstream default ('app', config-variables.ts:1225) stated
     # rather than inherited.
     DEFAULT_SUBDOMAIN = "app"
-    # Both URLs are the apex of var.domain_name: FRONTEND_URL is the
-    # `frontDomain` every workspace subdomain is resolved against (the util
-    # above), and SERVER_URL is the API host
-    # oauth-discovery.controller.ts's isApiHost() compares the request host
-    # against to decide whether /authorize lives on this host or on
-    # DEFAULT_SUBDOMAIN's.
-    SERVER_URL   = "https://${var.domain_name}"
+    # The API lives on its own subdomain (CRM-018, founder 30/10/2026): the
+    # apex is being handed to the Betty landing, so nothing Twenty emits may
+    # point at it. `api` is safe to take because twenty-shared's
+    # RESERVED_SUBDOMAINS lists it, so no workspace can ever claim that host;
+    # the wildcard record and the wildcard certificate (alb-acm.tf) already
+    # cover it, so this needs no new DNS and no new certificate. It is also
+    # the host oauth-discovery.controller.ts's isApiHost() compares the
+    # request host against to decide whether /authorize lives on this host or
+    # on DEFAULT_SUBDOMAIN's.
+    #
+    # FRONTEND_URL stays the apex ON PURPOSE, and is never emitted as a link:
+    # it is the `frontDomain` every request host is parsed against (the util
+    # above) and the base getBaseUrl() prefixes with DEFAULT_SUBDOMAIN while
+    # multi-workspace is on. Keeping it here is what makes sign-in resolve to
+    # app.<domain> and a workspace to <workspace>.<domain>. Setting it to
+    # app.<domain> instead would make getBaseUrl() emit app.app.<domain> and
+    # every workspace <workspace>.app.<domain>.
+    SERVER_URL   = "https://api.${var.domain_name}"
     FRONTEND_URL = "https://${var.domain_name}"
     # The ALB terminates TLS, so X-Forwarded-Proto must be honoured or every
     # getRequestBaseUrl() consumer would advertise http:// on an HTTPS-only

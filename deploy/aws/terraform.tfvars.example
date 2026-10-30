@@ -14,6 +14,14 @@ budget_alert_email = "REPLACE_ME"       # who AWS Budgets notifies
 # to override that lookup -- see variables.tf.
 # route53_zone_id = "REPLACE_ME"
 
+# Apex and www stay on the ALB while these are unset, which is what the beta
+# runs today: the CRM answers at api./app./<workspace>. only (CRM-018).
+# Uncomment and fill with the values the landing host publishes to move the
+# apex and www off this stack. Nothing else changes; rolling back is removing
+# these two lines and applying again (BETA_RUNBOOK.md).
+# apex_a_records   = ["REPLACE_ME"]  # A record the landing host publishes
+# www_cname_target = "REPLACE_ME"    # CNAME target for www.<domain>
+
 server_cpu           = 512
 server_memory        = 1024
 worker_cpu           = 512

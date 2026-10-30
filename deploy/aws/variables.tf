@@ -32,9 +32,11 @@ variable "aws_region" {
 variable "domain_name" {
   description = <<-EOT
     Public domain this stack serves. It is the apex of the beta's namespace,
-    not a host: the certificate covers it and "*.<domain>", SERVER_URL and
-    FRONTEND_URL point at it (ecs.tf), and every workspace lives at
-    "<workspace>.<domain>". A hosted zone for exactly this name must exist in
+    not a host: the certificate covers it and "*.<domain>", the API lives at
+    "api.<domain>", sign-in at "app.<domain>" and every workspace at
+    "<workspace>.<domain>" (ecs.tf). Since CRM-018 the apex itself serves
+    nothing of the CRM and can be handed to an external landing with
+    apex_a_records below. A hosted zone for exactly this name must exist in
     the account (data.tf looks it up), so passing a subdomain only works if
     that subdomain is itself a delegated zone. The founder owns this decision;
     no placeholder default ships here so a real domain is never accidentally
@@ -61,6 +63,66 @@ variable "route53_zone_id" {
   EOT
   type        = string
   default     = null
+}
+
+variable "apex_a_records" {
+  description = <<-EOT
+    Addresses to answer the apex (domain_name) with, when the apex is served
+    by something outside this stack -- the Betty landing (CRM-018 R2, founder
+    30/10/2026). Empty (default) keeps the apex as the alias A record to the
+    ALB it has been since CRM-013, so the default plan is empty. Set it to the
+    A record the landing host publishes and the apex becomes a plain A record
+    pointing there; nothing else in the stack moves, because the API lives at
+    api.<domain>, sign-in at app.<domain> and each workspace at its own
+    subdomain, all of them still on the wildcard (alb-acm.tf). No real value
+    ships here: the address belongs to whoever hosts the landing, and this
+    fork is public.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for record in var.apex_a_records :
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", record))
+    ])
+    error_message = "apex_a_records must contain IPv4 addresses: it populates an A record."
+  }
+}
+
+variable "www_cname_target" {
+  description = <<-EOT
+    Hostname `www.<domain_name>` should be a CNAME to, when the landing serves
+    www as well (CRM-018 R2). Null (default) creates no www record at all, so
+    the default plan is empty and www keeps resolving through the wildcard to
+    the ALB exactly as today. Set it to the CNAME target the landing host
+    publishes: an explicit record beats the wildcard in Route 53, so only www
+    moves. No real value ships here, same reason as apex_a_records.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.www_cname_target == null ? true : can(regex("^[a-z0-9.-]+$", var.www_cname_target))
+    error_message = "www_cname_target must be a hostname, not a URL."
+  }
+}
+
+variable "external_record_ttl" {
+  description = <<-EOT
+    TTL in seconds for the apex and www records once they point outside this
+    stack (apex_a_records / www_cname_target). Alias records have no TTL, so
+    this is unused while both keep their defaults. 300 is short enough that
+    rolling the apex back to the ALB takes minutes, not hours -- which is the
+    whole rollback story for the landing switch (BETA_RUNBOOK.md).
+  EOT
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.external_record_ttl >= 60 && var.external_record_ttl <= 86400
+    error_message = "external_record_ttl must be between 60 and 86400 seconds."
+  }
 }
 
 variable "budget_amount_usd" {
