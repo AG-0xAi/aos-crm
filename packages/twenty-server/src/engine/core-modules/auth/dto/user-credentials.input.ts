@@ -29,12 +29,4 @@ export class UserCredentialsInput {
   @IsString()
   @IsOptional()
   verifyEmailRedirectPath?: string;
-
-  // CRM-016: the operator's sign-up invitation, carried by the e-mailed link.
-  // Without it, a restricted instance refuses a sign-up that has no workspace
-  // to land in.
-  @Field(() => String, { nullable: true })
-  @IsString()
-  @IsOptional()
-  signUpInvitationToken?: string;
 }

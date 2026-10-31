@@ -4,6 +4,7 @@ import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/auth/hooks/useAuth';
 import { type Form } from '@/auth/sign-in-up/hooks/useSignInUpForm';
+import { useSignUpInvitationToken } from '@/auth/sign-in-up/hooks/useSignUpInvitationToken';
 import { lastAuthenticatedMethodState } from '@/auth/states/lastAuthenticatedMethodState';
 import { signInUpModeState } from '@/auth/states/signInUpModeState';
 import {
@@ -48,6 +49,7 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
   const [searchParams] = useSearchParams();
   const workspacePersonalInviteToken =
     searchParams.get('inviteToken') ?? undefined;
+  const { signUpInvitationToken } = useSignUpInvitationToken();
 
   const [isInviteMode] = useState(() =>
     isMatchingLocation(location, AppPath.Invite),
@@ -166,6 +168,7 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
             data.email.toLowerCase().trim(),
             data.password,
             token,
+            signUpInvitationToken,
           );
         }
 
@@ -197,6 +200,7 @@ export const useSignInUp = (form: UseFormReturn<Form>) => {
       signUpWithCredentialsInWorkspace,
       workspaceInviteHash,
       workspacePersonalInviteToken,
+      signUpInvitationToken,
       enqueueToast,
       buildSearchParamsFromUrlSyncedStates,
       isOnAWorkspace,

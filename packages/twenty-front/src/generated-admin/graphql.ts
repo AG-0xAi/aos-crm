@@ -662,6 +662,7 @@ export type Mutation = {
   addModelToProvider: Scalars['Boolean']['output'];
   clearMaintenanceMode: Scalars['Boolean']['output'];
   createDatabaseConfigVariable: Scalars['Boolean']['output'];
+  createSignUpInvitation: SignUpInvitation;
   createWorkspaceDataExport: WorkspaceDataExport;
   createWorkspaceUsageLimit: AdminPanelUsageLimit;
   deleteDatabaseConfigVariable: Scalars['Boolean']['output'];
@@ -672,7 +673,9 @@ export type Mutation = {
   refreshUpgradeStatus: InstanceAndAllWorkspacesUpgradeStatus;
   removeAiProvider: Scalars['Boolean']['output'];
   removeModelFromProvider: Scalars['Boolean']['output'];
+  resendSignUpInvitation: SignUpInvitation;
   retryJobs: RetryJobsResponse;
+  revokeSignUpInvitation: SignUpInvitation;
   revokeSigningKey: SigningKeyDto;
   revokeWorkspaceCreditGrant: AdminPanelWorkspaceCreditGrant;
   setAdminAiModelEnabled: Scalars['Boolean']['output'];
@@ -704,6 +707,12 @@ export type MutationAddModelToProviderArgs = {
 export type MutationCreateDatabaseConfigVariableArgs = {
   key: Scalars['String']['input'];
   value: Scalars['JSON']['input'];
+};
+
+
+export type MutationCreateSignUpInvitationArgs = {
+  email: Scalars['String']['input'];
+  locale?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -763,9 +772,20 @@ export type MutationRemoveModelFromProviderArgs = {
 };
 
 
+export type MutationResendSignUpInvitationArgs = {
+  id: Scalars['UUID']['input'];
+  locale?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationRetryJobsArgs = {
   jobIds: Array<Scalars['String']['input']>;
   queueName: Scalars['String']['input'];
+};
+
+
+export type MutationRevokeSignUpInvitationArgs = {
+  id: Scalars['UUID']['input'];
 };
 
 
@@ -875,6 +895,7 @@ export type Query = {
   getQueueJobs: QueueJobsResponse;
   getQueueMetrics: QueueMetricsData;
   getServerAdmins: Array<ServerAdmin>;
+  getSignUpInvitations: Array<SignUpInvitation>;
   getSigningKeys: SigningKeysAdminPanelDto;
   getSystemHealthStatus: SystemHealth;
   getUpgradeStatus: Array<WorkspaceUpgradeStatus>;
@@ -1095,6 +1116,24 @@ export type ServerAdmin = {
   id: Scalars['UUID']['output'];
   lastName: Scalars['String']['output'];
 };
+
+export type SignUpInvitation = {
+  __typename?: 'SignUpInvitation';
+  consumedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  email: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['UUID']['output'];
+  revokedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: SignUpInvitationStatus;
+};
+
+export enum SignUpInvitationStatus {
+  Expired = 'Expired',
+  Pending = 'Pending',
+  Revoked = 'Revoked',
+  Used = 'Used'
+}
 
 export type SigningKeyDto = {
   __typename?: 'SigningKeyDTO';
@@ -1775,6 +1814,36 @@ export type GetMaintenanceModeQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GetMaintenanceModeQuery = { __typename?: 'Query', getMaintenanceMode?: { __typename?: 'MaintenanceMode', startAt: string, endAt: string, link?: string | null } | null };
 
+export type SignUpInvitationFragmentFragment = { __typename?: 'SignUpInvitation', id: string, email: string, status: SignUpInvitationStatus, createdAt: string, expiresAt: string, consumedAt?: string | null, revokedAt?: string | null };
+
+export type CreateSignUpInvitationMutationVariables = Exact<{
+  email: Scalars['String']['input'];
+  locale?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type CreateSignUpInvitationMutation = { __typename?: 'Mutation', createSignUpInvitation: { __typename?: 'SignUpInvitation', id: string, email: string, status: SignUpInvitationStatus, createdAt: string, expiresAt: string, consumedAt?: string | null, revokedAt?: string | null } };
+
+export type ResendSignUpInvitationMutationVariables = Exact<{
+  id: Scalars['UUID']['input'];
+  locale?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ResendSignUpInvitationMutation = { __typename?: 'Mutation', resendSignUpInvitation: { __typename?: 'SignUpInvitation', id: string, email: string, status: SignUpInvitationStatus, createdAt: string, expiresAt: string, consumedAt?: string | null, revokedAt?: string | null } };
+
+export type RevokeSignUpInvitationMutationVariables = Exact<{
+  id: Scalars['UUID']['input'];
+}>;
+
+
+export type RevokeSignUpInvitationMutation = { __typename?: 'Mutation', revokeSignUpInvitation: { __typename?: 'SignUpInvitation', id: string, email: string, status: SignUpInvitationStatus, createdAt: string, expiresAt: string, consumedAt?: string | null, revokedAt?: string | null } };
+
+export type GetSignUpInvitationsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetSignUpInvitationsQuery = { __typename?: 'Query', getSignUpInvitations: Array<{ __typename?: 'SignUpInvitation', id: string, email: string, status: SignUpInvitationStatus, createdAt: string, expiresAt: string, consumedAt?: string | null, revokedAt?: string | null }> };
+
 export type RevokeSigningKeyMutationVariables = Exact<{
   id: Scalars['UUID']['input'];
 }>;
@@ -1790,6 +1859,7 @@ export type GetSigningKeysQuery = { __typename?: 'Query', getSigningKeys: { __ty
 export type ApplicationRegistrationFragmentFragment = { __typename?: 'ApplicationRegistration', id: string, universalIdentifier: string, name: string, logoUrl?: string | null, galleryImagesUrls: Array<string>, oAuthClientId: string, oAuthRedirectUris: Array<string>, oAuthScopes: Array<string>, sourceType: ApplicationRegistrationSourceType, sourcePackage?: string | null, latestAvailableVersion?: string | null, isListed: boolean, isVetted: boolean, isPreInstalled: boolean, isConfigured: boolean, ownerWorkspaceId?: string | null, createdAt: string, updatedAt: string };
 
 export const UserInfoFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"UserInfoFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"UserInfo"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]} as unknown as DocumentNode<UserInfoFragmentFragment, unknown>;
+export const SignUpInvitationFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SignUpInvitationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SignUpInvitation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"consumedAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}}]}}]} as unknown as DocumentNode<SignUpInvitationFragmentFragment, unknown>;
 export const ApplicationRegistrationFragmentFragmentDoc = {"kind":"Document","definitions":[{"kind":"FragmentDefinition","name":{"kind":"Name","value":"ApplicationRegistrationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"ApplicationRegistration"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"universalIdentifier"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"logoUrl"}},{"kind":"Field","name":{"kind":"Name","value":"galleryImagesUrls"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthClientId"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthRedirectUris"}},{"kind":"Field","name":{"kind":"Name","value":"oAuthScopes"}},{"kind":"Field","name":{"kind":"Name","value":"sourceType"}},{"kind":"Field","name":{"kind":"Name","value":"sourcePackage"}},{"kind":"Field","name":{"kind":"Name","value":"latestAvailableVersion"}},{"kind":"Field","name":{"kind":"Name","value":"isListed"}},{"kind":"Field","name":{"kind":"Name","value":"isVetted"}},{"kind":"Field","name":{"kind":"Name","value":"isPreInstalled"}},{"kind":"Field","name":{"kind":"Name","value":"isConfigured"}},{"kind":"Field","name":{"kind":"Name","value":"ownerWorkspaceId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]} as unknown as DocumentNode<ApplicationRegistrationFragmentFragment, unknown>;
 export const AddAiProviderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AddAiProvider"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"providerName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"providerConfig"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"JSON"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"addAiProvider"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"providerName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"providerName"}}},{"kind":"Argument","name":{"kind":"Name","value":"providerConfig"},"value":{"kind":"Variable","name":{"kind":"Name","value":"providerConfig"}}}]}]}}]} as unknown as DocumentNode<AddAiProviderMutation, AddAiProviderMutationVariables>;
 export const AddModelToProviderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AddModelToProvider"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"providerName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"modelConfig"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"JSON"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"addModelToProvider"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"providerName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"providerName"}}},{"kind":"Argument","name":{"kind":"Name","value":"modelConfig"},"value":{"kind":"Variable","name":{"kind":"Name","value":"modelConfig"}}}]}]}}]} as unknown as DocumentNode<AddModelToProviderMutation, AddModelToProviderMutationVariables>;
@@ -1851,5 +1921,9 @@ export const GetSystemHealthStatusDocument = {"kind":"Document","definitions":[{
 export const ClearMaintenanceModeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ClearMaintenanceMode"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"clearMaintenanceMode"}}]}}]} as unknown as DocumentNode<ClearMaintenanceModeMutation, ClearMaintenanceModeMutationVariables>;
 export const SetMaintenanceModeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetMaintenanceMode"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startAt"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endAt"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"link"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setMaintenanceMode"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"startAt"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startAt"}}},{"kind":"Argument","name":{"kind":"Name","value":"endAt"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endAt"}}},{"kind":"Argument","name":{"kind":"Name","value":"link"},"value":{"kind":"Variable","name":{"kind":"Name","value":"link"}}}]}]}}]} as unknown as DocumentNode<SetMaintenanceModeMutation, SetMaintenanceModeMutationVariables>;
 export const GetMaintenanceModeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetMaintenanceMode"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getMaintenanceMode"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startAt"}},{"kind":"Field","name":{"kind":"Name","value":"endAt"}},{"kind":"Field","name":{"kind":"Name","value":"link"}}]}}]}}]} as unknown as DocumentNode<GetMaintenanceModeQuery, GetMaintenanceModeQueryVariables>;
+export const CreateSignUpInvitationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateSignUpInvitation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"email"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"locale"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createSignUpInvitation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"email"},"value":{"kind":"Variable","name":{"kind":"Name","value":"email"}}},{"kind":"Argument","name":{"kind":"Name","value":"locale"},"value":{"kind":"Variable","name":{"kind":"Name","value":"locale"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SignUpInvitationFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SignUpInvitationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SignUpInvitation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"consumedAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}}]}}]} as unknown as DocumentNode<CreateSignUpInvitationMutation, CreateSignUpInvitationMutationVariables>;
+export const ResendSignUpInvitationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResendSignUpInvitation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"locale"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resendSignUpInvitation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"locale"},"value":{"kind":"Variable","name":{"kind":"Name","value":"locale"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SignUpInvitationFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SignUpInvitationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SignUpInvitation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"consumedAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}}]}}]} as unknown as DocumentNode<ResendSignUpInvitationMutation, ResendSignUpInvitationMutationVariables>;
+export const RevokeSignUpInvitationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RevokeSignUpInvitation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revokeSignUpInvitation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SignUpInvitationFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SignUpInvitationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SignUpInvitation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"consumedAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}}]}}]} as unknown as DocumentNode<RevokeSignUpInvitationMutation, RevokeSignUpInvitationMutationVariables>;
+export const GetSignUpInvitationsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSignUpInvitations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getSignUpInvitations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"SignUpInvitationFragment"}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"SignUpInvitationFragment"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SignUpInvitation"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"consumedAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}}]}}]} as unknown as DocumentNode<GetSignUpInvitationsQuery, GetSignUpInvitationsQueryVariables>;
 export const RevokeSigningKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RevokeSigningKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"revokeSigningKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"isCurrent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}},{"kind":"Field","name":{"kind":"Name","value":"verifyCountInWindow"}}]}}]}}]} as unknown as DocumentNode<RevokeSigningKeyMutation, RevokeSigningKeyMutationVariables>;
 export const GetSigningKeysDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSigningKeys"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getSigningKeys"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"signingKeys"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"publicKey"}},{"kind":"Field","name":{"kind":"Name","value":"isCurrent"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"revokedAt"}},{"kind":"Field","name":{"kind":"Name","value":"verifyCountInWindow"}}]}},{"kind":"Field","name":{"kind":"Name","value":"legacyVerifyCountInWindow"}},{"kind":"Field","name":{"kind":"Name","value":"verifyWindowDays"}}]}}]}}]} as unknown as DocumentNode<GetSigningKeysQuery, GetSigningKeysQueryVariables>;

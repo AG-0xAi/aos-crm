@@ -29804,3 +29804,59 @@ msgstr "enlace al código fuente sin configurar en este servidor ({version})"
 
 msgid "version not reported"
 msgstr "versión no informada"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "This invitation is for this address only."
+msgstr "Esta invitación es solo para esta dirección."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Sign-up invitations"
+msgstr "Invitaciones de alta"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Add an address and that person gets a single-use link to create their own account and workspace. The link expires in seven days; revoking it stops it working."
+msgstr "Añade una dirección y esa persona recibe un enlace de un solo uso para crear su cuenta y su espacio. El enlace caduca en siete días; al anularlo deja de funcionar."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "name@example.com"
+msgstr "nombre@ejemplo.com"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Failed to load sign-up invitations."
+msgstr "No se pudieron cargar las invitaciones de alta."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "No sign-up invitations yet."
+msgstr "Todavía no hay invitaciones de alta."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Invited on {0}"
+msgstr "Invitada el {0}"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Resend"
+msgstr "Reenviar"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Invitation sent"
+msgstr "Invitación enviada"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Could not send the invitation. Please try again later."
+msgstr "No se pudo enviar la invitación. Inténtalo más tarde."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Invitation sent again with a new link"
+msgstr "Invitación reenviada con un enlace nuevo"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Could not resend the invitation. Please try again later."
+msgstr "No se pudo reenviar la invitación. Inténtalo más tarde."
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Invitation revoked"
+msgstr "Invitación anulada"
+
+#: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
+msgid "Could not revoke the invitation. Please try again later."
+msgstr "No se pudo anular la invitación. Inténtalo más tarde."

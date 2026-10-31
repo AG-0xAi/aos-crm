@@ -23,10 +23,11 @@ jest.mock('twenty-emails', () => ({
 
 const PLAIN_TOKEN = 'a'.repeat(64);
 const EMAIL = 'ana@example.test';
+const INVITATION_ID = '11111111-1111-4111-8111-111111111111';
 
 const liveInvitation = (overrides: Partial<AppTokenEntity> = {}) =>
   ({
-    id: '11111111-1111-4111-8111-111111111111',
+    id: INVITATION_ID,
     type: AppTokenType.SignUpInvitationToken,
     value: hashSignUpInvitationToken(PLAIN_TOKEN),
     expiresAt: new Date(Date.now() + 86_400_000),
@@ -37,27 +38,57 @@ const liveInvitation = (overrides: Partial<AppTokenEntity> = {}) =>
     ...overrides,
   }) as AppTokenEntity;
 
-type Fakes = {
-  service: SignUpInvitationService;
-  appTokenRepository: jest.Mocked<Repository<AppTokenEntity>>;
-  emailService: jest.Mocked<EmailService>;
-  update: jest.Mock;
-};
+// A stateful fake rather than per-call mocks: create() and resend() both read
+// the row back after writing it (save() on an existing id is an UPDATE, whose
+// returned entity carries no createdAt), so call-order mocks would make the
+// assertions about mock bookkeeping instead of about behaviour.
+const buildService = ({
+  rows = [] as AppTokenEntity[],
+  liveForEmail = null as AppTokenEntity | null,
+} = {}) => {
+  const store = new Map(rows.map((row) => [row.id, { ...row }]));
 
-const buildService = (): Fakes => {
   const appTokenRepository = {
-    find: jest.fn(),
-    findOne: jest.fn(),
+    find: jest.fn(async () => [...store.values()]),
+    findOne: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
+      // The by-email duplicate lookup is the only one carrying a jsonb matcher.
+      if ('context' in where) return liveForEmail;
+      if (typeof where.id === 'string') return store.get(where.id) ?? null;
+      if (typeof where.value === 'string') {
+        return (
+          [...store.values()].find((row) => row.value === where.value) ?? null
+        );
+      }
+
+      return null;
+    }),
     create: jest.fn((entity) => entity),
-    save: jest.fn(async (entity) => ({
-      ...entity,
-      id: entity.id ?? liveInvitation().id,
-      createdAt: new Date(),
-    })),
-    update: jest.fn(),
+    save: jest.fn(async (entity: Partial<AppTokenEntity>) => {
+      const id = entity.id ?? INVITATION_ID;
+      const existing = store.get(id);
+      const saved = {
+        ...liveInvitation(),
+        ...existing,
+        ...entity,
+        id,
+        createdAt: existing?.createdAt ?? new Date(),
+      } as AppTokenEntity;
+
+      store.set(id, saved);
+
+      return entity.id === undefined ? { ...saved, createdAt: undefined } : { id };
+    }),
+    update: jest.fn(async (id: string, patch: Partial<AppTokenEntity>) => {
+      const existing = store.get(id);
+      if (existing) store.set(id, { ...existing, ...patch } as AppTokenEntity);
+
+      return { affected: existing ? 1 : 0 };
+    }),
   } as unknown as jest.Mocked<Repository<AppTokenEntity>>;
 
-  const emailService = { send: jest.fn() } as unknown as jest.Mocked<EmailService>;
+  const emailService = {
+    send: jest.fn(),
+  } as unknown as jest.Mocked<EmailService>;
 
   const twentyConfigService = {
     get: jest.fn((key: string) =>
@@ -66,12 +97,13 @@ const buildService = (): Fakes => {
   } as unknown as TwentyConfigService;
 
   const workspaceDomainsService = {
-    getSubdomainAndCustomDomainFromWorkspaceFallbackOnDefaultSubdomain:
-      jest.fn(() => ({
+    getSubdomainAndCustomDomainFromWorkspaceFallbackOnDefaultSubdomain: jest.fn(
+      () => ({
         subdomain: 'app',
         customDomain: null,
         isCustomDomainEnabled: false,
-      })),
+      }),
+    ),
     buildWorkspaceURL: jest.fn(
       ({ pathname, searchParams }) =>
         new URL(
@@ -81,7 +113,9 @@ const buildService = (): Fakes => {
   } as unknown as WorkspaceDomainsService;
 
   const i18nService = {
-    getI18nInstance: jest.fn(() => ({ _: (message: unknown) => String(message) })),
+    getI18nInstance: jest.fn(() => ({
+      _: (message: unknown) => String(message),
+    })),
   } as unknown as I18nService;
 
   const service = new SignUpInvitationService(
@@ -92,13 +126,18 @@ const buildService = (): Fakes => {
     i18nService,
   );
 
-  return {
-    service,
-    appTokenRepository,
-    emailService,
-    update: appTokenRepository.update as unknown as jest.Mock,
-  };
+  return { service, appTokenRepository, emailService, store };
 };
+
+const mailedLink = () =>
+  (
+    jest.requireMock('twenty-emails') as { SignUpInviteLinkEmail: jest.Mock }
+  ).SignUpInviteLinkEmail.mock.calls.at(-1)?.[0].link as string;
+
+const mailedToken = () =>
+  new URL(mailedLink()).searchParams.get(
+    SIGN_UP_INVITATION_TOKEN_SEARCH_PARAM,
+  ) as string;
 
 describe('SignUpInvitationService', () => {
   describe('findLiveInvitationForEmail', () => {
@@ -116,14 +155,16 @@ describe('SignUpInvitationService', () => {
     });
 
     it('looks the token up by its hash and never by its plaintext', async () => {
-      const { service, appTokenRepository } = buildService();
-
-      appTokenRepository.findOne.mockResolvedValue(liveInvitation());
-
-      await service.findLiveInvitationForEmail({
-        plainToken: PLAIN_TOKEN,
-        email: EMAIL,
+      const { service, appTokenRepository } = buildService({
+        rows: [liveInvitation()],
       });
+
+      await expect(
+        service.findLiveInvitationForEmail({
+          plainToken: PLAIN_TOKEN,
+          email: EMAIL,
+        }),
+      ).resolves.toBeDefined();
 
       const where = appTokenRepository.findOne.mock.calls[0][0]
         .where as Record<string, unknown>;
@@ -134,9 +175,7 @@ describe('SignUpInvitationService', () => {
     });
 
     it('refuses an invitation addressed to another mailbox', async () => {
-      const { service, appTokenRepository } = buildService();
-
-      appTokenRepository.findOne.mockResolvedValue(liveInvitation());
+      const { service } = buildService({ rows: [liveInvitation()] });
 
       await expect(
         service.findLiveInvitationForEmail({
@@ -146,10 +185,8 @@ describe('SignUpInvitationService', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('accepts the invited mailbox whatever its case', async () => {
-      const { service, appTokenRepository } = buildService();
-
-      appTokenRepository.findOne.mockResolvedValue(liveInvitation());
+    it('accepts the invited mailbox whatever its case or padding', async () => {
+      const { service } = buildService({ rows: [liveInvitation()] });
 
       await expect(
         service.findLiveInvitationForEmail({
@@ -162,31 +199,28 @@ describe('SignUpInvitationService', () => {
 
   describe('consumeWithinTransaction', () => {
     const entityManagerWithAffected = (affected: number | null | undefined) => {
-      const execute = jest.fn(async () => ({ affected }));
       const builder = {
         update: jest.fn(() => builder),
         set: jest.fn(() => builder),
         where: jest.fn(() => builder),
         andWhere: jest.fn(() => builder),
         setParameter: jest.fn(() => builder),
-        execute,
+        execute: jest.fn(async () => ({ affected })),
       };
 
       return {
-        entityManager: {
-          createQueryBuilder: jest.fn(() => builder),
-        },
+        entityManager: { createQueryBuilder: jest.fn(() => builder) },
         builder,
       };
     };
 
-    it('consumes the invitation exactly once', async () => {
+    it('consumes the invitation only while it is still live', async () => {
       const { service } = buildService();
       const { entityManager, builder } = entityManagerWithAffected(1);
 
       await service.consumeWithinTransaction({
         entityManager: entityManager as never,
-        invitationId: liveInvitation().id,
+        invitationId: INVITATION_ID,
         consumedByUserId: 'user-1',
       });
 
@@ -202,7 +236,7 @@ describe('SignUpInvitationService', () => {
         await expect(
           service.consumeWithinTransaction({
             entityManager: entityManager as never,
-            invitationId: liveInvitation().id,
+            invitationId: INVITATION_ID,
             consumedByUserId: 'user-1',
           }),
         ).rejects.toMatchObject({
@@ -214,9 +248,9 @@ describe('SignUpInvitationService', () => {
 
   describe('create', () => {
     it('refuses a second live invitation for the same address', async () => {
-      const { service, appTokenRepository, emailService } = buildService();
-
-      appTokenRepository.findOne.mockResolvedValue(liveInvitation());
+      const { service, emailService } = buildService({
+        liveForEmail: liveInvitation(),
+      });
 
       await expect(
         service.create({ email: EMAIL, issuedByUserId: 'operator' }),
@@ -225,9 +259,8 @@ describe('SignUpInvitationService', () => {
     });
 
     it('stores only the hash and mails a link carrying the plaintext', async () => {
-      const { service, appTokenRepository, emailService } = buildService();
-
-      appTokenRepository.findOne.mockResolvedValue(null);
+      const { service, appTokenRepository, emailService, store } =
+        buildService();
 
       const created = await service.create({
         email: ' Ana@Example.Test ',
@@ -236,6 +269,8 @@ describe('SignUpInvitationService', () => {
 
       expect(created.email).toBe(EMAIL);
       expect(created.status).toBe(SignUpInvitationStatusEnum.Pending);
+      expect(created.createdAt).toBeInstanceOf(Date);
+      expect(created.consumedAt).toBeNull();
 
       const saved = appTokenRepository.save.mock
         .calls[0][0] as unknown as AppTokenEntity;
@@ -248,99 +283,84 @@ describe('SignUpInvitationService', () => {
 
       expect(html).toBe('rendered');
 
-      const link = (
-        jest.requireMock('twenty-emails') as {
-          SignUpInviteLinkEmail: jest.Mock;
-        }
-      ).SignUpInviteLinkEmail.mock.calls.at(-1)?.[0].link as string;
-      const linkToken = new URL(link).searchParams.get(
-        SIGN_UP_INVITATION_TOKEN_SEARCH_PARAM,
-      );
+      const token = mailedToken();
 
-      expect(linkToken).toHaveLength(64);
-      expect(hashSignUpInvitationToken(linkToken as string)).toBe(saved.value);
+      expect(token).toHaveLength(64);
+      expect(hashSignUpInvitationToken(token)).toBe(
+        store.get(created.id)?.value,
+      );
+      expect(mailedLink()).not.toContain(store.get(created.id)?.value);
     });
   });
 
   describe('resend and revoke', () => {
     it('refuses to resend a redeemed invitation', async () => {
-      const { service, appTokenRepository, emailService } = buildService();
+      const redeemed = liveInvitation({
+        revokedAt: new Date(),
+        context: { email: EMAIL, consumedAt: new Date().toISOString() },
+      });
+      const { service, emailService } = buildService({ rows: [redeemed] });
 
-      appTokenRepository.findOne.mockResolvedValue(
-        liveInvitation({
-          revokedAt: new Date(),
-          context: { email: EMAIL, consumedAt: new Date().toISOString() },
-        }),
-      );
-
-      await expect(service.resend({ id: liveInvitation().id })).rejects.toMatchObject(
-        { code: AuthExceptionCode.INVALID_INPUT },
-      );
+      await expect(
+        service.resend({ id: INVITATION_ID }),
+      ).rejects.toMatchObject({ code: AuthExceptionCode.INVALID_INPUT });
       expect(emailService.send).not.toHaveBeenCalled();
     });
 
     it('refuses to resend a revoked invitation', async () => {
-      const { service, appTokenRepository, emailService } = buildService();
+      const { service, emailService } = buildService({
+        rows: [liveInvitation({ revokedAt: new Date() })],
+      });
 
-      appTokenRepository.findOne.mockResolvedValue(
-        liveInvitation({ revokedAt: new Date() }),
-      );
-
-      await expect(service.resend({ id: liveInvitation().id })).rejects.toMatchObject(
-        { code: AuthExceptionCode.INVALID_INPUT },
-      );
+      await expect(
+        service.resend({ id: INVITATION_ID }),
+      ).rejects.toMatchObject({ code: AuthExceptionCode.INVALID_INPUT });
       expect(emailService.send).not.toHaveBeenCalled();
     });
 
     it('rotates the token in place when it resends an expired invitation', async () => {
-      const { service, appTokenRepository, emailService } = buildService();
-      const expired = liveInvitation({
-        expiresAt: new Date(Date.now() - 1000),
+      const expired = liveInvitation({ expiresAt: new Date(Date.now() - 1000) });
+      const { service, emailService, store } = buildService({
+        rows: [expired],
       });
 
-      appTokenRepository.findOne.mockResolvedValue(expired);
+      const resent = await service.resend({ id: INVITATION_ID });
 
-      await service.resend({ id: expired.id });
-
-      const saved = appTokenRepository.save.mock
-        .calls[0][0] as unknown as AppTokenEntity;
-
-      expect(saved.id).toBe(expired.id);
-      expect(saved.value).not.toBe(expired.value);
-      expect(saved.revokedAt).toBeNull();
+      expect(resent.id).toBe(INVITATION_ID);
+      expect(resent.status).toBe(SignUpInvitationStatusEnum.Pending);
+      expect(store.get(INVITATION_ID)?.value).not.toBe(expired.value);
+      expect(hashSignUpInvitationToken(mailedToken())).toBe(
+        store.get(INVITATION_ID)?.value,
+      );
       expect(emailService.send).toHaveBeenCalledTimes(1);
     });
 
     it('refuses to revoke a redeemed invitation', async () => {
-      const { service, appTokenRepository, update } = buildService();
+      const { service, appTokenRepository } = buildService({
+        rows: [
+          liveInvitation({
+            revokedAt: new Date(),
+            context: { email: EMAIL, consumedAt: new Date().toISOString() },
+          }),
+        ],
+      });
 
-      appTokenRepository.findOne.mockResolvedValue(
-        liveInvitation({
-          revokedAt: new Date(),
-          context: { email: EMAIL, consumedAt: new Date().toISOString() },
-        }),
-      );
-
-      await expect(service.revoke(liveInvitation().id)).rejects.toMatchObject({
+      await expect(service.revoke(INVITATION_ID)).rejects.toMatchObject({
         code: AuthExceptionCode.INVALID_INPUT,
       });
-      expect(update).not.toHaveBeenCalled();
+      expect(appTokenRepository.update).not.toHaveBeenCalled();
     });
 
     it('revokes a pending invitation', async () => {
-      const { service, appTokenRepository, update } = buildService();
-      const pending = liveInvitation();
+      const { service, appTokenRepository } = buildService({
+        rows: [liveInvitation()],
+      });
 
-      appTokenRepository.findOne
-        .mockResolvedValueOnce(pending)
-        .mockResolvedValueOnce(
-          liveInvitation({ revokedAt: new Date() }),
-        );
+      const revoked = await service.revoke(INVITATION_ID);
 
-      const revoked = await service.revoke(pending.id);
-
-      expect(update).toHaveBeenCalledTimes(1);
+      expect(appTokenRepository.update).toHaveBeenCalledTimes(1);
       expect(revoked.status).toBe(SignUpInvitationStatusEnum.Revoked);
+      expect(revoked.revokedAt).toBeInstanceOf(Date);
     });
   });
 });

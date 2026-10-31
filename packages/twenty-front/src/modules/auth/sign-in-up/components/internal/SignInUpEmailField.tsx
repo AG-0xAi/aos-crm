@@ -1,4 +1,5 @@
 import { type Form } from '@/auth/sign-in-up/hooks/useSignInUpForm';
+import { InputHint } from '@/ui/input/components/internal/InputHint/InputHint';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
@@ -18,9 +19,11 @@ const StyledInputContainer = styled.div`
 export const SignInUpEmailField = ({
   showErrors,
   onInputChange,
+  isLocked,
 }: {
   showErrors: boolean;
   onInputChange?: (value: string) => void;
+  isLocked?: boolean;
 }) => {
   const { t } = useLingui();
   const form = useFormContext<Form>();
@@ -46,7 +49,8 @@ export const SignInUpEmailField = ({
             <SettingsTextInput
               instanceId="sign-in-up-email"
               autoComplete="email"
-              autoFocus
+              autoFocus={isLocked !== true}
+              disabled={isLocked === true}
               value={value}
               placeholder={t`Email`}
               onBlur={onBlur}
@@ -57,6 +61,9 @@ export const SignInUpEmailField = ({
               error={showErrors ? error?.message : undefined}
               fullWidth
             />
+            {isLocked === true && (
+              <InputHint>{t`This invitation is for this address only.`}</InputHint>
+            )}
           </StyledInputContainer>
         )}
       />

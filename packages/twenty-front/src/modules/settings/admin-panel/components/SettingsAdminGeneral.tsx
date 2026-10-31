@@ -3,6 +3,7 @@ import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
 import { useApolloAdminClient } from '@/settings/admin-panel/apollo/hooks/useApolloAdminClient';
 import { SettingsAdminServerAdmins } from '@/settings/admin-panel/components/SettingsAdminServerAdmins';
 import { SettingsAdminVersionContainer } from '@/settings/admin-panel/components/SettingsAdminVersionContainer';
+import { SettingsAdminSignUpInvitations } from '@/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations';
 import { SettingsSectionSkeletonLoader } from '@/settings/components/SettingsSectionSkeletonLoader';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { Table } from '@/ui/layout/table/components/Table';
@@ -91,6 +92,7 @@ export const SettingsAdminGeneral = () => {
             <SettingsAdminVersionContainer />
           </Section.Root>
           <SettingsAdminServerAdmins />
+          <SettingsAdminSignUpInvitations />
         </>
       )}
 

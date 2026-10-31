@@ -77,7 +77,7 @@ export class SignUpInvitationService {
       );
     }
 
-    const { invitation, plainToken } = await this.mint({
+    const { invitationId, plainToken, expiresAt } = await this.mint({
       email: normalizedEmail,
       issuedByUserId,
     });
@@ -85,11 +85,11 @@ export class SignUpInvitationService {
     await this.sendInvitationEmail({
       email: normalizedEmail,
       plainToken,
-      expiresAt: invitation.expiresAt,
+      expiresAt,
       locale,
     });
 
-    return this.toDTO(invitation);
+    return this.toDTO(await this.findByIdOrThrow(invitationId));
   }
 
   // Rotating rather than re-mailing the same token: after a resend exactly one
@@ -125,7 +125,7 @@ export class SignUpInvitationService {
     }
 
     const email = this.emailOfOrThrow(existing);
-    const { invitation, plainToken } = await this.mint({
+    const { invitationId, plainToken, expiresAt } = await this.mint({
       email,
       issuedByUserId: existing.context?.issuedByUserId,
       id: existing.id,
@@ -134,11 +134,11 @@ export class SignUpInvitationService {
     await this.sendInvitationEmail({
       email,
       plainToken,
-      expiresAt: invitation.expiresAt,
+      expiresAt,
       locale,
     });
 
-    return this.toDTO(invitation);
+    return this.toDTO(await this.findByIdOrThrow(invitationId));
   }
 
   async revoke(id: string): Promise<SignUpInvitationDTO> {
@@ -251,7 +251,7 @@ export class SignUpInvitationService {
     email: string;
     issuedByUserId?: string;
     id?: string;
-  }): Promise<{ invitation: AppTokenEntity; plainToken: string }> {
+  }): Promise<{ invitationId: string; plainToken: string; expiresAt: Date }> {
     const expiresIn = this.twentyConfigService.get(
       'SIGN_UP_INVITATION_TOKEN_EXPIRES_IN',
     );
@@ -264,12 +264,13 @@ export class SignUpInvitationService {
     }
 
     const plainToken = crypto.randomBytes(TOKEN_BYTES).toString('hex');
+    const expiresAt = addMilliseconds(new Date().getTime(), ms(expiresIn));
     const invitation = await this.appTokenRepository.save(
       this.appTokenRepository.create({
         ...(isDefined(id) ? { id } : {}),
         type: AppTokenType.SignUpInvitationToken,
         value: hashSignUpInvitationToken(plainToken),
-        expiresAt: addMilliseconds(new Date().getTime(), ms(expiresIn)),
+        expiresAt,
         revokedAt: null,
         context: {
           email,
@@ -278,7 +279,7 @@ export class SignUpInvitationService {
       }),
     );
 
-    return { invitation, plainToken };
+    return { invitationId: invitation.id, plainToken, expiresAt };
   }
 
   private async sendInvitationEmail({
