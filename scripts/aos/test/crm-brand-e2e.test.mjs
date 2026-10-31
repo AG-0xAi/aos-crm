@@ -44,6 +44,8 @@ import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
   BASE_URL,
+  BROWSER_ACCEPTANCE_DOCKERFILE,
+  browserAcceptanceContextFiles,
   compose,
   founderWorkspaceOrigin,
   http,
@@ -202,18 +204,17 @@ before(async () => {
   await waitForHealthy(HEALTH_TIMEOUT_MS);
   workspaceBaseUrl = founderWorkspaceOrigin();
 
-  // The same two-file context crm-browser-e2e builds, plus this suite's own
-  // in-container script. Built from a tar of three files in scripts/aos, so
-  // nothing else from this checkout reaches the daemon, and the layer cache is
-  // shared with that suite's build.
+  // The same context crm-browser-e2e builds, derived from the shared
+  // Dockerfile's own COPY lines, so nothing else from this checkout reaches the
+  // daemon and the layer cache is shared with that suite's build.
   const build = wsl(
     [
       'sh',
       '-c',
       `set -e; cd ${JSON.stringify(linuxRoot)}; ` +
-        'tar -C scripts/aos -cf - browser-acceptance.Dockerfile browser-acceptance.mjs brand-acceptance.mjs | ' +
+        `tar -C scripts/aos -cf - ${browserAcceptanceContextFiles().join(' ')} | ` +
         `docker build --provenance=false --build-arg BROWSER_IMAGE=${BROWSER_IMAGE} ` +
-        `--build-arg PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION} -f browser-acceptance.Dockerfile -t ${IMAGE_TAG} -`,
+        `--build-arg PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION} -f ${BROWSER_ACCEPTANCE_DOCKERFILE} -t ${IMAGE_TAG} -`,
     ],
     { timeout: 600_000 },
   );

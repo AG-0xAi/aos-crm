@@ -40,8 +40,9 @@ import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import {
-  ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, COMPOSE_PROJECT, DISTRO, PG_DB, PG_USER,
-  REPO_ROOT, founderWorkspaceOrigin, graphql, http,
+  ADMIN_EMAIL, ADMIN_PASSWORD, BASE_URL, BROWSER_ACCEPTANCE_DOCKERFILE,
+  COMPOSE_PROJECT, DISTRO, PG_DB, PG_USER, REPO_ROOT,
+  browserAcceptanceContextFiles, founderWorkspaceOrigin, graphql, http,
 } from '../mcp/lib.mjs';
 import { loginAsAdmin } from '../mcp/team-role.mjs';
 
@@ -210,13 +211,13 @@ before(async () => {
   workspaceSchema = schemas[0];
 
   // The browser image: the pinned official base plus the version-matched
-  // playwright package. Built from a tar of the two files in scripts/aos, so
-  // nothing else from this checkout reaches the daemon.
+  // playwright package. Built from a tar of only the files the shared
+  // Dockerfile names, so nothing else from this checkout reaches the daemon.
   const build = wsl(['sh', '-c',
     `set -e; cd ${JSON.stringify(linuxRoot)}; ` +
-    'tar -C scripts/aos -cf - browser-acceptance.Dockerfile browser-acceptance.mjs | ' +
+    `tar -C scripts/aos -cf - ${browserAcceptanceContextFiles().join(' ')} | ` +
     `docker build --provenance=false --build-arg BROWSER_IMAGE=${BROWSER_IMAGE} ` +
-    `--build-arg PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION} -f browser-acceptance.Dockerfile -t ${IMAGE_TAG} -`,
+    `--build-arg PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION} -f ${BROWSER_ACCEPTANCE_DOCKERFILE} -t ${IMAGE_TAG} -`,
   ], { timeout: 600_000 });
   assert.equal(build.status, 0, `the browser image build exited ${build.status}: ${(build.stderr || '').slice(-400)}`);
 });

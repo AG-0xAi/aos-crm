@@ -201,6 +201,32 @@ export function wsl(args, opts = {}) {
   });
 }
 
+export const BROWSER_ACCEPTANCE_DOCKERFILE = 'browser-acceptance.Dockerfile';
+
+// The build context of the browser image, DERIVED from the Dockerfile's own
+// COPY lines instead of written out per suite. Two suites share that
+// Dockerfile (crm-browser-e2e and crm-brand-e2e); when CRM-019 added a COPY for
+// the brand script, the suite that still named two files failed its build with
+// "/brand-acceptance.mjs: not found" and the other one passed. Derived, they
+// cannot drift.
+export function browserAcceptanceContextFiles() {
+  const dockerfile = readFileSync(
+    resolve(REPO_ROOT, 'scripts/aos', BROWSER_ACCEPTANCE_DOCKERFILE),
+    'utf8',
+  );
+  const copied = [...dockerfile.matchAll(/^COPY\s+(\S+)\s/gm)].map(
+    (match) => match[1],
+  );
+
+  if (copied.length === 0) {
+    throw new Error(
+      `${BROWSER_ACCEPTANCE_DOCKERFILE} declares no COPY, so the build context could not be derived`,
+    );
+  }
+
+  return [BROWSER_ACCEPTANCE_DOCKERFILE, ...new Set(copied)];
+}
+
 let cachedLinuxRoot = null;
 
 export function linuxRepoRoot() {
