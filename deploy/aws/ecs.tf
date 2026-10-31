@@ -88,6 +88,10 @@ locals {
     # ALB reaches the tasks from inside var.vpc_cidr (10.42.0.0/16), so this
     # pins the behaviour the stack depends on instead of inheriting it.
     TRUST_PROXY = "loopback, linklocal, uniquelocal"
+    # AGPL section 13: the sign-in license notice links to the exact source
+    # of the deployed image (CRM-019 LicenseNotice.tsx) and shows its version.
+    SOURCE_CODE_URL = var.source_code_url
+    APP_VERSION     = var.app_version
     # Outbound mail through SES (CRM-017, founder request 30/10/2026), in
     # three stages the operator moves through with tfvars, never with a code
     # change (BETA_RUNBOOK.md §8). SMTP is the only other driver Twenty
