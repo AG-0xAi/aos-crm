@@ -905,7 +905,11 @@ test('the rest of the operator procedure runs for the synthetic friend: the oper
 // 'requiresDestination' -> hasProvisionedDestination), so an identity that only
 // CLAIMS an invited address can create a user. What must not follow from that
 // is reaching the workspace: neither its invitation credential nor its records.
-test('an identity that only claims an invited address reaches no records, and is offered no workspace it was not invited to (measured limit: it IS handed the pending invitation)', async () => {
+// CRM-014 measured, on 30/10, that the sign-up answer DID hand over the
+// invitation token (§4.1). CRM-016 closed it in
+// user-workspace.service.ts setLoginTokenToAvailableWorkspacesWhenAuthProviderMatch,
+// so what was a reported limit is an assertion here now.
+test('an identity that only claims an invited address reaches no records, is offered no workspace it was not invited to, and is not handed the pending invitation', async () => {
   const claimedEmail = `reclamo.${RUN}@aos-crm.invalid`;
   const claimedPassword = randomBytes(36).toString('base64url');
 
@@ -938,31 +942,11 @@ test('an identity that only claims an invited address reaches no records, and is
   const wasHandedTheInvitation = typeof forB?.personalInviteToken === 'string' && forB.personalInviteToken.length > 0;
 
   try {
-    // MEASURED LIMIT, not a pass: on this profile the sign-up answer DOES hand
-    // the pending invitation token to whoever claims the address, and with it
-    // the address can join. It is upstream's design -- the invitation is
-    // addressed to an email and nothing proves the address while
-    // IS_EMAIL_VERIFICATION_REQUIRED is false -- so it is reported to the
-    // founder (.aos/reports/CRM-014.md, docs/aos/product/BETA_RUNBOOK.md) with
-    // its mitigation (invite, have it accepted, and delete anything pending)
-    // instead of being asserted away here. What IS asserted below is the shape
-    // of that exposure: it reaches only the workspace the address was really
-    // invited to, and it buys no records without redeeming the invitation.
-    let joinedWorkspaceId = null;
-    if (claimerToken !== null && wasHandedTheInvitation) {
-      const joined = await graphql(
-        METADATA,
-        'mutation($e: String!, $p: String!, $w: UUID, $h: String, $t: String) {' +
-          ' signUpInWorkspace(email: $e, password: $p, workspaceId: $w, workspaceInviteHash: $h,' +
-          ' workspacePersonalInviteToken: $t) { workspace { id } } }',
-        { e: claimedEmail, p: claimedPassword, w: workspaces.B.id, h: forB.inviteHash, t: forB.personalInviteToken },
-      );
-      joinedWorkspaceId = joined.data?.signUpInWorkspace?.workspace?.id ?? null;
-    }
-    console.log(
-      `[LIMIT] a claimed invited address was handed the pending invitation token: ${wasHandedTheInvitation}; ` +
-      `redeeming it joined the workspace: ${joinedWorkspaceId === workspaces.B.id}`,
-    );
+    // THE finding CRM-014 reported as §4.1, now the assertion that it is
+    // closed: an identity that only claims the address gets no invitation
+    // credential, so there is nothing to redeem and no join to attempt.
+    assert.equal(wasHandedTheInvitation, false,
+      'the sign-up answer handed the pending invitation token to an address nobody proved');
 
     // The exposure is bounded to the invitation that exists: no other workspace
     // of this deployment is offered to that address.
