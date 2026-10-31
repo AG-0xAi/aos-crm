@@ -125,6 +125,15 @@ async function signIn(page) {
 async function runPublicPhase(page) {
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
+  // `domcontentloaded` fires before React paints, and the first thing it paints
+  // is not necessarily the form: wait for the sign-in screen's OWN anchors, the
+  // same two signIn() relies on. Without this the body reads empty and every
+  // assertion below reports a brand failure that is really a timing failure.
+  const emailInput = page.locator('input[placeholder="Email"]').first();
+  const withEmail = page.getByRole('button', { name: /continue with email/i });
+
+  await emailInput.or(withEmail).first().waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+
   const title = await page.title();
 
   record(
@@ -144,12 +153,21 @@ async function runPublicPhase(page) {
     `href was ${JSON.stringify(favicon)}`,
   );
 
-  const withEmail = page.getByRole('button', { name: /continue with email/i });
-
-  if ((await withEmail.count()) > 0) await withEmail.first().click();
+  if ((await withEmail.count()) > 0) {
+    await withEmail.first().click();
+    await emailInput.waitFor({ timeout: LOCATOR_TIMEOUT_MS });
+  }
 
   const text = await visibleText(page);
 
+  // An empty body is "the page never rendered", which is a different fact from
+  // "the page says the wrong thing". Said once, so the checks below cannot be
+  // read as brand failures when nothing painted.
+  record(
+    'the sign-in page rendered something to read',
+    text.trim().length > 0,
+    `innerText was ${text.length} characters`,
+  );
   record(
     'the sign-in page names Betty',
     /\bBetty\b/.test(text),

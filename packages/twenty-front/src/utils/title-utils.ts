@@ -24,7 +24,19 @@ const getPathnameOrPrefix = (pathname: string) => {
   return pathname;
 };
 
+// R1 names the page title as part of the identity, and upstream's titles named
+// the product only on the fallback: the sign-in tab read "Sign in or Create an
+// account" and nothing else, which is the one page a visitor sees before any
+// branding at all.
 export const getPageTitleFromPath = (pathname: string): string => {
+  const sectionTitle = getSectionTitleFromPath(pathname);
+
+  return sectionTitle === BRAND_NAME
+    ? sectionTitle
+    : `${sectionTitle} - ${BRAND_NAME}`;
+};
+
+const getSectionTitleFromPath = (pathname: string): string => {
   const pathnameOrPrefix = getPathnameOrPrefix(pathname);
   switch (pathnameOrPrefix) {
     case AppPath.Verify:

@@ -6,52 +6,32 @@ i18n.load('en', enMessages);
 i18n.activate('en');
 
 describe('title-utils', () => {
-  it('should return the correct title for a given path', () => {
-    expect(getPageTitleFromPath('/verify')).toBe('Verify');
-    expect(getPageTitleFromPath('/welcome')).toBe(
-      'Sign in or Create an account',
-    );
-    expect(getPageTitleFromPath('/invite/:workspaceInviteHash')).toBe('Invite');
-    expect(getPageTitleFromPath('/workspace-activation')).toBe(
-      'Create Workspace',
-    );
-    expect(getPageTitleFromPath('/create/profile')).toBe('Create Profile');
-    expect(getPageTitleFromPath('/settings/objects/opportunities')).toBe(
-      'Data model - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/profile')).toBe(
-      'Profile - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/experience')).toBe(
-      'Experience - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/accounts')).toBe(
-      'Account - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/accounts/new')).toBe(
-      'Account - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/accounts/calendars')).toBe(
-      'Account - Settings',
-    );
-    expect(
-      getPageTitleFromPath('/settings/accounts/calendars/:accountUuid'),
-    ).toBe('Account - Settings');
-    expect(getPageTitleFromPath('/settings/accounts/emails')).toBe(
-      'Account - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/accounts/emails/:accountUuid')).toBe(
-      'Account - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/billing/plans')).toBe(
-      'Billing - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/members')).toBe(
-      'Members - Settings',
-    );
-    expect(getPageTitleFromPath('/settings/general')).toBe(
-      'General - Settings',
-    );
+  it.each([
+    ['/verify', 'Verify - Betty'],
+    ['/welcome', 'Sign in or Create an account - Betty'],
+    ['/invite/:workspaceInviteHash', 'Invite - Betty'],
+    ['/workspace-activation', 'Create Workspace - Betty'],
+    ['/create/profile', 'Create Profile - Betty'],
+    ['/settings/objects/opportunities', 'Data model - Settings - Betty'],
+    ['/settings/profile', 'Profile - Settings - Betty'],
+    ['/settings/experience', 'Experience - Settings - Betty'],
+    ['/settings/accounts', 'Account - Settings - Betty'],
+    ['/settings/accounts/new', 'Account - Settings - Betty'],
+    ['/settings/accounts/calendars', 'Account - Settings - Betty'],
+    [
+      '/settings/accounts/calendars/:accountUuid',
+      'Account - Settings - Betty',
+    ],
+    ['/settings/accounts/emails', 'Account - Settings - Betty'],
+    ['/settings/accounts/emails/:accountUuid', 'Account - Settings - Betty'],
+    ['/settings/billing/plans', 'Billing - Settings - Betty'],
+    ['/settings/members', 'Members - Settings - Betty'],
+    ['/settings/general', 'General - Settings - Betty'],
+  ])('should title %p as %p', (pathname, expected) => {
+    expect(getPageTitleFromPath(pathname)).toBe(expected);
+  });
+
+  it('should not repeat the brand on the paths that are only the brand', () => {
     expect(getPageTitleFromPath('/')).toBe('Betty');
     expect(getPageTitleFromPath('/random')).toBe('Betty');
   });
