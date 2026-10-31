@@ -683,6 +683,12 @@ export class UserWorkspaceService {
       this.twentyConfigService.get('IS_EMAIL_VERIFICATION_REQUIRED') &&
       !user.isEmailVerified;
 
+    // CRM-016 (closes CRM-014 §4.1): a pending invitation is a credential
+    // addressed to a mailbox, so it is only ever handed to an identity that
+    // PROVED that mailbox. Whoever holds the invitation link already carries
+    // the token and reaches the workspace through it, without this field.
+    const mayReceiveInvitationTokens = user.isEmailVerified === true;
+
     const availableWorkspacesForSignUpToList = shouldHideInvitations
       ? availableWorkspaces.availableWorkspacesForSignUp.filter(
           ({ appToken }) => !isDefined(appToken),
@@ -696,7 +702,9 @@ export class UserWorkspaceService {
             async ({ workspace, appToken }) => {
               return {
                 ...(await this.castWorkspaceToAvailableWorkspace(workspace)),
-                ...(appToken ? { personalInviteToken: appToken.value } : {}),
+                ...(appToken && mayReceiveInvitationTokens
+                  ? { personalInviteToken: appToken.value }
+                  : {}),
               };
             },
           ),

@@ -474,6 +474,16 @@ export class ConfigVariables {
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.TOKENS_DURATION,
+    description:
+      'Duration for which a server admin sign-up invitation link is valid',
+    type: ConfigVariableType.STRING,
+  })
+  @IsPositiveDuration()
+  @IsOptional()
+  SIGN_UP_INVITATION_TOKEN_EXPIRES_IN = '7d';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.TOKENS_DURATION,
     description: 'Duration for which the short-term token is valid',
     type: ConfigVariableType.STRING,
   })

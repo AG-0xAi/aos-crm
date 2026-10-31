@@ -87,6 +87,12 @@ const NO_ATTESTATION = '--provenance=false';
 const SPECS = [
   'src/engine/core-modules/telemetry/__tests__/telemetry.service.spec.ts',
   'src/engine/core-modules/twenty-config/__tests__/twenty-config.service.spec.ts',
+  // CRM-016 (R4): the sign-up invitation. These cover the fail-closed paths no
+  // e2e can force cheaply -- a token looked up by plaintext instead of by its
+  // hash, a redemption whose conditional update matched a row count other than
+  // one, and a resend of an already redeemed or revoked invitation.
+  'src/engine/core-modules/sign-up-invitation/services/__tests__/sign-up-invitation.service.spec.ts',
+  'src/engine/core-modules/sign-up-invitation/utils/__tests__/get-sign-up-invitation-status.util.spec.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
 
@@ -357,14 +363,18 @@ function selfTest() {
   };
   const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
   const measured = { depsBuildStatus: 0, sourcesBuildStatus: 0, containerStatus: 0 };
-  const clean = 'Test Suites: 2 passed, 2 total\nTests:       4 passed, 4 total\n';
+  // Derived from SPECS, not written out: a fixture carrying its own suite count
+  // failed the self-test the moment the list grew, which reads as a broken gate
+  // instead of a longer one.
+  const cleanSummary = (suites) =>
+    `Test Suites: ${suites} passed, ${suites} total\nTests:       ${suites * 2} passed, ${suites * 2} total\n`;
+  const clean = cleanSummary(EXPECTED_SUITES);
 
-  record('parseJestSummary: a clean two-suite run passes', () => {
-    const r = parseJestSummary('Test Suites: 2 passed, 2 total\nTests:       4 passed, 4 total\n');
-    assert(r.ok, r.detail);
+  record('parseJestSummary: a clean run of every spec in the list passes', () => {
+    assert(parseJestSummary(clean).ok, parseJestSummary(clean).detail);
   });
   record('parseJestSummary: a failing suite is rejected', () => {
-    const r = parseJestSummary('Test Suites: 1 failed, 1 passed, 2 total\nTests:       1 failed, 3 passed, 4 total\n');
+    const r = parseJestSummary(`Test Suites: 1 failed, ${EXPECTED_SUITES - 1} passed, ${EXPECTED_SUITES} total\nTests:       1 failed, 3 passed, 4 total\n`);
     assert(!r.ok, 'expected a failing suite to be rejected');
   });
   record('parseJestSummary: a run that matched no spec file is rejected, not read as green', () => {
@@ -372,7 +382,7 @@ function selfTest() {
     assert(!r.ok, 'expected zero suites to be rejected');
   });
   record('parseJestSummary: fewer suites than expected is rejected even if all passed', () => {
-    const r = parseJestSummary('Test Suites: 1 passed, 1 total\nTests:       2 passed, 2 total\n');
+    const r = parseJestSummary(cleanSummary(EXPECTED_SUITES - 1));
     assert(!r.ok, 'expected a short run to be rejected');
   });
   record('parseJestSummary: output with no summary at all is rejected', () => {
@@ -496,7 +506,9 @@ function selfTest() {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     assert(/npx jest --config jest\.config\.mjs --runInBand/.test(source), 'the specs are no longer run with the project jest config in band');
     assert(/'--network', 'none'/.test(source), 'the specs container is no longer isolated from the network');
-    assert(SPECS.length === 2, `expected exactly the 2 CRM-003 specs, got ${SPECS.length}`);
+    assert(SPECS.length === 4, `expected exactly the 2 CRM-003 specs and the 2 CRM-016 ones, got ${SPECS.length}`);
+    assert(SPECS.filter((spec) => spec.includes('/sign-up-invitation/')).length === 2,
+      'the CRM-016 sign-up-invitation specs are no longer in this gate');
   });
   record('the wrapper tears down only the container it named itself', () => {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');

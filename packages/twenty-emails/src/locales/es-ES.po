@@ -424,3 +424,18 @@ msgstr "Tu espacio de trabajo ha sido eliminado"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Tu espacio de trabajo está en pausa"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Create my workspace"
+msgstr "Crear mi espacio"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Open this link to create your account and your own workspace. It only works for this address and only once, and it expires in {duration}."
+msgstr "Abre este enlace para crear tu cuenta y tu propio espacio. Solo funciona para esta dirección y una sola vez, y caduca en {duration}."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You have been invited to Betty"
+msgstr "Te han invitado a Betty"

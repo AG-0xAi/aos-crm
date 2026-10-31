@@ -49,6 +49,7 @@ import { ExceptionHandlerService } from 'src/engine/core-modules/exception-handl
 import { MetricsService } from 'src/engine/core-modules/metrics/metrics.service';
 import { MetricsKeys } from 'src/engine/core-modules/metrics/types/metrics-keys.type';
 import { OnboardingService } from 'src/engine/core-modules/onboarding/onboarding.service';
+import { SignUpInvitationService } from 'src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service';
 import { TelemetryEventType } from 'src/engine/core-modules/telemetry/telemetry-event.type';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { UserWorkspaceService } from 'src/engine/core-modules/user-workspace/user-workspace.service';
@@ -90,6 +91,7 @@ export class SignInUpService {
     private readonly enterprisePlanService: EnterprisePlanService,
     private readonly eventLogEmitterService: EventLogEmitterService,
     private readonly billingService: BillingService,
+    private readonly signUpInvitationService: SignUpInvitationService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -436,6 +438,7 @@ export class SignInUpService {
   // Enforced at sign-up so a restricted instance stops accumulating users who can never reach a workspace
   private async assertSignUpWithoutWorkspaceAllowed(
     email: string,
+    signUpInvitationToken?: string,
   ): Promise<void> {
     const decision = getSignUpWithoutWorkspaceDecision({
       isMultiWorkspaceEnabled: this.twentyConfigService.get(
@@ -451,9 +454,18 @@ export class SignInUpService {
       return;
     }
 
+    // A sign-up invitation IS the destination: it is the operator's promise
+    // that this address may open one workspace. 'refused' is never widened --
+    // it means sign-up itself is off.
     if (
       decision === 'requiresDestination' &&
-      (await this.hasProvisionedDestination(email))
+      ((await this.hasProvisionedDestination(email)) ||
+        isDefined(
+          await this.signUpInvitationService.findLiveInvitationForEmail({
+            plainToken: signUpInvitationToken,
+            email,
+          }),
+        ))
     ) {
       return;
     }
@@ -490,6 +502,7 @@ export class SignInUpService {
 
   private async assertWorkspaceCreationAllowed(
     userData: ExistingUserOrPartialUserWithPicture['userData'],
+    signUpInvitation?: AppTokenEntity,
   ): Promise<void> {
     await this.assertSignUpEnabled();
 
@@ -499,6 +512,8 @@ export class SignInUpService {
       return;
     }
 
+    // Deliberately before the invitation check: an invitation opens the door
+    // for one person, it does not raise the instance's workspace ceiling.
     await this.assertWorkspaceCountWithinLimit(workspaceCount);
 
     if (
@@ -513,7 +528,7 @@ export class SignInUpService {
       userData.type === 'existingUser' &&
       userData.existingUser.canAccessFullAdminPanel;
 
-    if (isExistingAdmin) {
+    if (isExistingAdmin || isDefined(signUpInvitation)) {
       return;
     }
 
@@ -548,7 +563,12 @@ export class SignInUpService {
 
   async signUpOnNewWorkspace(
     userData: ExistingUserOrPartialUserWithPicture['userData'],
-    options?: { displayName?: string; subdomain?: string; partner?: string },
+    options?: {
+      displayName?: string;
+      subdomain?: string;
+      partner?: string;
+      signUpInvitationToken?: string;
+    },
   ) {
     const email =
       userData.type === 'newUserWithPicture'
@@ -565,7 +585,13 @@ export class SignInUpService {
       );
     }
 
-    await this.assertWorkspaceCreationAllowed(userData);
+    const signUpInvitation =
+      await this.signUpInvitationService.findLiveInvitationForEmail({
+        plainToken: options?.signUpInvitationToken,
+        email,
+      });
+
+    await this.assertWorkspaceCreationAllowed(userData, signUpInvitation);
 
     const displayName = options?.displayName?.trim();
 
@@ -637,6 +663,17 @@ export class SignInUpService {
                 },
                 queryRunner,
               );
+
+          // Inside this transaction on purpose: the conditional update is what
+          // makes one token open exactly one workspace even under concurrent
+          // redemption, and a rollback here gives the invitation back.
+          if (isDefined(signUpInvitation)) {
+            await this.signUpInvitationService.consumeWithinTransaction({
+              entityManager,
+              invitationId: signUpInvitation.id,
+              consumedByUserId: user.id,
+            });
+          }
 
           await this.userWorkspaceService.create(
             {
@@ -716,6 +753,7 @@ export class SignInUpService {
   async signUpWithoutWorkspace(
     newUserParams: SignInUpNewUserPayload,
     authParams: AuthProviderWithPasswordType['authParams'],
+    signUpInvitationToken?: string,
   ) {
     const userExists = await this.userService.findUserByEmail(
       newUserParams.email,
@@ -729,7 +767,10 @@ export class SignInUpService {
       );
     }
 
-    await this.assertSignUpWithoutWorkspaceAllowed(newUserParams.email);
+    await this.assertSignUpWithoutWorkspaceAllowed(
+      newUserParams.email,
+      signUpInvitationToken,
+    );
 
     const shouldGrantServerAdmin = !(await this.hasServerAdmin());
 

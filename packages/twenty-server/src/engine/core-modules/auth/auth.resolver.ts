@@ -526,6 +526,7 @@ export class AuthResolver {
         provider: AuthProviderEnum.Password,
         password: signUpInput.password,
       },
+      signUpInput.signUpInvitationToken,
     );
 
     const availableWorkspaces =
@@ -716,6 +717,7 @@ export class AuthResolver {
         displayName: input?.displayName,
         subdomain: input?.subdomain,
         partner: input?.partner,
+        signUpInvitationToken: input?.signUpInvitationToken,
       },
     );
 
