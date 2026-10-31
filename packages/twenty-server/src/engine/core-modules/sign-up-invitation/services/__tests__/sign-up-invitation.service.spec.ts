@@ -129,10 +129,14 @@ const buildService = ({
   return { service, appTokenRepository, emailService, store };
 };
 
-const mailedLink = () =>
-  (
+// Indexed and not .at(-1): twenty-server's tsconfig lib predates it (TS2550).
+const mailedLink = () => {
+  const { calls } = (
     jest.requireMock('twenty-emails') as { SignUpInviteLinkEmail: jest.Mock }
-  ).SignUpInviteLinkEmail.mock.calls.at(-1)?.[0].link as string;
+  ).SignUpInviteLinkEmail.mock;
+
+  return calls[calls.length - 1][0].link as string;
+};
 
 const mailedToken = () =>
   new URL(mailedLink()).searchParams.get(
@@ -198,8 +202,19 @@ describe('SignUpInvitationService', () => {
   });
 
   describe('consumeWithinTransaction', () => {
+    // Annotated: the stub's methods return the stub, and without a type the
+    // self-reference in its own initializer is TS7022/TS7024.
+    type QueryBuilderStub = {
+      update: jest.Mock;
+      set: jest.Mock;
+      where: jest.Mock;
+      andWhere: jest.Mock;
+      setParameter: jest.Mock;
+      execute: jest.Mock;
+    };
+
     const entityManagerWithAffected = (affected: number | null | undefined) => {
-      const builder = {
+      const builder: QueryBuilderStub = {
         update: jest.fn(() => builder),
         set: jest.fn(() => builder),
         where: jest.fn(() => builder),
