@@ -89,6 +89,9 @@ export const SPECS = [
   // key the brand change moved.
   'src/modules/settings/mcp/components/__tests__/McpConnectAssistant.test.tsx',
   'src/modules/settings/mcp/utils/__tests__/mcpSetup.test.ts',
+  // CRM-016 (R4): the invited person's own screen. The address arrives in the
+  // link and the invitation is what locks it, which no server test can see.
+  'src/modules/auth/sign-in-up/components/internal/__tests__/SignInUpEmailField.test.tsx',
 ];
 const EXPECTED_SUITES = SPECS.length;
 

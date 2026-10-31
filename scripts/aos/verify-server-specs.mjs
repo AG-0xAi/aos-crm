@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// CRM-004: runs the two CRM-003 privacy specs for real.
+// CRM-004: runs twenty-server's own unit specs for real. CRM-016 widened the
+// list beyond CRM-003's two privacy specs; SPECS below is what it runs.
 //
 // CRM-003 could only deliver a STATIC privacy gate: it reads config files and
 // greps pinned source, and it says so. The two specs that exercise the real
@@ -195,7 +196,7 @@ export function judgeSpecsRun({ depsBuildStatus, sourcesBuildStatus, containerSt
     return { ok: false, detail: `the source/dependency-build image exited ${sourcesBuildStatus ?? 'unmeasured'}: the workspace builds the specs resolve were not produced` };
   }
   if (containerStatus !== 0) {
-    return { ok: false, detail: `the privacy specs container exited ${containerStatus ?? 'unmeasured'} instead of completing: jest's summary cannot be trusted` };
+    return { ok: false, detail: `the server specs container exited ${containerStatus ?? 'unmeasured'} instead of completing: jest's summary cannot be trusted` };
   }
   return parseJestSummary(output);
 }
@@ -335,12 +336,12 @@ function run() {
   }
   ownImages.push(SOURCES_IMAGE);
 
-  console.log(`[INFO] running the two privacy specs (container ${CONTAINER_NAME}, no network)`);
+  console.log(`[INFO] running the ${SPECS.length} server specs (container ${CONTAINER_NAME}, no network)`);
   const res = wsl(['docker', 'run', '--rm', '--name', CONTAINER_NAME, '--network', 'none', SOURCES_IMAGE,
     'sh', '-c', `cd /app/packages/twenty-server && npx jest --config jest.config.mjs --runInBand ${SPECS.join(' ')}`,
   ], { timeout: RUN_TIMEOUT_MS });
   if (res.error?.code === 'ETIMEDOUT' || res.signal) {
-    fail(`the privacy specs container exceeded its ${RUN_TIMEOUT_MS} ms budget and was torn down; nothing was measured`);
+    fail(`the server specs container exceeded its ${RUN_TIMEOUT_MS} ms budget and was torn down; nothing was measured`);
   }
   const output = `${res.stdout || ''}\n${res.stderr || ''}`;
   const verdict = judgeSpecsRun({ depsBuildStatus, sourcesBuildStatus, containerStatus: res.status, output });
@@ -348,12 +349,12 @@ function run() {
     const tail = output.split('\n').filter((l) => l.trim()).slice(-25);
     console.error(tail.length ? tail.join('\n') : '(the container produced no output at all)');
     if (res.error) console.error(`spawn error: ${res.error.code || res.error.message}`);
-    fail(`privacy specs: ${verdict.detail}`);
+    fail(`server specs: ${verdict.detail}`);
   }
 
   removeOwnResources();
-  console.log(`[PASS] CRM-003 privacy specs executed against the real classes: ${verdict.detail}`);
-  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence, run with no network in a server-deps image rebuilt from this run\'s lockfile, over a git archive of this commit\'s sources. This does NOT start the CRM or observe runtime traffic.');
+  console.log(`[PASS] server specs executed against the real classes: ${verdict.detail}`);
+  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence (CRM-003), plus the sign-up invitation service and its status derivation (CRM-016), run with no network in a server-deps image rebuilt from this run\'s lockfile, over a git archive of this commit\'s sources. This does NOT start the CRM or observe runtime traffic.');
 }
 
 function selfTest() {
