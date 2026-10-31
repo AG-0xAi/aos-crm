@@ -3,10 +3,13 @@
 // by scripts/aos/test/crm-brand-e2e.test.mjs.
 //
 // What it measures, in a real headless Chromium with its sandbox ON:
-//  - public   : the unauthenticated sign-in/sign-up page. Betty's name and
-//               wordmark, the document title, the legal links pointing at
-//               betty.management, the AGPL notice, and no "Twenty" in any text
-//               a visitor can read.
+//  - public   : the unauthenticated sign-in/sign-up page. The document title,
+//               the favicon and the default logo this deployment paints, the
+//               legal links pointing at betty.management, the AGPL notice, and
+//               no "Twenty" in any text a visitor can read or any image the
+//               page paints. The brand is NOT asserted as body text: on a
+//               workspace host this screen greets with the workspace name,
+//               which is upstream's design and correct.
 //  - settings : Settings > AI > MCP. The "Connect your assistant" card at the
 //               top, Claude's prefilled link (or its stated absence), the
 //               ChatGPT steps, the workspace's own MCP URL, and the absence of
@@ -168,10 +171,28 @@ async function runPublicPhase(page) {
     text.trim().length > 0,
     `innerText was ${text.length} characters`,
   );
+
+  // On a workspace host this screen greets with the WORKSPACE name ("Welcome,
+  // <workspace>."), which is upstream's design and correct: the visitor is
+  // signing in to their workspace, not to the product. So the brand is not
+  // asserted as body text here -- it is asserted where it actually appears, as
+  // the default logo this deployment paints and as the tab title.
+  const painted = await paintedImageUrls(page);
+
   record(
-    'the sign-in page names Betty',
-    /\bBetty\b/.test(text),
-    text.slice(0, 200),
+    "the sign-in page paints Betty's own logo, served by this deployment",
+    painted.some((value) => value.includes('/brand/logo/')),
+    painted.join(' | ').slice(0, 300),
+  );
+  record(
+    'the browser tab names Betty',
+    /\bBetty\b/.test(title),
+    `title was ${JSON.stringify(title)}`,
+  );
+  record(
+    'no Twenty asset is painted on the sign-in page',
+    !painted.some((value) => TWENTY_ASSET.test(value)),
+    painted.filter((value) => TWENTY_ASSET.test(value)).join(' | '),
   );
   recordNoTwenty('no "Twenty" anywhere a visitor can read', text);
 
