@@ -8,6 +8,8 @@ import {
   jotaiStore,
   resetJotaiStore,
 } from '@/ui/utilities/state/jotai/jotaiStore';
+import { i18n } from '@lingui/core';
+import { I18nProvider } from '@lingui/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider as JotaiProvider } from 'jotai';
@@ -33,9 +35,11 @@ const FieldUnderTest = () => {
 
 const renderAt = (search: string) => {
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <MemoryRouter initialEntries={[search]}>
-      <JotaiProvider store={jotaiStore}>{children}</JotaiProvider>
-    </MemoryRouter>
+    <I18nProvider i18n={i18n}>
+      <MemoryRouter initialEntries={[search]}>
+        <JotaiProvider store={jotaiStore}>{children}</JotaiProvider>
+      </MemoryRouter>
+    </I18nProvider>
   );
 
   return render(<FieldUnderTest />, { wrapper: Wrapper });

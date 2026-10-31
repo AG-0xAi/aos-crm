@@ -155,9 +155,7 @@ export const SettingsAdminSignUpInvitations = () => {
                       text={
                         invitation.status === SignUpInvitationStatus.Used &&
                         isDefined(invitation.consumedAt)
-                          ? beautifyPastDateRelativeToNow(
-                              invitation.consumedAt,
-                            )
+                          ? beautifyPastDateRelativeToNow(invitation.consumedAt)
                           : beautifyExactDateTime(invitation.expiresAt)
                       }
                     />
