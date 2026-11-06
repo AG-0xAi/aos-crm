@@ -24,7 +24,19 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
-### 2026-11-06 21:45Z · DECISIÓN DE ANDRÉS: cambian el final de la Fase 2, el orden de las fases y la regla de pushes
+> Corrección de horas (20:45Z): las horas que el coordinador puso en sus entradas iban adelantadas hasta una hora; ya están cambiadas por las reales, las de cada commit en UTC. La decisión de Andrés que antes decía 21:45Z es la de 20:41Z.
+
+### 2026-11-06 20:45Z · tu clasificación de rojos, leída
+- Tu tabla encaja con la decisión de Andrés de abajo: los rojos de código son la línea base y las primeras specs del bus en la VM. No hace falta proponerle una spec aparte; regístralas tú en el pack, en estado `pending`, y anótalas en la bitácora.
+- Agrupación sugerida, tres specs de tamaño S:
+  1. Marcar para traducción las tres cadenas (`twenty-emails`: `sign-up-invite-link.email.tsx` y `Logo.tsx`; `twenty-front`: `SettingsLegalDpaNew.tsx`).
+  2. Pruebas de Twenty que asumen la marca Twenty: `getTimelineActivityAuthorFullName`, `SettingsAvailableApplicationDetails`, el Markdown generado de `TwentyIconDictionary` (se regenera con su generador, no se edita a mano) y `get-record-image-identifier` del servidor.
+  3. `useSignInUp` con el argumento de invitación que añadió CRM-016.
+- Cada contrato dice qué spec cambió el comportamiento (CRM-016 o la marca Betty) y cuál es el comportamiento esperado ahora. Ojo con `getLogoUrlFromDomainName` devolviendo `null`: si la marca dejó de pedir iconos a `twenty-icons.com` a propósito, la prueba debe afirmar eso; si fue sin querer, el arreglo va en el código, no en la prueba. Esa decisión queda escrita en el contrato.
+- `server-lint-typecheck` queda sin medir mientras falle el lint de `twenty-emails` (por `--nxBail`): no entra en los checks obligatorios de la PARADA 2 hasta que la spec 1 esté fusionada y se vea su línea base real.
+- Bien los dos arreglos de infraestructura (Storybook fijado a `ubuntu-24.04` y la espera del reset antes del `globalSetup`). Anota cuánto tarda esa espera en la tabla de tiempos.
+
+### 2026-11-06 20:41Z · DECISIÓN DE ANDRÉS: cambian el final de la Fase 2, el orden de las fases y la regla de pushes
 Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye a lo que dice el encargo.
 
 1. **La Fase 2 termina con la CI medida, no toda verde.**
@@ -32,10 +44,10 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
    - Rojos de código o pruebas (los de la marca de Betty: formato y textos sin traducir en `twenty-emails`, el Markdown generado de iconos en `twenty-ui`, lint y tests del front, y los que salgan en servidor): no los arregles ahora. Anótalos en la bitácora como **línea base**: check, test y fichero de cada uno, sobre el commit de `betty/factory` en que corrió.
    - Después: pide a Andrés que fusione el PR #4 (o que dé OK al coordinador para hacerlo) y haz la PARADA 2: `betty/factory` con PR obligatorio, sin pushes directos y, como checks obligatorios, **solo los que pasan en la línea base** (lístalos). Los demás se añaden a medida que se pongan verdes.
 2. **Esos rojos de código son las primeras specs del bus en la VM.** Regístralas en tu pack con el CLI `aos` antes de la mudanza, para que viajen con él: una spec por grupo coherente (correos, iconos, lint del front, tests del front, servidor), tamaño S como mínimo (XS se lo asigna a un modelo pequeño), cada una con un contrato corto: qué falla, qué check lo demuestra y criterio de hecho = ese check verde en su PR. Estado `pending`. No las despaches en este PC.
-3. **Orden nuevo: la Fase 4 va antes que la Fase 3.** Tras la PARADA 2 haces la mudanza (Fase 4) con el comando corregido de abajo (21:25Z). La Fase 3 (despliegue desde Actions) va después, desde este PC; hasta entonces, si hace falta desplegar, se hace como hoy y solo con OK de Andrés. La Fase 5 (relevo) cierra.
+3. **Orden nuevo: la Fase 4 va antes que la Fase 3.** Tras la PARADA 2 haces la mudanza (Fase 4) con el comando corregido de abajo (20:34Z). La Fase 3 (despliegue desde Actions) va después, desde este PC; hasta entonces, si hace falta desplegar, se hace como hoy y solo con OK de Andrés. La Fase 5 (relevo) cierra.
 4. **El override de la guarda `pre-push` NO es «siempre»: vale solo mientras dura el traspaso.** Andrés lo aclara: es para terminar de montar esto, no una regla permanente. Mientras tanto: cada push con su razón escrita (`AOS_PUSH_OVERRIDE_REASON="traspaso Betty: <qué subes>"`) y nunca un push directo a `betty/factory` (solo fusiones en GitHub). Se acaba al cerrar la Fase 5, o antes si Andrés lo retira; anota en el relevo cuándo dejaste de usarlo. Después, todo cambio de Betty llega por PR desde los workers de la VM, con su gate y la CI de Actions.
 
-### 2026-11-06 21:25Z · CORRECCIÓN para la mudanza (Fase 4): tu pack no viajaba
+### 2026-11-06 20:34Z · CORRECCIÓN para la mudanza (Fase 4): tu pack no viajaba
 - El script de mudanza solo lleva `events`, `state`, `inbox`, `outbox`, `tracks`, `budget` y `specs`. En Betty `.aos/` entero está fuera de git (el fork no tiene ni `.aos/` ni `packs/`), así que tu pack canónico `.aos/pack/aos-crm/` (`specs.json`, contratos y `changes/`), tu `verify.json` y tu `config.json` no llegarían a la VM ni con el clon ni con la mudanza. El comando correcto de la Fase 4 es:
   ```
   AOS_MOVER_EXTRA_PARTS="pack verify.json config.json docs onboarding" \
@@ -47,37 +59,37 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
 - Verificación tras la mudanza, además de `aos-betty status`: `aos-betty specs list --pack aos-crm` (desde `/opt/aos/betty`) con los mismos conteos por estado que tu Fase 0, y el mismo número de contratos en `.aos/pack/aos-crm/specs/` que en este PC. Si no cuadra, no restaures nada aún: avisa.
 - El registro del proyecto en el bus de la VM (slug `aos-crm`) lo hace la sesión de AWS después de la mudanza, con el token; no lo hagas tú.
 
-### 2026-11-06 21:05Z · tu Fase 2, leída (poda y primeras ejecuciones)
+### 2026-11-06 20:23Z · tu Fase 2, leída (poda y primeras ejecuciones)
 - Bien la poda (10 workflows) y el cambio de base a `betty/factory`; los rojos de `pull_request_target` que vienen de la versión vieja de la línea desaparecen al fusionar #4, como dices.
 - Sugerencia, no orden: `ci-utils` (Danger) es el bot de PR de Twenty y corre con `pull_request_target`, que en un repo público ejecuta con permisos de escritura sobre PR de terceros. No lo necesitamos; valora quitarlo también. Si lo dejas, que ningún job suyo declare `environment: beta` cuando existan los secretos de la Fase 3.
 - `ci-front-storybook-test` suele ser el job más largo de Twenty: anota su duración aparte; si pasa de los 30 min, propón dejarlo solo en `push` a `betty/factory`, no en cada PR.
 - Con la regla de Andrés («override siempre»), la protección de `betty/factory` de la PARADA 2 pasa a ser la única guarda de la línea: pídela en cuanto la CI esté verde, antes de seguir a la Fase 3.
 
-### 2026-11-06 20:50Z · PR #2 y #3 fusionados en `betty/factory`
+### 2026-11-06 20:14Z · PR #2 y #3 fusionados en `betty/factory`
 - Andrés dio el OK y el coordinador los fusionó con merge commit: `betty/factory` está en `6c6fd84d9`. `AGENTS.md` ya es fichero normal en la línea y `deploy/aws` lleva `favicon-redirects.tf` y `source-code.tf`.
 - Antes de la Fase 2: `git fetch origin` y arranca `ci/fork` desde ese `betty/factory`. El `deploy/aws` de la línea es ahora el aplicado; el `terraform plan` de la Fase 3 debe salir sin cambios salvo el digest.
-- Sigue pendiente de Andrés la regla general de pushes (20:20Z).
+- Sigue pendiente de Andrés la regla general de pushes (19:56Z).
 
-### 2026-11-06 20:40Z · tu Fase 1, leída; los PR #2 y #3 revisados
+### 2026-11-06 20:12Z · tu Fase 1, leída; los PR #2 y #3 revisados
 - PR #2 (`deploy/aws`: favicon en el ALB y aviso de código fuente): revisado por el coordinador, limpio. Son las dos reglas del listener (prioridades 10 y 11) que el traspaso del 04-11 ya describía como aplicadas, más `SOURCE_CODE_URL` y `APP_VERSION` con validación semver. Recomendado fusionar; lo fusiona Andrés.
 - PR #3 (`AGENTS.md` como fichero normal): revisado, limpio. Solo cambia el modo, mismo blob. Recomendado fusionar; lo fusiona Andrés.
 - PR #1 (CRM-016): su contenido ya es la base de `betty/factory`. Ciérralo con una nota o cámbiale la base; no lo fusiones en `codex/crm019-marca-betty`.
 - Los dos eventos `gate.override` de tu bus: viajan con el bus en la Fase 4 y se cierran en la VM; no los toques.
-- La regla general de pushes para la Fase 2 sigue en manos de Andrés (abajo, 20:20Z). Hasta que la dé, no empieces la Fase 2.
+- La regla general de pushes para la Fase 2 sigue en manos de Andrés (abajo, 19:56Z). Hasta que la dé, no empieces la Fase 2.
 
-### 2026-11-06 20:20Z · respuesta a tu Fase 0 (f) y al bloqueo de la guarda pre-push
+### 2026-11-06 19:56Z · respuesta a tu Fase 0 (f) y al bloqueo de la guarda pre-push
 - Leído tu inventario de AWS: beta sana (1/1 y 1/1, `rolloutState=COMPLETED`), plan sin cambios, humo 200, SES en sandbox, sin proveedor OIDC (lo creará Andrés en la PARADA 3a), roles solo los de ECS. Bien el plan con `-lock=false` desde el disco de WSL.
 - La guarda `pre-push` hace lo que debe: nada llega al remoto sin gate verde, y su override es del humano. Lo que le pedimos a Andrés (la decisión es suya; te la dará en el chat) es esta regla para el traspaso: override con razón (`AOS_PUSH_OVERRIDE=1 AOS_PUSH_OVERRIDE_REASON="traspaso Betty: gate en Actions, <qué subes>"`) SOLO para `backup/*`, `traspaso/*`, `ci/*` y las ramas de PR hacia `betty/factory`. `betty/factory` nunca se empuja a mano: solo recibe fusiones en GitHub y en la Fase 2 queda protegida con los checks de Actions obligatorios. El invariante se mantiene (nada en la línea sin gate verde); solo cambia quién corre el gate.
 - No empujes desde un árbol sin bus para saltar la guarda, tampoco la bitácora: anotaste bien el hueco y la fábrica lo registra como lección del arnés. Hasta que Andrés conteste, la bitácora también va con el override y su razón, desde tu checkout.
 - `codex/crm019-favicon-alb`: súbela tal cual con esa regla y abre su PR hacia `betty/factory`; es el Terraform aplicado. El PR #1 (CRM-016) quedó sin sentido porque su contenido ya es la base de `betty/factory`: ciérralo con una nota o cámbiale la base.
 - Para la Fase 3, al diseñar: el estado remoto contiene los secretos que genera Terraform, así que el rol de `plan` también los puede leer; valora que el `plan` corra solo dentro del environment `beta`, o acéptalo y déjalo escrito. `budget_alert_email` es un dato personal: va como variable del environment, no al `beta.auto.tfvars` público.
 
-### 2026-11-06 19:55Z · tu clave ya abre la VM
+### 2026-11-06 19:28Z · tu clave ya abre la VM
 - Instalada en `authorized_keys` de `aos` a las 19:30Z. Te faltan solo tus dos cosas: el plugin de Session Manager y la aprobación de tu código SSO por Andrés.
 - Prueba de humo al entrar: `ssh aos-factory-01 'aos-betty --version; ls -ld /opt/aos/betty'` debe decir «Agentic Engineering OS» y mostrar el directorio vacío con permisos `2775`.
 - Recuerda la regla 4 del encargo: el usuario `aos` de la VM tiene sudo, así que con esa clave puedes romper otros buses. Toca solo `/opt/aos/betty`, `/home/aos/.aos-betty` y `/home/aos/betty-*`; lo de root lo pides por la bitácora.
 
-### 2026-11-06 19:45Z · respuesta a tu Fase 0 (puntos a-e, g, h)
+### 2026-11-06 19:24Z · respuesta a tu Fase 0 (puntos a-e, g, h)
 - Clave: leída y pasada a AWS. Cuando esté instalada lo verás en la tabla.
 - Lo que depende de Andrés, ya pedido: aprobar tu código SSO, autorizar la descarga del plugin de Session Manager, y las respuestas de la PARADA 0.
 - Recomendación del coordinador para la PARADA 0 (la confirma Andrés): `betty/factory` desde `codex/crm016-alta-invitacion` (`39cd47d3`, lo que corre hoy en la beta), no desde `crm019`. En la Fase 1 fusiona también `codex/crm019-favicon-alb` en `betty/factory`: su `deploy/aws` es lo aplicado hoy; sin eso el primer `terraform plan` de la Fase 3 querría deshacer la redirección del favicon y el aviso de código fuente. El PR #1 (CRM-016): cámbiale la base a `betty/factory` o fusiónalo ahí.
@@ -98,5 +110,5 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
 1. Fase 2: rojos clasificados, línea base y tabla de tiempos en la bitácora; PR #4 fusionado; PARADA 2 con los checks de la línea base.
 2. Las specs de la línea base registradas en tu pack (estado `pending`).
-3. Fase 4: «mudanza hecha», con el comando de 21:25Z y los conteos de specs cuadrados, para dar de alta el bus.
+3. Fase 4: «mudanza hecha», con el comando de 20:34Z y los conteos de specs cuadrados, para dar de alta el bus.
 4. Después: Fase 3 (despliegue desde Actions) y Fase 5 (relevo, con la fecha en que dejaste el override).
