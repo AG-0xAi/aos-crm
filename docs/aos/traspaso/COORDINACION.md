@@ -24,6 +24,19 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 23:34Z · PR #4 fusionado; DECISIÓN DE ANDRÉS: CRM-021 va a la VM
+- **PR #4 fusionado** por el coordinador con el OK de Andrés, a las 23:32Z: merge commit fijado a la cabeza revisada `59094aae`. `betty/factory` está en `da70ec1b`; la rama `ci/fork` sigue en el repo. CRM-020 aún no había abierto su PR, así que el suyo correrá ya la CI nueva.
+- Hiciste bien en no rodear `aos-merge-guard`. Regla para lo que queda: tus PRs los fusiona Andrés desde GitHub o el coordinador con su OK. Tú pides la fusión en la bitácora y no lo intentas.
+- **Tu comprobación ya está hecha:** el push del merge lanzó solo las seis CIs conservadas (UI, Server, Front, Utils Test, Shared, Emails) y ninguno de los tres rojos de los workflows de la base. Anota en la bitácora cómo terminan; se esperan los rojos de la línea base y nada más.
+- **CRM-021 va a la VM.** No lo despaches en este PC. Queda `pending` en tu pack y viaja con la mudanza; será el primer despacho del bus de la VM, cuando tenga alta y workers encendidos y el PR de CRM-020 esté fusionado.
+- **Orden desde aquí:**
+  1. CRM-020 termina en este PC: verify del arnés, aceptación y publicación como PR contra `betty/factory`. Pide la fusión en la bitácora.
+  2. Con CRM-020 aceptado y sin runs en vuelo: mudanza (Fase 4) con el comando de 20:34Z y el script `d1dcde96d`. Si sale con 7 u 8, paras y avisas.
+  3. «Mudanza hecha» en la bitácora, con los conteos de specs por estado de los dos lados.
+  4. Después: alta del bus, medición del gate en la VM y, con OK de Andrés, workers encendidos.
+- La PARADA 2 (proteger `betty/factory`) sigue en manos de Andrés; no es tarea tuya. Con #4 dentro, el coordinador propondrá los checks obligatorios cuando termine esta primera CI del push.
+
+
 ### 2026-11-06 22:00Z · CRM-020 en vuelo: déjalo terminar; CRM-021 espera a Andrés
 - Leído: desglosaste la spec en CRM-020 y CRM-021 y despachaste CRM-020 en este PC con el «Sí, redáctala» de Andrés. Esa respuesta choca con su decisión de las 20:41Z (abajo): arreglos hechos por los workers de la VM y mudanza antes. El coordinador se lo está preguntando; hasta que conteste:
   - **CRM-020: déjalo terminar.** No lo pares ni lo mates. Si se cuelga, rescátalo con `aos salvage`. Ojo: el gate de este bus son los 32 comandos (unos 88 min) y su typecheck colgó WSL hoy a las 15:40; vigila memoria y no lances nada más pesado en paralelo.
@@ -139,7 +152,8 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
 - Gate de los despachos: el arnés ya tiene la lección y la spec para que el encargo derivado tome el gate del `verify.json` del proyecto; hasta que esté en `main`, cada despacho de Betty lleva su gate por `--body-file`.
 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
-1. Fase 2: rojos clasificados, línea base y tabla de tiempos en la bitácora; PR #4 fusionado; PARADA 2 con los checks de la línea base.
-2. Las specs de la línea base registradas en tu pack (estado `pending`).
-3. Fase 4: «mudanza hecha», con el comando de 20:34Z y los conteos de specs cuadrados, para dar de alta el bus.
-4. Después: Fase 3 (despliegue desde Actions) y Fase 5 (relevo, con la fecha en que dejaste el override).
+1. Fase 2: cómo terminan las seis CIs del push de `da70ec1b` (PR #4 ya fusionado). La PARADA 2 la deciden Andrés y el coordinador.
+2. Specs de la línea base en tu pack: CRM-021 en `pending`, sin despachar en este PC.
+3. CRM-020 aceptado y publicado como PR contra `betty/factory`, con la petición de fusión en la bitácora.
+4. Fase 4: «mudanza hecha», con el comando de 20:34Z y los conteos de specs cuadrados, para dar de alta el bus.
+5. Después: Fase 3 (despliegue desde Actions) y Fase 5 (relevo, con la fecha en que dejaste el override).
