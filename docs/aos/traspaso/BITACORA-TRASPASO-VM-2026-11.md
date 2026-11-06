@@ -394,3 +394,20 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Con #4 dentro: comprobar que el push a `betty/factory` lanza solo los seis CIs conservados y que desaparecen los tres rojos de workflows de la base.
 - Retorno de CRM-020 cuando el worker termine.
+
+## 2026-11-07 · Fase 2 · PR #4 fusionado: CI propia en `betty/factory`
+
+**Hecho**
+- Andrés fusiona el PR #4 desde GitHub (merge commit `da70ec1b`, 23:32 UTC del 06/11).
+
+**Verificado (cómo)**
+- `gh pr view 4`: `MERGED`. `git ls-remote`: `betty/factory` en `da70ec1b`, padres `6c6fd84d` y `59094aae`. `ci/fork` sigue en el remoto.
+- `git diff 59094aae da70ec1b -- .github nx.json` vacío: la CI fusionada es exactamente la revisada.
+- `.github/workflows/` en `betty/factory`: los diez ficheros conservados y ninguno más.
+- Runs del push sobre `da70ec1b`: CI Server, CI Front, CI UI, CI Shared, CI Emails y CI Utils Test. Ninguno de los workflows retirados (`dispatch`, `trigger-preview`, `Sensitive paths approval`).
+
+**Bloqueo o pido**
+- Nada. Este primer push saldrá rojo por los rojos de código ya clasificados (CRM-020 y CRM-021).
+
+**Siguiente**
+- Retorno de CRM-020: el worker sigue vivo, con dos commits en `crm020/ci-twenty-convenciones` (R2).
