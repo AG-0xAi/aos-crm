@@ -2,16 +2,16 @@ name: CI Front
 
 on:
   pull_request:
-  merge_group:
+    branches: [betty/factory]
   push:
-    branches: [main]
+    branches: [betty/factory]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/betty/factory' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 env:
   # restore-cache action adds 'v4-' prefix and '-<branch>-<sha>' suffix to the key
@@ -25,6 +25,10 @@ jobs:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/workflows/ci-front.yaml
+        .github/workflows/ci-front-storybook-test.yaml
+        .github/actions/**
+        nx.json
         package.json
         yarn.lock
         packages/twenty-front/**
@@ -41,7 +45,7 @@ jobs:
       (github.event_name == 'push' ||
       needs.changed-files-check.outputs.any_changed == 'true')
     timeout-minutes: 30
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-latest
     env:
       REACT_APP_SERVER_BASE_URL: http://localhost:3000
     steps:
@@ -186,7 +190,7 @@ jobs:
     needs: changed-files-check
     if: needs.changed-files-check.outputs.any_changed == 'true'
     timeout-minutes: 30
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: "--max-old-space-size=10240"
       ANALYZE: "true"

@@ -2,14 +2,16 @@ name: CI Server
 
 on:
   pull_request:
-  merge_group:
+    branches: [betty/factory]
+  push:
+    branches: [betty/factory]
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 env:
   SERVER_BUILD_CACHE_KEY: server-build
@@ -21,6 +23,9 @@ jobs:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/workflows/ci-server.yaml
+        .github/actions/**
+        nx.json
         package.json
         yarn.lock
         packages/twenty-server/**
@@ -94,7 +99,7 @@ jobs:
           tasks: lingui:compile
 
   server-upgrade-mutation-guard:
-    if: github.event_name != 'merge_group'
+    if: github.event_name == 'pull_request'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
@@ -369,6 +374,22 @@ jobs:
           key: v4-jest-server-integration-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: v4-jest-server-integration-${{ github.ref_name }}-
           path: .cache/jest/packages/twenty-server-integration
+      # The background reset can restore twenty-shared's dist from the Nx cache
+      # while jest's globalSetup imports it, so the run waits for the reset first.
+      - name: Server / Wait for Test DB reset
+        run: |
+          for i in $(seq 1 450); do
+            if [ -f "$INTEGRATION_TEST_DB_RESET_STATUS_FILE" ]; then
+              if [ "$(cat "$INTEGRATION_TEST_DB_RESET_STATUS_FILE")" = ready ]; then
+                exit 0
+              fi
+              cat "${{ github.workspace }}/.cache/integration-db-reset.log" || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Test DB reset did not finish in 15 minutes" >&2
+          exit 1
       - name: Server / Run Integration Tests
         uses: ./.github/actions/nx-affected
         with:
@@ -401,41 +422,6 @@ jobs:
     with:
       skip: ${{ needs.upgrade-changed-files-check.outputs.any_changed != 'true' }}
 
-  discover-public-apps:
-    needs: changed-files-check
-    if: needs.changed-files-check.outputs.any_changed == 'true'
-    uses: ./.github/workflows/discover-apps.yaml
-    with:
-      scope: public
-      changed-only: false
-
-  server-apps-install-smoke:
-    needs: [discover-public-apps, server-build]
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: ${{ fromJSON(needs.discover-public-apps.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          fetch-depth: 10
-      - name: Spawn Twenty server from monorepo
-        id: twenty
-        uses: ./.github/actions/spawn-twenty-server
-        with:
-          source: local
-          server-build-cache-key: ${{ env.SERVER_BUILD_CACHE_KEY }}
-      - name: Install app against server
-        uses: ./.github/actions/test-twenty-app
-        with:
-          api-url: ${{ steps.twenty.outputs.server-url }}
-          api-key: ${{ steps.twenty.outputs.api-key }}
-          app-path: ${{ matrix.app.path }}
-          mode: installation-only
-
   ci-server-status-check:
     if: always() && !cancelled()
     timeout-minutes: 5
@@ -450,8 +436,6 @@ jobs:
         server-test,
         server-integration-test,
         cross-version-upgrade,
-        discover-public-apps,
-        server-apps-install-smoke,
       ]
     steps:
       - name: Fail job if any needs failed

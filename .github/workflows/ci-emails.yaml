@@ -6,19 +6,23 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - betty/factory
 
   pull_request:
+    branches:
+      - betty/factory
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 jobs:
   changed-files-check:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/actions/**
+        nx.json
         package.json
         yarn.lock
         .github/workflows/ci-emails.yaml

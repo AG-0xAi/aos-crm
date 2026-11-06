@@ -287,7 +287,7 @@
     }
   },
   "useInferencePlugins": false,
-  "defaultBase": "main",
+  "defaultBase": "betty/factory",
   "tui": {
     "enabled": false
   },
