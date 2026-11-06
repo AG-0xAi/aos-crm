@@ -374,6 +374,22 @@ jobs:
           key: v4-jest-server-integration-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: v4-jest-server-integration-${{ github.ref_name }}-
           path: .cache/jest/packages/twenty-server-integration
+      # The background reset can restore twenty-shared's dist from the Nx cache
+      # while jest's globalSetup imports it, so the run waits for the reset first.
+      - name: Server / Wait for Test DB reset
+        run: |
+          for i in $(seq 1 450); do
+            if [ -f "$INTEGRATION_TEST_DB_RESET_STATUS_FILE" ]; then
+              if [ "$(cat "$INTEGRATION_TEST_DB_RESET_STATUS_FILE")" = ready ]; then
+                exit 0
+              fi
+              cat "${{ github.workspace }}/.cache/integration-db-reset.log" || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Test DB reset did not finish in 15 minutes" >&2
+          exit 1
       - name: Server / Run Integration Tests
         uses: ./.github/actions/nx-affected
         with:
