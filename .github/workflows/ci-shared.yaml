@@ -19,6 +19,9 @@ jobs:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/workflows/ci-shared.yaml
+        .github/actions/**
+        nx.json
         packages/twenty-shared/**
         packages/twenty-oxlint-rules/**
   shared-test:

@@ -21,6 +21,8 @@ jobs:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/actions/**
+        nx.json
         package.json
         yarn.lock
         .github/workflows/ci-emails.yaml

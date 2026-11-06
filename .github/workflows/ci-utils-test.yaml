@@ -21,6 +21,9 @@ jobs:
     uses: ./.github/workflows/changed-files.yaml
     with:
       files: |
+        .github/workflows/ci-utils-test.yaml
+        .github/actions/**
+        nx.json
         packages/twenty-utils/**
   utils-test:
     needs: changed-files-check
