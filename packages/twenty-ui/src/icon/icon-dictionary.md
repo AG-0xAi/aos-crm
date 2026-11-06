@@ -82,7 +82,7 @@ import { IconHierarchy } from 'twenty-ui/icon';
 | Workflows | `IconSettingsAutomation` | `settings-automation` | Representing workflows or the workflow system. | Representing one workflow action or an AI tool. | workflow, automation flow, workflow builder |
 | Tools (AI + Workflows) | `IconTool` | `tool` | Representing tools available to AI agents or workflows. | Representing application settings or developer skills. | tool, AI tool, workflow tool, callable capability |
 | Skill | `IconBook` | `book` | Representing an AI skill or reusable instruction set. | Representing documentation in general or an executable tool. | skill, agent instructions, knowledge guide |
-| Serverless functions | `IconBrandTypescript` | `brand-typescript` | Representing Twenty serverless or logic functions. | Representing generic source code or non-TypeScript tools. | serverless function, logic function, TypeScript function |
+| Serverless functions | `IconBrandTypescript` | `brand-typescript` | Representing Betty serverless or logic functions. | Representing generic source code or non-TypeScript tools. | serverless function, logic function, TypeScript function |
 | Execution Logs | `IconTerminal` | `terminal` | Representing runtime output from workflows, agents, or code. | Representing audit trails, event history, or source code. | execution logs, runtime logs, workflow logs, agent logs |
 
 ## AI
@@ -100,7 +100,7 @@ import { IconHierarchy } from 'twenty-ui/icon';
 | --- | --- | --- | --- | --- | --- |
 | API | `IconApi` | `api` | Representing APIs, API access, or API configuration. | Representing MCP, webhooks, or external-service integrations. | API, REST, GraphQL, API key |
 | Developers | `IconCode` | `code` | Representing the Developers settings area for API keys, webhooks, and apps. | Representing an API, webhook, or app individually, or generic source code. | developers, developer settings, API keys and webhooks, app development |
-| CLI | `IconTerminal2` | `terminal-2` | Representing the Twenty command line tool or its commands. | Representing execution logs, runtime output, or the command menu. | CLI, command line, terminal, twenty command |
+| CLI | `IconTerminal2` | `terminal-2` | Representing the Betty command line tool or its commands. | Representing execution logs, runtime output, or the command menu. | CLI, command line, terminal, twenty command |
 | API Key | `IconKey` | `key` | Representing an API key or API credential. | Representing APIs generally, security settings, or permissions. | API key, API credential, access token, secret key |
 | Webhook | `IconWebhook` | `webhook` | Representing webhooks, webhook endpoints, or webhook events. | Representing a generic API, integration, or workflow action. | webhook, event callback, HTTP event, webhook endpoint |
 | Integration / Connection | `IconPlug` | `plug` | Representing an integration or connection to an external service. | Representing an app, API, MCP, or connected email account. | integration, connection, external service, provider |
@@ -108,7 +108,7 @@ import { IconHierarchy } from 'twenty-ui/icon';
 | Marketplace | `IconShoppingBag` | `shopping-bag` | Representing the app marketplace or marketplace catalog. | Representing an installed app or the action of installing one. | marketplace, app catalog, browse apps, marketplace apps |
 | Application Version | `IconVersions` | `versions` | Representing application version information. | Representing a Git branch, deployment status, or update action. | application version, app version, latest version, version |
 | MCP | `IconSparkles` | `sparkles` | Representing MCP integrations, servers, or capabilities. | Representing generic AI features, APIs, or non-MCP integrations. | MCP, Model Context Protocol, AI connection |
-| Admin Panel | `IconServer` | `server` | Representing the Twenty admin panel or instance-level administration. | Representing infrastructure health, server status, or workspace settings. | admin panel, instance administration, system administration, admin settings |
+| Admin Panel | `IconServer` | `server` | Representing the Betty admin panel or instance-level administration. | Representing infrastructure health, server status, or workspace settings. | admin panel, instance administration, system administration, admin settings |
 
 ## General
 
@@ -118,7 +118,7 @@ import { IconHierarchy } from 'twenty-ui/icon';
 | Files | `IconFiles` | `files` | Representing a collection of files or a files section. | Representing one file, an attachment, or an upload action. | files, file collection, documents, file section |
 | Attachments | `IconPaperclip` | `paperclip` | Representing attachments or an attachment relationship. | Representing a general file collection, import, or upload action. | attachment, attachments, attached file, record attachment |
 | Dictation | `IconMicrophone` | `microphone` | Representing voice input or a dictation control. | Representing audio playback, a call recording, or a phone number. | dictation, voice input, speech to text, microphone |
-| App | `IconApps` | `apps` | Representing an application or the apps platform. | Representing a widget, integration, or one navigation item. | app, application, Twenty app |
+| App | `IconApps` | `apps` | Representing an application or the apps platform. | Representing a widget, integration, or one navigation item. | app, application, Betty app |
 | Navigation Sidebar | `IconLayoutSidebar` | `layout-sidebar` | Representing the application navigation sidebar. | Representing a destination inside the navigation menu. | navigation sidebar, sidebar, left navigation |
 | Iframe | `IconFrame` | `frame` | Representing an iframe or embedded external page. | Representing a native page layout or browser window. | iframe, embedded page, web frame |
 | Agents | `IconLego` | `lego` | Representing AI agents or the agents platform. | Representing MCP, tools, or generic automation logic. | agent, AI agent, agent configuration |
