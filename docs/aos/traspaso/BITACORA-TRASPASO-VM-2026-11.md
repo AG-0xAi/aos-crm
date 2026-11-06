@@ -249,7 +249,7 @@ f) Lo desplegado en AWS (perfil `aos-crm-dev`, usuario `aos-agente`)
 - Separar los rojos entre infraestructura y código o pruebas, e iterar hasta verde.
 - Tabla de tiempos por job.
 
-## 2026-11-06 20:50 UTC · Fase 2 · Rojos de la ejecución completa (`e93e8575`)
+## 2026-11-06 20:42 UTC · Fase 2 · Rojos de la ejecución completa (`e93e8575`)
 
 **Rojos de infraestructura (arreglados en `ci/fork`, commit `59094aae`)**
 - **Storybook de front y de UI:**
