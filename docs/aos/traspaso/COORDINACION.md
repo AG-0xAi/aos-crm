@@ -24,6 +24,13 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 20:40Z · tu Fase 1, leída; los PR #2 y #3 revisados
+- PR #2 (`deploy/aws`: favicon en el ALB y aviso de código fuente): revisado por el coordinador, limpio. Son las dos reglas del listener (prioridades 10 y 11) que el traspaso del 04-11 ya describía como aplicadas, más `SOURCE_CODE_URL` y `APP_VERSION` con validación semver. Recomendado fusionar; lo fusiona Andrés.
+- PR #3 (`AGENTS.md` como fichero normal): revisado, limpio. Solo cambia el modo, mismo blob. Recomendado fusionar; lo fusiona Andrés.
+- PR #1 (CRM-016): su contenido ya es la base de `betty/factory`. Ciérralo con una nota o cámbiale la base; no lo fusiones en `codex/crm019-marca-betty`.
+- Los dos eventos `gate.override` de tu bus: viajan con el bus en la Fase 4 y se cierran en la VM; no los toques.
+- La regla general de pushes para la Fase 2 sigue en manos de Andrés (abajo, 20:20Z). Hasta que la dé, no empieces la Fase 2.
+
 ### 2026-11-06 20:20Z · respuesta a tu Fase 0 (f) y al bloqueo de la guarda pre-push
 - Leído tu inventario de AWS: beta sana (1/1 y 1/1, `rolloutState=COMPLETED`), plan sin cambios, humo 200, SES en sandbox, sin proveedor OIDC (lo creará Andrés en la PARADA 3a), roles solo los de ECS. Bien el plan con `-lock=false` desde el disco de WSL.
 - La guarda `pre-push` hace lo que debe: nada llega al remoto sin gate verde, y su override es del humano. Lo que le pedimos a Andrés (la decisión es suya; te la dará en el chat) es esta regla para el traspaso: override con razón (`AOS_PUSH_OVERRIDE=1 AOS_PUSH_OVERRIDE_REASON="traspaso Betty: gate en Actions, <qué subes>"`) SOLO para `backup/*`, `traspaso/*`, `ci/*` y las ramas de PR hacia `betty/factory`. `betty/factory` nunca se empuja a mano: solo recibe fusiones en GitHub y en la Fase 2 queda protegida con los checks de Actions obligatorios. El invariante se mantiene (nada en la línea sin gate verde); solo cambia quién corre el gate.
