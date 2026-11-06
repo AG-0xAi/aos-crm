@@ -287,3 +287,69 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 - Leer la ejecución sobre `59094aae`.
 - Tabla de tiempos.
 - Proponer la spec a Andrés.
+
+## 2026-11-06 21:25 UTC · Fase 2 · Ejecución sobre `59094aae`: clasificación completa y tiempos
+
+**Hecho**
+- Con los arreglos de infraestructura todas las suites corren hasta el final: Playwright instala, y los shards de integración esperan al reset y ejecutan sus tests.
+- Línea base: los checks del propio Twenty sobre el mismo commit `twenty/v2.51.0` (`15e4826d`), leídos con `gh api repos/twentyhq/twenty/commits/<sha>/check-runs`. 320 checks; solo fallaron `ui-sb-test` y su status check, por una única historia: `DatePicker > Navigation Unmount`.
+
+**Clasificación final de los rojos**
+- Infraestructura, arreglada: Playwright en Ubuntu 26.04 y la carrera del reset en integración.
+- Infraestructura, se va al fusionar #4: los tres `pull_request_target` de la base.
+- Preexistente en Twenty (línea base roja), no nuestro: `twenty-ui` storybook `DatePicker.interactions.stories.tsx > Navigation Unmount`.
+- Código nuestro (hallazgos reales, NO tocados):
+
+| CI / job | Fichero o prueba | Qué falla | Origen |
+| --- | --- | --- | --- |
+| emails lint, server lint | `twenty-emails/src/emails/sign-up-invite-link.email.tsx:44` | cadena sin marcar para traducción | CRM-016 |
+| emails lint, server lint | `twenty-emails/src/components/Logo.tsx:6` | cadena sin marcar para traducción | marca Betty |
+| front lint | `twenty-front/src/pages/settings/legal/SettingsLegalDpaNew.tsx:96` | cadena sin marcar para traducción | marca Betty |
+| shared lint | `twenty-shared/src/constants/Brand.ts` | regla `max-consts-per-file` (12 constantes en un fichero) | marca Betty |
+| server-validation | `twenty-shared/src/constants/index.ts` | el generador de barriles reordena las exportaciones de `Brand.ts` (no hay migraciones pendientes) | marca Betty |
+| ui test, shared test | `twenty-ui/src/icon/__tests__/TwentyIconDictionary.test.ts` | Markdown del diccionario de iconos desincronizado | marca Betty |
+| ui storybook (13 historias) | `LightButton`, `LightIconButton`, `MainButton`, `ReactionButton`, `Badge`, `Skeleton`, `Select.portals`, `Text`, `ThemeProvider` | colores del tema en mayúsculas (`#35362E` frente a `#35362e`) y tipografía | marca Betty |
+| front test | `getTimelineActivityAuthorFullName.test.ts` | espera «Twenty» | marca Betty |
+| front test | `SettingsAvailableApplicationDetails.test.tsx` (2) | textos con «Twenty» | marca Betty |
+| front test | `useSignInUp.test.tsx` | `signUp` con un cuarto argumento (la invitación) | CRM-016 |
+| front storybook | `OnboardingSkipDialogAvatars.stories.tsx > Default` | no encuentra `role="presentation"` | marca Betty |
+| front storybook | `NavigationMenuItemEditable.stories.tsx > Preview Insertion` | busca el valor «Twenty» | marca Betty |
+| server unit | `get-record-image-identifier.util.spec.ts` (2) | espera la URL de `twenty-icons.com` | marca Betty (`getLogoUrlFromDomainName`) |
+| server integration | `sign-up-with-pending-invitation.integration-spec.ts` | espera el token de invitación para un correo sin verificar; CRM-016 dejó de entregarlo a propósito | CRM-016 |
+| server integration | `endpoint-permission-declarations.integration-spec.ts` | instantánea sin los 4 endpoints de invitaciones (todos con `AdminPanelGuard`) | CRM-016 |
+| server integration | `mcp-tool-catalog.integration-spec.ts` (2) | espera `search_help_center`, retirado a propósito por privacidad | CRM-007 |
+| server integration | `mcp.controller.integration-spec.ts` | «Betty MCP Server» frente a «Twenty MCP Server» | marca Betty |
+| server integration | `mcp-navigation-menu-item-tools.integration-spec.ts` | descripción con «Betty» | marca Betty |
+| server integration | `failing-app-installation-workspace-version`, `failing-upload-application-server-version` | mensajes con «Betty server» | marca Betty |
+
+- Sin medir todavía: el lint y el typecheck propios de `twenty-server`. `server-lint-typecheck` corta con `--nxBail` en el lint de `twenty-emails`.
+
+**Tiempos (ejecución completa, runners `ubuntu-latest` de 4 núcleos; storybook en `ubuntu-24.04`)**
+
+| CI | Jobs | Más lento | Minutos de runner |
+| --- | ---: | --- | ---: |
+| CI Server | 26 | `server-integration-test` 989 s (16 shards) | 243 |
+| CI Front | 23 | `front-sb-test-modules (7)` 686 s | 172 |
+| CI UI | 8 | `ui-sb-test` 654 s | 31 |
+| CI Shared | 4 | `shared-test (test)` 296 s | 14 |
+| CI Emails | 3 | `emails-test` 262 s | 5 |
+| CI Utils Test | 3 | `utils-test` 210 s | 4 |
+| **Total** | 67 | reloj: 35 min (20:42 a 21:17 UTC) | **531** |
+
+- Por shard: integración del servidor 16 (máximo 989 s); unit del servidor 4 (máximo 424 s); front test 3; storybook del front 8 de módulos, 4 de páginas y 4 de rendimiento.
+- La instalación de dependencias tarda unos 3,5 min por job con la caché fría.
+- Repositorio público: los minutos de los runners estándar no se cobran.
+
+**Bloqueo o pido**
+- `betty/factory` no puede quedar en verde sin cambiar código. Propongo una spec (track `CRM-`, por el bus) que:
+  - alinee las pruebas, instantáneas y textos de Twenty con la marca Betty y con los cambios intencionales de CRM-016 y CRM-007;
+  - marque las tres cadenas para traducción;
+  - parta `Brand.ts` según la regla de Twenty;
+  - regenere los barriles y el Markdown del diccionario de iconos;
+  - y resuelva qué hacer con el rojo heredado de Twenty (`DatePicker`).
+- Fusionar #4 (Andrés): solo toca CI y quita los tres rojos de la base.
+- PARADA 2 (protección de `betty/factory`) mejor tras el verde: con checks obligatorios en rojo no se podría fusionar nada, tampoco la spec que los arregla.
+
+**Siguiente**
+- Con el OK de Andrés: redactar y registrar la spec, despacharla y re-ejecutar hasta el verde.
+- Después, la protección.
