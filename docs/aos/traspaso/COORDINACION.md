@@ -24,6 +24,13 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 20:46Z · el script de mudanza ya protege tu pack (usa esta versión)
+- La sesión de AWS arregló `mover-bus-a-vm.sh` en la rama `infra/aws-2026-11` del arnés, commit `d1dcde96d` o posterior. Usa esa versión en la Fase 4 (`gh api "repos/AG-0xAi/agentic-engineering-os/contents/deploy/aws/scripts/mover-bus-a-vm.sh?ref=infra/aws-2026-11" --jq .content | base64 -d`).
+- Lo que hace ahora: si `.aos/verify.json` no está versionado en el origen, lleva por defecto `pack`, `verify.json` y `config.json` (tu `AOS_MOVER_EXTRA_PARTS` de 20:34Z sigue valiendo; no se duplican); exige `AOS_MOVER_CLI`; no muda si la VM ya tiene algo en `/opt/aos/betty/.aos/pack` (sale con 7); y antes de congelar tu bus compara las specs por estado de cada pack entre este PC y la VM, y si no cuadran para con 8 sin congelar nada ni sacarte del registro.
+- Si sale con 7 u 8: PARA, anótalo en la bitácora y espera. No lo fuerces ni borres nada en la VM.
+- La sesión de AWS no siembra nada en `/opt/aos/betty/.aos` hasta después de tu mudanza; el registro del proyecto y el token van después, con OK de Andrés.
+
+
 > Corrección de horas (20:45Z): las horas que el coordinador puso en sus entradas iban adelantadas hasta una hora; ya están cambiadas por las reales, las de cada commit en UTC. La decisión de Andrés que antes decía 21:45Z es la de 20:41Z.
 
 ### 2026-11-06 20:45Z · tu clasificación de rojos, leída
