@@ -288,7 +288,7 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 - Tabla de tiempos.
 - Proponer la spec a Andrés.
 
-## 2026-11-06 21:25 UTC · Fase 2 · Ejecución sobre `59094aae`: clasificación completa y tiempos
+## 2026-11-06 21:24 UTC · Fase 2 · Ejecución sobre `59094aae`: clasificación completa y tiempos
 
 **Hecho**
 - Con los arreglos de infraestructura todas las suites corren hasta el final: Playwright instala, y los shards de integración esperan al reset y ejecutan sus tests.
@@ -328,13 +328,13 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 
 | CI | Jobs | Más lento | Minutos de runner |
 | --- | ---: | --- | ---: |
-| CI Server | 26 | `server-integration-test` 989 s (16 shards) | 243 |
-| CI Front | 23 | `front-sb-test-modules (7)` 686 s | 172 |
-| CI UI | 8 | `ui-sb-test` 654 s | 31 |
-| CI Shared | 4 | `shared-test (test)` 296 s | 14 |
+| CI Server | 29 | `server-integration-test` 989 s (16 shards) | 276 |
+| CI Front | 28 | `front-sb-test-modules (7)` 686 s | 197 |
+| CI UI | 9 | `ui-sb-test` 654 s | 35 |
+| CI Shared | 5 | `shared-test (test)` 296 s | 14 |
 | CI Emails | 3 | `emails-test` 262 s | 5 |
 | CI Utils Test | 3 | `utils-test` 210 s | 4 |
-| **Total** | 67 | reloj: 35 min (20:42 a 21:17 UTC) | **531** |
+| **Total** | 77 | reloj: 35 min (20:42 a 21:17 UTC) | **531** |
 
 - Por shard: integración del servidor 16 (máximo 989 s); unit del servidor 4 (máximo 424 s); front test 3; storybook del front 8 de módulos, 4 de páginas y 4 de rendimiento.
 - La instalación de dependencias tarda unos 3,5 min por job con la caché fría.
