@@ -24,6 +24,18 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 21:25Z · CORRECCIÓN para la mudanza (Fase 4): tu pack no viajaba
+- El script de mudanza solo lleva `events`, `state`, `inbox`, `outbox`, `tracks`, `budget` y `specs`. En Betty `.aos/` entero está fuera de git (el fork no tiene ni `.aos/` ni `packs/`), así que tu pack canónico `.aos/pack/aos-crm/` (`specs.json`, contratos y `changes/`), tu `verify.json` y tu `config.json` no llegarían a la VM ni con el clon ni con la mudanza. El comando correcto de la Fase 4 es:
+  ```
+  AOS_MOVER_EXTRA_PARTS="pack verify.json config.json docs onboarding" \
+  AOS_MOVER_AOS_HOME=/home/aos/.aos-betty AOS_MOVER_CLI=/opt/aos/cli \
+    bash mover-bus-a-vm.sh "<checkout de Betty en este PC>" aos-factory-01 /opt/aos/betty
+  ```
+  Si añades `runs reports artifacts` (encargo, Fase 4 punto 5), van en la misma variable. Antes, `ls .aos` en tu checkout: si ves otra carpeta con estado propio del proyecto (no `worktrees`, `tmp`, `receipts`, `health-*`, `logs`), añádela y anótalo.
+- Trampa: el script extrae con `--keep-newer-files`. Si antes de la mudanza algo siembra en la VM un `.aos/pack/aos-crm/specs.json` vacío, ese gana y el tuyo no se extrae. En la VM, dentro de `/opt/aos/betty/.aos/`, crea solo `verify.json` y `config.json` para medir; justo antes de mudar comprueba que `/opt/aos/betty/.aos/pack` NO existe, y si existe PARA y avisa.
+- Verificación tras la mudanza, además de `aos-betty status`: `aos-betty specs list --pack aos-crm` (desde `/opt/aos/betty`) con los mismos conteos por estado que tu Fase 0, y el mismo número de contratos en `.aos/pack/aos-crm/specs/` que en este PC. Si no cuadra, no restaures nada aún: avisa.
+- El registro del proyecto en el bus de la VM (slug `aos-crm`) lo hace la sesión de AWS después de la mudanza, con el token; no lo hagas tú.
+
 ### 2026-11-06 21:05Z · tu Fase 2, leída (poda y primeras ejecuciones)
 - Bien la poda (10 workflows) y el cambio de base a `betty/factory`; los rojos de `pull_request_target` que vienen de la versión vieja de la línea desaparecen al fusionar #4, como dices.
 - Sugerencia, no orden: `ci-utils` (Danger) es el bot de PR de Twenty y corre con `pull_request_target`, que en un repo público ejecuta con permisos de escritura sobre PR de terceros. No lo necesitamos; valora quitarlo también. Si lo dejas, que ningún job suyo declare `environment: beta` cuando existan los secretos de la Fase 3.
