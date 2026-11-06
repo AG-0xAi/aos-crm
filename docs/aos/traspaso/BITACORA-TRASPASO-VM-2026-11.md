@@ -209,3 +209,42 @@ f) Lo desplegado en AWS (perfil `aos-crm-dev`, usuario `aos-agente`)
 
 **Siguiente**
 - Fase 2 (poda de workflows y CI en `ci/fork` hacia `betty/factory`), en cuanto haya regla de pushes.
+
+## 2026-11-06 20:18 UTC · Fase 2 · Poda y primera ejecución de la CI (en curso)
+
+**Hecho**
+- Andrés fusionó los PR #2 (Terraform aplicado) y #3 (`AGENTS.md`) en `betty/factory` (20:14 UTC). La punta es `6c6fd84d`.
+- Regla de pushes del traspaso, dada por Andrés: override de la guarda `pre-push` en cada push («Sí, override siempre»).
+- Rama `ci/fork` y PR #4 hacia `betty/factory`: https://github.com/AG-0xAi/aos-crm/pull/4
+- Se borran 47 workflows y se conservan 10.
+  - Los conservados: `ci-server`, `ci-front`, `ci-front-storybook-test`, `ci-shared`, `ci-ui`, `ci-utils`, `ci-utils-test`, `ci-emails`, `changed-files` y `ci-cross-version-upgrade` (este último lo llama `ci-server`).
+  - Además de la lista del encargo, se borran estos, que el encargo no nombraba y decidí quitar: `ci-agent-skills*`, `ci-ai-catalog-sync`, `ci-app-docs-drift`, `ci-breaking-changes`, `ci-cache-warm`, `ci-docs`, `ci-dpa-subprocessors-sync`, `ci-e2e-main`, `ci-front-component-renderer`, `ci-knip`, `ci-merge-queue`, `ci-sensitive-paths-approval`, `ci-test-docker-compose` y `ci-website`.
+  - El motivo: son infraestructura de Twenty, piden secretos que no tenemos, corren con `schedule` o solo en `main`.
+- Disparadores: `pull_request` hacia `betty/factory` y `push` a `betty/factory`, sin `merge_group` ni `schedule`.
+- `main` pasa a `betty/factory` en:
+  - `nx-affected`: `fetch`, `nx-set-shas main-branch-name` y el fallback;
+  - la clave de respaldo de `restore-cache`;
+  - `concurrency`;
+  - `nx.json` (`defaultBase`).
+- `ci-front`: `ubuntu-latest-8-cores`, de pago, pasa a `ubuntu-latest`.
+- `ci-server`: fuera `discover-public-apps` y `server-apps-install-smoke`; la guarda de mutaciones de upgrade corre solo en PRs.
+- `ci-utils` (Danger con `pull_request_target`): limitado a `betty/factory` y sin el job `congratulate`.
+- Primera ejecución: 20 de 39 checks en `skipped`. Los jobs de cada CI solo corren si el PR toca sus paquetes, y este solo tocaba `.github`.
+  - Corregido: cada CI cuenta como cambio su propio workflow, `.github/actions/**` y `nx.json`.
+  - Segunda ejecución en curso sobre `e93e8575`.
+
+**Verificado (cómo)**
+- YAML de los 10 workflows y de las acciones parseado.
+- Todas las referencias `uses: ./.github/...` resuelven.
+- `git diff --check` limpio.
+- Sin literales con forma de ID de cuenta, clave ni ARN en el diff.
+- Jobs del primer `CI Server` leídos con `gh api .../actions/runs/<id>/jobs`.
+
+**Rojos ya vistos (infraestructura, no código)**
+- `PR Review Dispatch` (`dispatch`), `Preview Environment Dispatch` (`trigger-preview`) y `Sensitive Paths Approval` fallan.
+- Son `pull_request_target` y corren con la versión de `betty/factory`, que aún los tiene. Desaparecen al fusionar #4.
+
+**Siguiente**
+- Leer la segunda ejecución.
+- Separar los rojos entre infraestructura y código o pruebas, e iterar hasta verde.
+- Tabla de tiempos por job.
