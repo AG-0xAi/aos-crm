@@ -248,3 +248,42 @@ f) Lo desplegado en AWS (perfil `aos-crm-dev`, usuario `aos-agente`)
 - Leer la segunda ejecución.
 - Separar los rojos entre infraestructura y código o pruebas, e iterar hasta verde.
 - Tabla de tiempos por job.
+
+## 2026-11-06 20:50 UTC · Fase 2 · Rojos de la ejecución completa (`e93e8575`)
+
+**Rojos de infraestructura (arreglados en `ci/fork`, commit `59094aae`)**
+- **Storybook de front y de UI:**
+  - Síntoma: «Playwright does not support chromium on ubuntu26.04-x64».
+  - Causa: `ubuntu-latest` ya resuelve a Ubuntu 26.04.
+  - Arreglo: `front-sb-test-*` (vía `ci-front-storybook-test`) y `ui-sb-test` quedan fijados a `ubuntu-24.04`.
+- **`server-integration-test`, los 16 shards:**
+  - Síntoma: «Cannot find module .../twenty-shared/dist/utils.cjs» en el `globalSetup` de Jest, antes de ejecutar ningún test.
+  - Causa: el reset de la base de pruebas, que corre en segundo plano, repone el `dist` de `twenty-shared` desde la caché de Nx mientras el setup lo importa. Con la caché fría del fork la ventana se abre siempre.
+  - Arreglo: un paso que espera a que el reset termine, con tope de 15 min y el log del reset si falla.
+- **Los tres `pull_request_target` de la base** (`dispatch`, `trigger-preview`, `Sensitive paths approval`): no se pueden arreglar desde la rama y desaparecen al fusionar #4.
+
+**Rojos de código o pruebas: hallazgos reales, NO tocados**
+Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecutaba esas suites de Twenty.
+
+| Suite | Fichero | Qué falla | Origen |
+| --- | --- | --- | --- |
+| `twenty-emails` lint (i18n) | `src/emails/sign-up-invite-link.email.tsx:44` | cadena sin marcar para traducción | CRM-016 (`d7679668`) |
+| `twenty-emails` lint (i18n) | `src/components/Logo.tsx:6` | cadena sin marcar para traducción | marca Betty (`9ea9badb`) |
+| `twenty-front` lint (i18n) | `src/pages/settings/legal/SettingsLegalDpaNew.tsx:96` | cadena sin marcar para traducción | marca Betty (`9ea9badb`) |
+| `twenty-front` test | `activities/timeline-activities/utils/__tests__/getTimelineActivityAuthorFullName.test.ts` | espera «Twenty», recibe «Betty» | marca Betty (`3538cd86`) |
+| `twenty-front` test | `pages/settings/applications/__tests__/SettingsAvailableApplicationDetails.test.tsx` (2 tests) | no encuentra textos que dicen «Twenty» | marca Betty (`9ea9badb`) |
+| `twenty-front` test | `auth/sign-in-up/hooks/__tests__/useSignInUp.test.tsx` | `signUp` recibe un cuarto argumento (`undefined`, la invitación) | CRM-016 (`0d1e289a`) |
+| `twenty-ui` test (también tumba `ci-shared`) | `src/icon/__tests__/TwentyIconDictionary.test.ts` | el Markdown generado no coincide con el manifiesto | marca Betty (`3538cd86`, `TwentyIconDictionary.ts`) |
+| `twenty-server` unit | `record-crud/utils/__tests__/get-record-image-identifier.util.spec.ts` (2 tests) | espera la URL de `twenty-icons.com` y recibe `null` | marca Betty (`9ea9badb`, `getLogoUrlFromDomainName`) |
+
+- `server-lint-typecheck` cae por el lint de `twenty-emails`, que es dependencia del servidor. Con `--nxBail`, el lint y el typecheck propios del servidor quedan sin medir hasta que se arregle.
+- `server-validation` (migraciones pendientes y codegen) quedó en curso al subir `59094aae`; se medirá en la siguiente ejecución.
+
+**Bloqueo o pido**
+- Los rojos de código piden una spec propia (track `CRM-` por el bus): adaptar las pruebas de Twenty a la marca Betty y a la invitación de CRM-016, y marcar las tres cadenas para traducción.
+- Sin eso, `betty/factory` no puede quedar en verde.
+
+**Siguiente**
+- Leer la ejecución sobre `59094aae`.
+- Tabla de tiempos.
+- Proponer la spec a Andrés.
