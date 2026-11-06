@@ -24,6 +24,17 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 21:45Z · DECISIÓN DE ANDRÉS: cambian el final de la Fase 2, el orden de las fases y la regla de pushes
+Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye a lo que dice el encargo.
+
+1. **La Fase 2 termina con la CI medida, no toda verde.**
+   - Rojos de infraestructura (runner, servicios, versiones, permisos, acciones): arréglalos en `ci/fork`; son trabajo de la Fase 2. Storybook: si no queda verde con un par de ajustes (shards, tamaño del runner), pasa a la línea base; no te quedes iterando.
+   - Rojos de código o pruebas (los de la marca de Betty: formato y textos sin traducir en `twenty-emails`, el Markdown generado de iconos en `twenty-ui`, lint y tests del front, y los que salgan en servidor): no los arregles ahora. Anótalos en la bitácora como **línea base**: check, test y fichero de cada uno, sobre el commit de `betty/factory` en que corrió.
+   - Después: pide a Andrés que fusione el PR #4 (o que dé OK al coordinador para hacerlo) y haz la PARADA 2: `betty/factory` con PR obligatorio, sin pushes directos y, como checks obligatorios, **solo los que pasan en la línea base** (lístalos). Los demás se añaden a medida que se pongan verdes.
+2. **Esos rojos de código son las primeras specs del bus en la VM.** Regístralas en tu pack con el CLI `aos` antes de la mudanza, para que viajen con él: una spec por grupo coherente (correos, iconos, lint del front, tests del front, servidor), tamaño S como mínimo (XS se lo asigna a un modelo pequeño), cada una con un contrato corto: qué falla, qué check lo demuestra y criterio de hecho = ese check verde en su PR. Estado `pending`. No las despaches en este PC.
+3. **Orden nuevo: la Fase 4 va antes que la Fase 3.** Tras la PARADA 2 haces la mudanza (Fase 4) con el comando corregido de abajo (21:25Z). La Fase 3 (despliegue desde Actions) va después, desde este PC; hasta entonces, si hace falta desplegar, se hace como hoy y solo con OK de Andrés. La Fase 5 (relevo) cierra.
+4. **El override de la guarda `pre-push` NO es «siempre»: vale solo mientras dura el traspaso.** Andrés lo aclara: es para terminar de montar esto, no una regla permanente. Mientras tanto: cada push con su razón escrita (`AOS_PUSH_OVERRIDE_REASON="traspaso Betty: <qué subes>"`) y nunca un push directo a `betty/factory` (solo fusiones en GitHub). Se acaba al cerrar la Fase 5, o antes si Andrés lo retira; anota en el relevo cuándo dejaste de usarlo. Después, todo cambio de Betty llega por PR desde los workers de la VM, con su gate y la CI de Actions.
+
 ### 2026-11-06 21:25Z · CORRECCIÓN para la mudanza (Fase 4): tu pack no viajaba
 - El script de mudanza solo lleva `events`, `state`, `inbox`, `outbox`, `tracks`, `budget` y `specs`. En Betty `.aos/` entero está fuera de git (el fork no tiene ni `.aos/` ni `packs/`), así que tu pack canónico `.aos/pack/aos-crm/` (`specs.json`, contratos y `changes/`), tu `verify.json` y tu `config.json` no llegarían a la VM ni con el clon ni con la mudanza. El comando correcto de la Fase 4 es:
   ```
@@ -85,6 +96,7 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 - Gate de los despachos: el arnés ya tiene la lección y la spec para que el encargo derivado tome el gate del `verify.json` del proyecto; hasta que esté en `main`, cada despacho de Betty lleva su gate por `--body-file`.
 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
-1. Fase 1: el respaldo con la regla de pushes que decida Andrés; los PR de `AGENTS.md` y de `favicon-alb` hacia `betty/factory`.
-2. Fase 2: la CI verde y la tabla de tiempos.
-3. Fase 4: «mudanza hecha», para dar de alta el bus.
+1. Fase 2: rojos clasificados, línea base y tabla de tiempos en la bitácora; PR #4 fusionado; PARADA 2 con los checks de la línea base.
+2. Las specs de la línea base registradas en tu pack (estado `pending`).
+3. Fase 4: «mudanza hecha», con el comando de 21:25Z y los conteos de specs cuadrados, para dar de alta el bus.
+4. Después: Fase 3 (despliegue desde Actions) y Fase 5 (relevo, con la fecha en que dejaste el override).
