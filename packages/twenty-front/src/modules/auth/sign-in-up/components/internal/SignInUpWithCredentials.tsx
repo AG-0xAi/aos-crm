@@ -1,6 +1,7 @@
 import { useHasMultipleAuthMethods } from '@/auth/sign-in-up/hooks/useHasMultipleAuthMethods';
 import { useSignInUp } from '@/auth/sign-in-up/hooks/useSignInUp';
 import { type Form } from '@/auth/sign-in-up/hooks/useSignInUpForm';
+import { useSignUpInvitationToken } from '@/auth/sign-in-up/hooks/useSignUpInvitationToken';
 import { lastAuthenticatedMethodState } from '@/auth/states/lastAuthenticatedMethodState';
 import {
   SignInUpStep,
@@ -53,6 +54,7 @@ export const SignInUpWithCredentials = ({
     lastAuthenticatedMethodState,
   );
   const hasMultipleAuthMethods = useHasMultipleAuthMethods();
+  const { isSignUpInvitation } = useSignUpInvitationToken();
 
   const {
     signInUpMode,
@@ -152,6 +154,7 @@ export const SignInUpWithCredentials = ({
             <SignInUpEmailField
               showErrors={showErrors}
               onInputChange={onEmailChange}
+              isLocked={isSignUpInvitation}
             />
           )}
           {signInUpStep === SignInUpStep.Password && (

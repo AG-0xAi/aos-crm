@@ -21,4 +21,11 @@ export class SignUpInNewWorkspaceInput {
   @IsOptional()
   @Matches(PARTNER_PATTERN)
   partner?: string;
+
+  // CRM-016: what lets a non-admin open their one workspace on an instance
+  // where creation is restricted to server admins. Consumed on success.
+  @Field(() => String, { nullable: true })
+  @IsString()
+  @IsOptional()
+  signUpInvitationToken?: string;
 }

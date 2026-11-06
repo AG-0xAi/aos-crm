@@ -394,13 +394,19 @@ export const useAuth = () => {
   );
 
   const handleCredentialsSignUp = useCallback(
-    async (email: string, password: string, captchaToken?: string) => {
+    async (
+      email: string,
+      password: string,
+      captchaToken?: string,
+      signUpInvitationToken?: string,
+    ) => {
       const signUpResult = await signUp({
         variables: {
           email,
           password,
           captchaToken,
           locale: i18n.locale ?? SOURCE_LOCALE,
+          signUpInvitationToken,
         },
       });
 

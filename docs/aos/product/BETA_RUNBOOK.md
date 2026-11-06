@@ -1,9 +1,12 @@
-# CRM-014 — Runbook del operador para la beta
+# Runbook del operador para la beta
 
-Fecha: 30 de octubre de 2026. Implementa el contrato `.aos/pack/aos-crm/specs/beta-espacios/spec.md`.
+Fecha: 31 de octubre de 2026. Implementa los contratos `.aos/pack/aos-crm/specs/beta-espacios/spec.md`
+(CRM-014) y `.aos/pack/aos-crm/specs/alta-invitacion/spec.md` (CRM-016).
 
 Cada amigo de la beta usa **su propio espacio** del mismo despliegue, con su propia URL, sus propios
-datos y su propio conector para ChatGPT o Claude. Los espacios los abre **solo el operador**. Este
+datos y su propio conector para ChatGPT o Claude. Desde CRM-016 el operador **solo añade un correo** y
+la persona se da de alta y abre su espacio sola (§1); abrirlo a mano (§2 y §3) sigue documentado para
+cuando eso no sirva. Este
 documento es el procedimiento exacto del operador y está escrito contra el código de Twenty pinneado
 en este checkout (`twenty/v2.51.0`, `15e4826d3b`): cada paso cita el fichero que lo implementa, para
 que nadie tenga que adivinar qué hace el botón.
@@ -13,8 +16,8 @@ aparecen son las del **stack local**; la columna de AWS dice cómo se traduce ca
 despliegue de CRM-013 esté arriba.
 
 Lo que aquí se afirma está medido contra el stack local de este checkout con
-`scripts/aos/test/crm-isolation-e2e.test.mjs`; las cifras de cada corrida están en
-`.aos/reports/CRM-014.md`.
+`scripts/aos/test/crm-isolation-e2e.test.mjs` y `scripts/aos/test/crm-signup-invitation-e2e.test.mjs`;
+las cifras de cada corrida están en `.aos/reports/CRM-014.md` y `.aos/reports/CRM-016.md`.
 
 ## 0. El perfil: qué hace que esto funcione así
 
@@ -46,7 +49,7 @@ configuración:
 | Conector MCP de ese amigo | `http://<subdominio>.localhost:43000/mcp` | `https://<subdominio>.<dominio>/mcp` |
 | Pantalla de autorización | `http://<subdominio>.localhost:43000/authorize` | `https://<subdominio>.<dominio>/authorize` |
 | API (`SERVER_URL`): ficheros, OAuth, webhooks | `http://localhost:43000` | `https://api.<dominio>` |
-| La raíz `<dominio>` | no se usa | **no es del CRM** (ver §7) |
+| La raíz `<dominio>` | no se usa | **no es del CRM** (ver §8) |
 
 Desde CRM-018 (orden del founder, 30 de octubre de 2026) **la raíz del dominio no sirve el CRM en
 AWS**: queda libre para la landing. La API se mudó a `api.<dominio>` y los espacios, el acceso y la
@@ -64,7 +67,65 @@ crear el **sexto** espacio (`MAX_WORKSPACES_WITHOUT_ENTERPRISE_KEY = 5` en
 cuatro amigos**. Un quinto amigo exige una decisión del founder (clave Enterprise, que esta beta
 excluye, o un segundo despliegue).
 
-## 1. Abrir el espacio de un amigo
+## 1. Dar de alta a alguien: la persona crea su cuenta y su espacio sola
+
+Esto es lo normal desde CRM-016 y es lo que hay que usar. El operador solo añade un correo; lo demás
+lo hace la persona. El procedimiento a mano de §2 y §3 sigue existiendo para cuando no sirva este.
+
+1. El operador entra en su CRM, va a **Settings → Admin Panel → General** y busca la sección
+   **«Sign-up invitations»** (justo debajo de la lista de administradores).
+2. Escribe el correo de la persona y pulsa **Invite**. Aparece una fila **Pending** con su fecha de
+   caducidad: **siete días**.
+3. A la persona le llega un correo **«Te han invitado a Betty»** con un enlace único. El correo sale
+   en el idioma en el que el operador tenía la interfaz (hay español e inglés).
+4. La persona abre el enlace y ve la pantalla de alta con **su correo ya puesto y bloqueado**: ese
+   enlace no sirve para ninguna otra dirección. Elige contraseña, y después el nombre y el
+   subdominio de su espacio. El subdominio es su URL, así que conviene que sea su nombre
+   (1-30 caracteres, minúsculas, números y guiones).
+5. Al confirmar, la persona queda **administradora de su propio espacio** y la fila del panel pasa a
+   **Used**. El operador **no** es miembro de ese espacio: no hay nada que abandonar después.
+
+Lo que el operador puede hacer con una fila:
+
+| Acción | Para qué | Qué pasa |
+| --- | --- | --- |
+| **Resend** | el correo se perdió, o la invitación caducó | se manda otro correo **con un enlace nuevo**; el anterior deja de funcionar |
+| **Revoke** | la invitación ya no debe usarse | el enlace deja de funcionar al instante |
+
+Reglas que el servidor aplica solo, sin que el operador tenga que acordarse:
+
+- **Un solo uso.** El enlace abre **un** espacio. Repetirlo no abre un segundo.
+- **Una sola dirección.** El enlace solo vale para el correo al que se mandó.
+- **Siete días.** Pasado eso caduca y hay que reenviarlo (`SIGN_UP_INVITATION_TOKEN_EXPIRES_IN`).
+- **El token no se guarda.** En la base de datos solo queda su huella (sha256), así que ni el
+  operador ni nadie con acceso a la base puede recuperar el enlace: si se pierde, se reenvía.
+- **Sin invitación, nadie abre espacios.** Quien no sea administrador del servidor y no traiga un
+  enlace válido sigue recibiendo `Workspace creation is restricted to admins`.
+- **El tope de espacios sigue mandando.** Una invitación no sube el techo de cinco espacios del §0:
+  si el despliegue está lleno, el alta se rechaza aunque la invitación sea válida.
+
+### Mientras no haya correo de verdad (hoy)
+
+`EMAIL_DRIVER` está en `LOGGER`, así que ese correo **no sale de la máquina**: se escribe en el log
+del **worker**. Para leer el enlace y pasarlo a mano:
+
+```sh
+docker compose -f deploy/local/compose.yaml -p aos-crm-local logs --no-log-prefix   --tail 4000 worker | grep -o "http[^\"<> ]*signUpInvitationToken=[^\"<> ]*" | tail -1
+```
+
+Es el log del `worker` y no del `server`, y se lee con `--tail` y **no** con `--since` (ver §3 para el
+porqué de las dos cosas). El enlace **es una credencial**: se manda por un canal privado, no se pega
+en un chat de grupo. Encender el correo de verdad es §9.
+
+### Comprobar qué hay pendiente antes de exponer el despliegue
+
+```sh
+docker compose -f deploy/local/compose.yaml -p aos-crm-local exec -T db   psql -U aos_crm -d aos_crm_local -c "select context->>'email', \"expiresAt\", \"revokedAt\" from core.\"appToken\" where type = 'SIGN_UP_INVITATION_TOKEN' and context->>'consumedAt' is null and \"revokedAt\" is null;"
+```
+
+Lo que salga ahí son enlaces vivos. Lo que no se vaya a usar, **Revoke**.
+
+## 2. Abrir el espacio de un amigo
 
 El operador no "crea un usuario": crea un espacio y después lo entrega.
 
@@ -85,12 +146,12 @@ Medido: un amigo que **no** es administrador del servidor ve el botón igual (es
 y el servidor le responde `Workspace creation is restricted to admins`; no se crea ninguna fila.
 `crm-isolation-e2e.test.mjs` lo comprueba con un usuario sintético real.
 
-## 2. Entregarlo: el amigo como administrador de su espacio, sin correo
+## 3. Entregarlo: el amigo como administrador de su espacio, sin correo
 
 Este despliegue **no tiene salida de correo**: `EMAIL_DRIVER` se queda en el valor por defecto
 `LOGGER` (`config-variables.ts:531`), de modo que el "correo" de invitación se escribe en un log y no
 sale de la máquina (`email/drivers/logger.driver.ts`). Eso es lo que convierte el enlace de
-invitación en un enlace que el operador copia a mano. Es la etapa 1 de §8, y mientras siga ahí este
+invitación en un enlace que el operador copia a mano. Es la etapa 1 de §9, y mientras siga ahí este
 procedimiento es el único que funciona.
 
 **En el log del `worker`, no del `server`.** `EmailService.send` no envía: encola un `EmailSenderJob`
@@ -121,40 +182,36 @@ líneas de hace segundos.
    explícitamente (`select: { value: false }`), así que si se pierde hay que reenviar la invitación
    (`resendWorkspaceInvitation`) y leer el log otra vez.
 
-### Aviso que hay que leer antes de invitar a nadie
+### Aviso que hay que leer antes de invitar a nadie (actualizado en CRM-016)
 
-**Una invitación pendiente es una credencial a nombre de una dirección de correo, y en este perfil
-nada prueba que quien dice tener esa dirección la tenga.** Medido el 30/10 contra el stack local
-(`crm-isolation-e2e.test.mjs`, línea `[LIMIT]`): mientras la invitación está pendiente, cualquiera
-que **conozca la dirección invitada** puede registrarse con ella (el registro de una dirección con
-invitación pendiente está permitido a propósito,
-`sign-in-up.service.ts assertSignUpWithoutWorkspaceAllowed`), la respuesta del registro **le entrega
-el token personal de la invitación**, y canjearlo **le mete en el espacio con el rol invitado**. No
-hace falta tocar el correo de nadie: basta saber la dirección.
+Hasta CRM-016, una invitación pendiente era una credencial que se entregaba a quien **supiera la
+dirección**: la respuesta del registro le daba el token personal de la invitación y canjearlo le
+metía en el espacio. **Eso está cerrado.** Ahora el token personal solo viaja a una identidad que ha
+**probado la dirección** (tiene el enlace, o tiene el correo verificado); quien solo la conoce
+recibe la respuesta sin token. Medido en `crm-signup-invitation-e2e.test.mjs`.
 
-En local da igual (el puerto solo escucha en loopback). En AWS, con el dominio público, **no** da
-igual. Mitigación mientras no haya una decisión mejor:
+Lo que **sigue siendo cierto** y conviene no olvidar:
 
-1. Invita y haz que la persona **acepte en el momento**, contigo delante si se puede. La ventana de
-   riesgo es exactamente el tiempo que la invitación pasa pendiente.
-2. **Borra toda invitación pendiente que no se haya consumido** (Settings → Members, o la mutación
+1. **El enlace de la invitación es la credencial.** Quien lo tenga entra en ese espacio con el rol
+   invitado. Se manda por un canal privado y no se pega en un chat de grupo.
+2. Alguien que **conozca una dirección invitada** todavía puede crear una cuenta con ella y, al
+   hacerlo, ver que esa dirección está invitada a un espacio (nombre y URL). **No entra** y **no lee
+   ningún dato**: sin el enlace no hay token que canjear. Es una filtración de "a quién invitaste",
+   no de acceso.
+3. **Borra toda invitación pendiente que no se vaya a usar** (Settings → Members, o
    `deleteWorkspaceInvitation`). No dejes invitaciones abiertas "para luego".
-3. Comprueba que no hay ninguna pendiente antes de exponer el despliegue:
+4. Comprueba qué hay pendiente antes de exponer el despliegue:
    `select context->>'email' from core."appToken" where type = 'INVITATION_TOKEN' and "deletedAt" is null;`
-   El 30/10 había **una** pendiente en el espacio del founder, a una dirección real: acéptala o
-   bórrala antes de abrir la beta.
-4. `IS_EMAIL_VERIFICATION_REQUIRED=true` es el control que trae Twenty para esto, pero **no está
-   medido aquí y no es gratis**: el enlace de verificación también acabaría en el log del worker (el
-   operador tendría que llevarlo a mano), y no cierra la entrega del token —que ocurre en la
-   respuesta del registro, antes de cualquier verificación—, solo (probablemente) el acceso
-   posterior. Queda como decisión del founder y trabajo de otro track.
+5. `IS_EMAIL_VERIFICATION_REQUIRED=true` sigue sin estar medido aquí y sigue sin ser gratis: hoy el
+   enlace de verificación también acabaría en el log del worker y el operador tendría que llevarlo a
+   mano. Con el agujero del token cerrado, ya no es urgente: queda como decisión del founder.
 
 Alternativa sin rol preasignado: Settings → Members ofrece también un **enlace genérico** del espacio
 (el `inviteHash`); sirve para que entre cualquiera que lo tenga, y después el operador le cambia el
 rol a Admin en la misma pantalla. Se usa solo si el paso 1 no es posible, porque un enlace genérico
 no caduca por persona.
 
-## 3. Salir el operador
+## 4. Salir el operador
 
 Cuando el amigo ya es Admin de su espacio, el operador deja de tener razón para estar dentro.
 
@@ -172,7 +229,7 @@ de administración y borrar el espacio. El aislamiento que esta beta demuestra e
 que es quien opera la máquina. Si el founder quiere que ni el operador pueda entrar, eso es otra
 decisión de producto (quitarse `canImpersonate` a sí mismo y dejar constancia).
 
-## 4. Restablecer una contraseña sin correo
+## 5. Restablecer una contraseña sin correo
 
 1. El amigo pulsa "Forgot password" en su propia pantalla de acceso, o el operador dispara el enlace
    con la mutación pública `emailPasswordResetLink(email, workspaceId)` (`auth.resolver.ts:1270`).
@@ -196,7 +253,7 @@ decisión de producto (quitarse `canImpersonate` a sí mismo y dejar constancia)
 
 El operador nunca ve ni fija la contraseña: solo transporta un enlace de un solo uso.
 
-## 5. Borrar un espacio a petición
+## 6. Borrar un espacio a petición
 
 El borrado es en dos pasos porque el producto borra en dos pasos, y decirlo importa: el primer paso
 **no** borra los datos.
@@ -229,7 +286,7 @@ El borrado es en dos pasos porque el producto borra en dos pasos, y decirlo impo
    `crm-isolation-e2e.test.mjs` hace exactamente estos tres pasos con sus dos espacios sintéticos y
    espera el efecto en la base de datos en vez de fiarse del código de salida del comando.
 
-## 6. El conector de cada usuario (ChatGPT / Claude)
+## 7. El conector de cada usuario (ChatGPT / Claude)
 
 **La URL que pega cada usuario es la de su propio espacio más `/mcp`:**
 
@@ -270,7 +327,7 @@ misma URL. No hay dos respuestas.
 
 Este punto no se ha ejercitado contra el despliegue de AWS: está leído del código y medido en local
 por `crm-isolation-e2e.test.mjs`. La comprobación tras el despliegue es
-`scripts/aos/verify-public-hosts.mjs` (ver §7).
+`scripts/aos/verify-public-hosts.mjs` (ver §8).
 
 Medido en `crm-isolation-e2e.test.mjs` (R3): el token OAuth que obtiene un usuario de su espacio
 **solo ve su espacio** por `/mcp` — los ids del otro espacio no se leen, no aparecen al buscar por
@@ -282,7 +339,7 @@ Límite heredado de CRM-007 y que sigue en pie: un token de acceso OAuth ya emit
 autocontenido y sobrevive a la revocación de su autorización hasta que caduca (hasta 1800 s). Para
 cortar el acceso de inmediato hay que cambiar la contraseña del usuario o quitarlo del espacio.
 
-## 7. Sacar el CRM de la raíz y poner ahí la landing
+## 8. Sacar el CRM de la raíz y poner ahí la landing
 
 Orden del founder del 30 de octubre de 2026: la raíz del dominio es para la landing, el CRM vive en
 sus subdominios. Son **dos pasos separados**, y el orden importa.
@@ -356,7 +413,7 @@ CRM. Antes del paso 2 eso es normal y el script lo dice como información, no co
 ### Reconectar ChatGPT y Claude
 
 La URL del conector **no cambia con esta mudanza**: siempre fue y sigue siendo la del espacio,
-`https://<subdominio>.<dominio>/mcp` (§6). Quien ya lo tenga conectado no tiene que hacer nada.
+`https://<subdominio>.<dominio>/mcp` (§7). Quien ya lo tenga conectado no tiene que hacer nada.
 
 Quien lo tenga apuntando a la raíz (porque alguien se lo dio mal) tiene que rehacerlo: borrar el
 conector en su cliente y añadirlo de nuevo con la URL de su espacio. La forma de llegar a ella sin
@@ -377,7 +434,7 @@ hay interruptor de configuración que lo quite: la lista solo se puede ampliar
 o se acepta (la landing es suya y controla qué scripts carga), o hace falta un cambio de código en
 ese fichero, que está fuera de lo que CRM-018 tocó.
 
-## 8. El correo: tres etapas, y el buzón del dominio
+## 9. El correo: tres etapas, y el buzón del dominio
 
 Mandar y recibir son dos cosas distintas, las hace cada una un proveedor distinto, y se encienden
 por separado:
@@ -395,9 +452,9 @@ imagen nueva:
 
 | Etapa | Qué se pone en `terraform.tfvars` | Qué cambia para la gente |
 | --- | --- | --- |
-| **1. Hoy** | nada: los valores por defecto | El correo **se escribe en el log del worker** y no sale a internet, que es de lo que vive el procedimiento a mano de §2 y §4. Para entrar no hace falta tener la dirección verificada. |
+| **1. Hoy** | nada: los valores por defecto | El correo **se escribe en el log del worker** y no sale a internet, que es de lo que vive el procedimiento a mano de §3 y §5. Para entrar no hace falta tener la dirección verificada. |
 | **2. Correo de verdad** | `outbound_email_enabled = true` | Invitaciones y restablecimientos salen por SES desde el remitente del dominio, y el operador deja de copiar enlaces del log. Entrar sigue sin exigir verificación. |
-| **3. Verificación obligatoria** | y además `email_verification_required = true` | Quien no tenga su dirección verificada no puede entrar. Es el control que cierra el agujero del aviso de §2 («una invitación pendiente es una credencial»). |
+| **3. Verificación obligatoria** | y además `email_verification_required = true` | Quien no tenga su dirección verificada no puede entrar. Es el control que cierra el agujero del aviso de §3 («una invitación pendiente es una credencial»). |
 
 **La etapa 1 es la que está aplicada y la que describe el resto de este runbook.** Las etapas 2 y 3
 son decisiones del founder, y cada una tiene una condición que no depende de nosotros.
@@ -456,14 +513,16 @@ Dos cosas que conviene saber antes de rellenarlo:
 Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
 en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
 
-## 9. Lo que este runbook no cubre
+## 10. Lo que este runbook no cubre
 
-- **El panel de administración del servidor** (`/settings/admin-panel`) da al operador búsqueda de
-  usuarios, impersonación y variables de configuración. No forma parte de este procedimiento y no se
-  ha ejercitado en CRM-014.
+- **El resto del panel de administración del servidor** (`/settings/admin-panel`): búsqueda de
+  usuarios, impersonación y variables de configuración. De ese panel, CRM-016 solo ejercita la
+  sección de invitaciones de alta (§1); lo demás no forma parte de este procedimiento.
 - **SSO, facturación y permisos por fila** son Enterprise y esta beta no los usa.
-- **Correo saliente**: montado en AWS y apagado. Hoy las invitaciones y los restablecimientos siguen
-  pasando por el log del worker y por la mano del operador; encenderlo es una decisión del founder en
-  dos pasos, y está en §8 con sus condiciones.
+- **Correo saliente**: montado en AWS y apagado. Hoy las invitaciones de alta, las de equipo y los
+  restablecimientos siguen pasando por el log del worker y por la mano del operador; encenderlo es una
+  decisión del founder en dos pasos, y está en §9 con sus condiciones. Mientras siga apagado, el alta
+  autónoma de §1 lo es a medias: la persona hace todo el trámite sola, pero el enlace se lo pasa el
+  operador.
 - **Copias de seguridad** del volumen de PostgreSQL: fuera de este track. Antes de que los amigos
   metan datos de verdad, es la siguiente pregunta que hay que resolver.

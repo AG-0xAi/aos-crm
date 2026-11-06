@@ -117,6 +117,7 @@ import { GetAuthTokensFromSsoExchangeTokenInput } from './dto/get-auth-tokens-fr
 import { LoginTokenDTO } from './dto/login-token.dto';
 import { SignUpInNewWorkspaceInput } from './dto/sign-up-in-new-workspace.input';
 import { SignUpInput } from './dto/sign-up.input';
+import { SignUpCredentialsInput } from './dto/sign-up-credentials.input';
 import { UserCredentialsInput } from './dto/user-credentials.input';
 import { CheckUserExistDTO } from './dto/user-exists.dto';
 import { EmailAndCaptchaInput } from './dto/user-exists.input';
@@ -514,7 +515,7 @@ export class AuthResolver {
   @UseGuards(CaptchaGuard, PublicEndpointGuard, NoPermissionGuard)
   @AllowSuspendedWorkspace()
   async signUp(
-    @Args() signUpInput: UserCredentialsInput,
+    @Args() signUpInput: SignUpCredentialsInput,
     @Context() context: { req: Request },
   ): Promise<AvailableWorkspacesAndAccessTokensDTO> {
     const user = await this.signInUpService.signUpWithoutWorkspace(
@@ -526,6 +527,7 @@ export class AuthResolver {
         provider: AuthProviderEnum.Password,
         password: signUpInput.password,
       },
+      signUpInput.signUpInvitationToken,
     );
 
     const availableWorkspaces =
@@ -716,6 +718,7 @@ export class AuthResolver {
         displayName: input?.displayName,
         subdomain: input?.subdomain,
         partner: input?.partner,
+        signUpInvitationToken: input?.signUpInvitationToken,
       },
     );
 

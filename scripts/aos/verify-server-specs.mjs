@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// CRM-004: runs the two CRM-003 privacy specs for real.
+// CRM-004: runs twenty-server's own unit specs for real. CRM-016 widened the
+// list beyond CRM-003's two privacy specs; SPECS below is what it runs.
 //
 // CRM-003 could only deliver a STATIC privacy gate: it reads config files and
 // greps pinned source, and it says so. The two specs that exercise the real
@@ -87,6 +88,12 @@ const NO_ATTESTATION = '--provenance=false';
 const SPECS = [
   'src/engine/core-modules/telemetry/__tests__/telemetry.service.spec.ts',
   'src/engine/core-modules/twenty-config/__tests__/twenty-config.service.spec.ts',
+  // CRM-016 (R4): the sign-up invitation. These cover the fail-closed paths no
+  // e2e can force cheaply -- a token looked up by plaintext instead of by its
+  // hash, a redemption whose conditional update matched a row count other than
+  // one, and a resend of an already redeemed or revoked invitation.
+  'src/engine/core-modules/sign-up-invitation/services/__tests__/sign-up-invitation.service.spec.ts',
+  'src/engine/core-modules/sign-up-invitation/utils/__tests__/get-sign-up-invitation-status.util.spec.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
 
@@ -189,7 +196,7 @@ export function judgeSpecsRun({ depsBuildStatus, sourcesBuildStatus, containerSt
     return { ok: false, detail: `the source/dependency-build image exited ${sourcesBuildStatus ?? 'unmeasured'}: the workspace builds the specs resolve were not produced` };
   }
   if (containerStatus !== 0) {
-    return { ok: false, detail: `the privacy specs container exited ${containerStatus ?? 'unmeasured'} instead of completing: jest's summary cannot be trusted` };
+    return { ok: false, detail: `the server specs container exited ${containerStatus ?? 'unmeasured'} instead of completing: jest's summary cannot be trusted` };
   }
   return parseJestSummary(output);
 }
@@ -329,12 +336,12 @@ function run() {
   }
   ownImages.push(SOURCES_IMAGE);
 
-  console.log(`[INFO] running the two privacy specs (container ${CONTAINER_NAME}, no network)`);
+  console.log(`[INFO] running the ${SPECS.length} server specs (container ${CONTAINER_NAME}, no network)`);
   const res = wsl(['docker', 'run', '--rm', '--name', CONTAINER_NAME, '--network', 'none', SOURCES_IMAGE,
     'sh', '-c', `cd /app/packages/twenty-server && npx jest --config jest.config.mjs --runInBand ${SPECS.join(' ')}`,
   ], { timeout: RUN_TIMEOUT_MS });
   if (res.error?.code === 'ETIMEDOUT' || res.signal) {
-    fail(`the privacy specs container exceeded its ${RUN_TIMEOUT_MS} ms budget and was torn down; nothing was measured`);
+    fail(`the server specs container exceeded its ${RUN_TIMEOUT_MS} ms budget and was torn down; nothing was measured`);
   }
   const output = `${res.stdout || ''}\n${res.stderr || ''}`;
   const verdict = judgeSpecsRun({ depsBuildStatus, sourcesBuildStatus, containerStatus: res.status, output });
@@ -342,12 +349,12 @@ function run() {
     const tail = output.split('\n').filter((l) => l.trim()).slice(-25);
     console.error(tail.length ? tail.join('\n') : '(the container produced no output at all)');
     if (res.error) console.error(`spawn error: ${res.error.code || res.error.message}`);
-    fail(`privacy specs: ${verdict.detail}`);
+    fail(`server specs: ${verdict.detail}`);
   }
 
   removeOwnResources();
-  console.log(`[PASS] CRM-003 privacy specs executed against the real classes: ${verdict.detail}`);
-  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence, run with no network in a server-deps image rebuilt from this run\'s lockfile, over a git archive of this commit\'s sources. This does NOT start the CRM or observe runtime traffic.');
+  console.log(`[PASS] server specs executed against the real classes: ${verdict.detail}`);
+  console.log('Scope: TelemetryService.publish() with an HTTP spy and TwentyConfigService ENV-vs-DB precedence (CRM-003), plus the sign-up invitation service and its status derivation (CRM-016), run with no network in a server-deps image rebuilt from this run\'s lockfile, over a git archive of this commit\'s sources. This does NOT start the CRM or observe runtime traffic.');
 }
 
 function selfTest() {
@@ -357,14 +364,18 @@ function selfTest() {
   };
   const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
   const measured = { depsBuildStatus: 0, sourcesBuildStatus: 0, containerStatus: 0 };
-  const clean = 'Test Suites: 2 passed, 2 total\nTests:       4 passed, 4 total\n';
+  // Derived from SPECS, not written out: a fixture carrying its own suite count
+  // failed the self-test the moment the list grew, which reads as a broken gate
+  // instead of a longer one.
+  const cleanSummary = (suites) =>
+    `Test Suites: ${suites} passed, ${suites} total\nTests:       ${suites * 2} passed, ${suites * 2} total\n`;
+  const clean = cleanSummary(EXPECTED_SUITES);
 
-  record('parseJestSummary: a clean two-suite run passes', () => {
-    const r = parseJestSummary('Test Suites: 2 passed, 2 total\nTests:       4 passed, 4 total\n');
-    assert(r.ok, r.detail);
+  record('parseJestSummary: a clean run of every spec in the list passes', () => {
+    assert(parseJestSummary(clean).ok, parseJestSummary(clean).detail);
   });
   record('parseJestSummary: a failing suite is rejected', () => {
-    const r = parseJestSummary('Test Suites: 1 failed, 1 passed, 2 total\nTests:       1 failed, 3 passed, 4 total\n');
+    const r = parseJestSummary(`Test Suites: 1 failed, ${EXPECTED_SUITES - 1} passed, ${EXPECTED_SUITES} total\nTests:       1 failed, 3 passed, 4 total\n`);
     assert(!r.ok, 'expected a failing suite to be rejected');
   });
   record('parseJestSummary: a run that matched no spec file is rejected, not read as green', () => {
@@ -372,7 +383,7 @@ function selfTest() {
     assert(!r.ok, 'expected zero suites to be rejected');
   });
   record('parseJestSummary: fewer suites than expected is rejected even if all passed', () => {
-    const r = parseJestSummary('Test Suites: 1 passed, 1 total\nTests:       2 passed, 2 total\n');
+    const r = parseJestSummary(cleanSummary(EXPECTED_SUITES - 1));
     assert(!r.ok, 'expected a short run to be rejected');
   });
   record('parseJestSummary: output with no summary at all is rejected', () => {
@@ -496,7 +507,9 @@ function selfTest() {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     assert(/npx jest --config jest\.config\.mjs --runInBand/.test(source), 'the specs are no longer run with the project jest config in band');
     assert(/'--network', 'none'/.test(source), 'the specs container is no longer isolated from the network');
-    assert(SPECS.length === 2, `expected exactly the 2 CRM-003 specs, got ${SPECS.length}`);
+    assert(SPECS.length === 4, `expected exactly the 2 CRM-003 specs and the 2 CRM-016 ones, got ${SPECS.length}`);
+    assert(SPECS.filter((spec) => spec.includes('/sign-up-invitation/')).length === 2,
+      'the CRM-016 sign-up-invitation specs are no longer in this gate');
   });
   record('the wrapper tears down only the container it named itself', () => {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');

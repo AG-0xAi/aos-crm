@@ -73,6 +73,11 @@ import { AdminAiModelsDTO } from 'src/engine/core-modules/client-config/client-c
 import { FeatureFlagException } from 'src/engine/core-modules/feature-flag/feature-flag.exception';
 import { FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
 import { PreventNestToAutoLogGraphqlErrorsFilter } from 'src/engine/core-modules/graphql/filters/prevent-nest-to-auto-log-graphql-errors.filter';
+import { CreateSignUpInvitationInput } from 'src/engine/core-modules/sign-up-invitation/dtos/create-sign-up-invitation.input';
+import { ResendSignUpInvitationInput } from 'src/engine/core-modules/sign-up-invitation/dtos/resend-sign-up-invitation.input';
+import { SignUpInvitationDTO } from 'src/engine/core-modules/sign-up-invitation/dtos/sign-up-invitation.dto';
+import { SignUpInvitationIdInput } from 'src/engine/core-modules/sign-up-invitation/dtos/sign-up-invitation-id.input';
+import { SignUpInvitationService } from 'src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service';
 import { ResolverValidationPipe } from 'src/engine/core-modules/graphql/pipes/resolver-validation.pipe';
 import { UserInputError } from 'src/engine/core-modules/graphql/utils/graphql-errors.util';
 import { MarketplaceCatalogSyncCronJob } from 'src/engine/core-modules/application/application-marketplace/crons/marketplace-catalog-sync.cron.job';
@@ -151,6 +156,7 @@ export class AdminPanelResolver {
     private readonly usageAnalyticsService: UsageAnalyticsService,
     private readonly maintenanceModeService: MaintenanceModeService,
     private readonly upgradeStatusService: UpgradeStatusService,
+    private readonly signUpInvitationService: SignUpInvitationService,
     @InjectRepository(WorkspaceEntity)
     private readonly workspaceRepository: Repository<WorkspaceEntity>,
     @InjectMessageQueue(MessageQueue.cronQueue)
@@ -847,5 +853,40 @@ export class AdminPanelResolver {
     @Args() { id }: RevokeSigningKeyInput,
   ): Promise<SigningKeyDTO> {
     return this.adminPanelSigningKeyService.revokeSigningKey(id);
+  }
+
+  @UseGuards(AdminPanelGuard)
+  @Query(() => [SignUpInvitationDTO])
+  async getSignUpInvitations(): Promise<SignUpInvitationDTO[]> {
+    return this.signUpInvitationService.findAll();
+  }
+
+  @UseGuards(AdminPanelGuard)
+  @Mutation(() => SignUpInvitationDTO)
+  async createSignUpInvitation(
+    @AuthUser() currentUser: AuthContextUser,
+    @Args() { email, locale }: CreateSignUpInvitationInput,
+  ): Promise<SignUpInvitationDTO> {
+    return this.signUpInvitationService.create({
+      email,
+      locale,
+      issuedByUserId: currentUser.id,
+    });
+  }
+
+  @UseGuards(AdminPanelGuard)
+  @Mutation(() => SignUpInvitationDTO)
+  async resendSignUpInvitation(
+    @Args() { id, locale }: ResendSignUpInvitationInput,
+  ): Promise<SignUpInvitationDTO> {
+    return this.signUpInvitationService.resend({ id, locale });
+  }
+
+  @UseGuards(AdminPanelGuard)
+  @Mutation(() => SignUpInvitationDTO)
+  async revokeSignUpInvitation(
+    @Args() { id }: SignUpInvitationIdInput,
+  ): Promise<SignUpInvitationDTO> {
+    return this.signUpInvitationService.revoke(id);
   }
 }

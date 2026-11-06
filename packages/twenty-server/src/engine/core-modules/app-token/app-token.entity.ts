@@ -25,6 +25,11 @@ export enum AppTokenType {
   PasswordResetToken = 'PASSWORD_RESET_TOKEN',
   InvitationToken = 'INVITATION_TOKEN',
   OnboardingInvitationToken = 'ONBOARDING_INVITATION_TOKEN',
+  // CRM-016: a server-level invitation to OPEN a workspace. It belongs to no
+  // workspace and no user yet, which is why both relations are nullable, and
+  // it is deliberately absent from INVITATION_APP_TOKEN_TYPES so no
+  // join-invitation query can ever redeem it.
+  SignUpInvitationToken = 'SIGN_UP_INVITATION_TOKEN',
   EmailVerificationToken = 'EMAIL_VERIFICATION_TOKEN',
   EnterpriseValidityToken = 'ENTERPRISE_VALIDITY_TOKEN',
   SsoExchangeToken = 'SSO_EXCHANGE_TOKEN',
@@ -110,5 +115,10 @@ export class AppTokenEntity {
     authProvider?: AuthProviderEnum;
     revokedReason?: UserSessionRevokedReason;
     issuedByUserId?: string;
+    // CRM-016: set when a SIGN_UP_INVITATION_TOKEN is redeemed, which is what
+    // tells "used" apart from "revoked by the operator". Both also carry
+    // revokedAt, so every liveness query refuses them either way.
+    consumedAt?: string;
+    consumedByUserId?: string;
   } | null;
 }

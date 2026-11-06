@@ -41,6 +41,7 @@ import { JwtModule } from 'src/engine/core-modules/jwt/jwt.module';
 import { KeyValuePairModule } from 'src/engine/core-modules/key-value-pair/key-value-pair.module';
 import { MetricsModule } from 'src/engine/core-modules/metrics/metrics.module';
 import { SecureHttpClientModule } from 'src/engine/core-modules/secure-http-client/secure-http-client.module';
+import { SignUpInvitationModule } from 'src/engine/core-modules/sign-up-invitation/sign-up-invitation.module';
 import { TwoFactorAuthenticationModule } from 'src/engine/core-modules/two-factor-authentication/two-factor-authentication.module';
 import { UpgradeModule } from 'src/engine/core-modules/upgrade/upgrade.module';
 import { UsageLimitModule } from 'src/engine/core-modules/usage-limit/usage-limit.module';
@@ -72,6 +73,7 @@ import { provideWorkspaceScopedRepository } from 'src/engine/twenty-orm/workspac
     FeatureFlagModule,
     PermissionsModule,
     SecureHttpClientModule,
+    SignUpInvitationModule,
     ApplicationRegistrationModule,
     UsageModule,
     UsageLimitModule,

@@ -16902,3 +16902,27 @@ msgstr "Su espacio de trabajo se ha actualizado con un nuevo modelo de datos. Po
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Tu espacio de trabajo está en pausa; reactívalo para conservar tus datos"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Te han invitado a Betty"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "This address already has a live invitation. Resend it, or revoke it first."
+msgstr "Esta dirección ya tiene una invitación activa. Reenvíala o anúlala primero."
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "This invitation was already used to open a workspace."
+msgstr "Esta invitación ya se usó para crear un espacio."
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "This invitation was revoked. Invite the address again instead."
+msgstr "Esta invitación fue anulada. Vuelve a invitar a esa dirección."
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "This invitation link is no longer valid."
+msgstr "Este enlace de invitación ya no es válido."
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "This invitation no longer exists."
+msgstr "Esta invitación ya no existe."
