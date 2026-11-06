@@ -20,11 +20,17 @@ const carriesSignUpInvitationFragment = (document: DocumentNode) =>
 
 describe('sign-up-invitations graphql documents', () => {
   it.each([
-    ['GET_SIGN_UP_INVITATIONS (sent by the hook via refetchQueries)', GET_SIGN_UP_INVITATIONS],
+    [
+      'GET_SIGN_UP_INVITATIONS (sent by the hook via refetchQueries)',
+      GET_SIGN_UP_INVITATIONS,
+    ],
     ['CREATE_SIGN_UP_INVITATION', CREATE_SIGN_UP_INVITATION],
     ['RESEND_SIGN_UP_INVITATION', RESEND_SIGN_UP_INVITATION],
     ['REVOKE_SIGN_UP_INVITATION', REVOKE_SIGN_UP_INVITATION],
-  ])('%s carries the SignUpInvitationFragment definition', (_name, document) => {
-    expect(carriesSignUpInvitationFragment(document)).toBe(true);
-  });
+  ])(
+    '%s carries the SignUpInvitationFragment definition',
+    (_name, document) => {
+      expect(carriesSignUpInvitationFragment(document)).toBe(true);
+    },
+  );
 });
