@@ -92,6 +92,11 @@ export const SPECS = [
   // CRM-016 (R4): the invited person's own screen. The address arrives in the
   // link and the invitation is what locks it, which no server test can see.
   'src/modules/auth/sign-in-up/components/internal/__tests__/SignInUpEmailField.test.tsx',
+  // CRM-016 fix1: every document the sign-up-invitations hook sends to the
+  // server carries the SignUpInvitationFragment definition it spreads, not
+  // only a reference to it -- the review finding this closes (part 6) was the
+  // refetchQueries document failing with "Unknown fragment" in production.
+  'src/modules/settings/admin-panel/sign-up-invitations/hooks/__tests__/useSignUpInvitations.test.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
 
