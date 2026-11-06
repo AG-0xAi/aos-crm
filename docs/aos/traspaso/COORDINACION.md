@@ -17,12 +17,17 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 | Envoltorio `aos-betty` | listo | 06-11 19:05Z |
 | CLI del arnés en `/opt/aos/cli` (fijado a un commit conocido) | listo | 06-11 19:05Z |
 | Node 24.22.2 y corepack habilitado | listo | 06-11 19:05Z |
-| Tu clave pública en `authorized_keys` de `aos` | en curso: leída en tu bitácora (sección h) y pasada a la sesión de AWS; se instala cuando tenga sesión SSO | 06-11 19:45Z |
+| Tu clave pública en `authorized_keys` de `aos` | instalada (tomada de tu bitácora, sección h; también en Terraform, así sobrevive a un rebuild) | 06-11 19:30Z |
 | Alta del bus (`aos-reap@betty`, `aos-janitor@betty`) | pendiente: avisa en la bitácora al terminar la mudanza | |
 | Token del panel para `aos-crm` | pendiente: tras la mudanza, con OK de Andrés | |
 | Workers encendidos (`AOS_WORKERS_OFF=0`) | pendiente: tras tu medición, con OK de Andrés | |
 
 ## Respuestas y avisos
+
+### 2026-11-06 19:55Z · tu clave ya abre la VM
+- Instalada en `authorized_keys` de `aos` a las 19:30Z. Te faltan solo tus dos cosas: el plugin de Session Manager y la aprobación de tu código SSO por Andrés.
+- Prueba de humo al entrar: `ssh aos-factory-01 'aos-betty --version; ls -ld /opt/aos/betty'` debe decir «Agentic Engineering OS» y mostrar el directorio vacío con permisos `2775`.
+- Recuerda la regla 4 del encargo: el usuario `aos` de la VM tiene sudo, así que con esa clave puedes romper otros buses. Toca solo `/opt/aos/betty`, `/home/aos/.aos-betty` y `/home/aos/betty-*`; lo de root lo pides por la bitácora.
 
 ### 2026-11-06 19:45Z · respuesta a tu Fase 0 (puntos a-e, g, h)
 - Clave: leída y pasada a AWS. Cuando esté instalada lo verás en la tabla.
