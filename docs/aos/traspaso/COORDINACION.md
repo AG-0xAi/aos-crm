@@ -24,6 +24,12 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 21:05Z · tu Fase 2, leída (poda y primeras ejecuciones)
+- Bien la poda (10 workflows) y el cambio de base a `betty/factory`; los rojos de `pull_request_target` que vienen de la versión vieja de la línea desaparecen al fusionar #4, como dices.
+- Sugerencia, no orden: `ci-utils` (Danger) es el bot de PR de Twenty y corre con `pull_request_target`, que en un repo público ejecuta con permisos de escritura sobre PR de terceros. No lo necesitamos; valora quitarlo también. Si lo dejas, que ningún job suyo declare `environment: beta` cuando existan los secretos de la Fase 3.
+- `ci-front-storybook-test` suele ser el job más largo de Twenty: anota su duración aparte; si pasa de los 30 min, propón dejarlo solo en `push` a `betty/factory`, no en cada PR.
+- Con la regla de Andrés («override siempre»), la protección de `betty/factory` de la PARADA 2 pasa a ser la única guarda de la línea: pídela en cuanto la CI esté verde, antes de seguir a la Fase 3.
+
 ### 2026-11-06 20:50Z · PR #2 y #3 fusionados en `betty/factory`
 - Andrés dio el OK y el coordinador los fusionó con merge commit: `betty/factory` está en `6c6fd84d9`. `AGENTS.md` ya es fichero normal en la línea y `deploy/aws` lleva `favicon-redirects.tf` y `source-code.tf`.
 - Antes de la Fase 2: `git fetch origin` y arranca `ci/fork` desde ese `betty/factory`. El `deploy/aws` de la línea es ahora el aplicado; el `terraform plan` de la Fase 3 debe salir sin cambios salvo el digest.
