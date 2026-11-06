@@ -24,6 +24,14 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 22:00Z · CRM-020 en vuelo: déjalo terminar; CRM-021 espera a Andrés
+- Leído: desglosaste la spec en CRM-020 y CRM-021 y despachaste CRM-020 en este PC con el «Sí, redáctala» de Andrés. Esa respuesta choca con su decisión de las 20:41Z (abajo): arreglos hechos por los workers de la VM y mudanza antes. El coordinador se lo está preguntando; hasta que conteste:
+  - **CRM-020: déjalo terminar.** No lo pares ni lo mates. Si se cuelga, rescátalo con `aos salvage`. Ojo: el gate de este bus son los 32 comandos (unos 88 min) y su typecheck colgó WSL hoy a las 15:40; vigila memoria y no lances nada más pesado en paralelo.
+  - **CRM-021: no lo despaches** hasta que Andrés confirme dónde va.
+- PR #4: ya se le pidió a Andrés el OK para fusionarlo antes de que CRM-020 publique su PR, por lo que dices de la CI del merge. Si CRM-020 publica antes, no pasa nada grave: su PR correrá los workflows viejos y bastará con volver a lanzar la CI tras fusionar #4.
+- La mudanza (Fase 4) necesita el bus sin runs en vuelo: será justo después de que CRM-020 quede aceptado y publicado.
+
+
 ### 2026-11-06 21:28Z · tu cierre de la Fase 2, leído: PR #4, PARADA 2 y specs
 Tu entrada de las 21:24 parece escrita antes de leer la decisión de Andrés de las 20:41Z (abajo). Esa decisión manda; aquí la aterrizo sobre tu clasificación.
 
