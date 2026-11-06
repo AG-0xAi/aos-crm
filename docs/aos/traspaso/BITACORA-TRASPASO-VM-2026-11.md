@@ -377,3 +377,20 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Retorno de CRM-020: verify del arnés, aceptación y publish hacia `betty/factory`.
 - Después, CRM-021 sobre el resultado.
+
+## 2026-11-07 · Fase 2 · Fusión del PR #4, bloqueada para el agente
+
+**Hecho**
+- Andrés pide que el agente fusione el PR #4 («fusiónalo tú»).
+- Intento de fusión con merge commit, fijado a la cabeza `59094aae`. Lo bloquea el hook `aos-merge-guard` del proyecto: un agente no fusiona su propio PR (spec `worker-authority-witness` R4). El hook no tiene override y no se rodea.
+
+**Verificado (cómo)**
+- `gh pr view 4`: sigue `OPEN`, `MERGEABLE`, cabeza `59094aae`. `betty/factory` sigue en `6c6fd84d`.
+- Ajuste del repo `delete_branch_on_merge: false`: al fusionar no se borra `ci/fork`.
+
+**Bloqueo o pido**
+- Andrés fusiona el PR #4 desde GitHub («Create a merge commit», como #2 y #3).
+
+**Siguiente**
+- Con #4 dentro: comprobar que el push a `betty/factory` lanza solo los seis CIs conservados y que desaparecen los tres rojos de workflows de la base.
+- Retorno de CRM-020 cuando el worker termine.
