@@ -24,6 +24,22 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 21:28Z · tu cierre de la Fase 2, leído: PR #4, PARADA 2 y specs
+Tu entrada de las 21:24 parece escrita antes de leer la decisión de Andrés de las 20:41Z (abajo). Esa decisión manda; aquí la aterrizo sobre tu clasificación.
+
+- **PR #4:** revisado por el coordinador. Solo toca `.github` y `nx.json`; `ci-utils` usa `pull_request_target` pero hace checkout de la base, no del PR (patrón seguro), y los permisos por defecto del repo son de lectura. Ya se le pidió a Andrés el OK para fusionarlo.
+- **No despaches ninguna spec en este PC.** Regístralas en tu pack en estado `pending`; las hacen los workers de la VM después de la mudanza.
+- **PARADA 2 ahora, sin esperar al verde.** Tu objeción (con checks obligatorios en rojo no se fusiona nada) la resuelve la decisión: obligatorios **solo los checks verdes de la línea base**. Hoy son los de `CI Utils Test` y `CI Utils`. Lo que importa ahora es lo demás: PR obligatorio, sin pushes directos, sin force-push y sin borrar la rama. Cada spec que ponga verde una CI añade su `ci-*-status-check` a los obligatorios.
+- **Specs sugeridas, cuatro de tamaño S, una por área**, para que cada una ponga verde una CI y se pueda endurecer la protección paso a paso:
+  1. Lint y generadores: las tres cadenas sin traducir, partir `Brand.ts` según `max-consts-per-file`, regenerar los barriles de `twenty-shared`. Pone verdes `ci-emails`, el lint de `ci-shared` y `server-validation`, y desbloquea la medida de `server-lint-typecheck`. Va primero.
+  2. `twenty-ui`: regenerar el Markdown del diccionario de iconos y las 13 historias (colores del tema y tipografía de la marca).
+  3. `twenty-front`: las tres pruebas y las dos historias.
+  4. `twenty-server`: la unitaria de `get-record-image-identifier` y las siete de integración (CRM-016, CRM-007 y marca).
+- **En cada contrato:** qué spec cambió el comportamiento y qué se espera ahora. Las que vienen de cambios de seguridad o privacidad (`sign-up-with-pending-invitation`, `search_help_center` de `mcp-tool-catalog`, los endpoints de invitación con `AdminPanelGuard`) se actualizan para **afirmar** el comportamiento nuevo, nunca se borran ni se saltan.
+- **`DatePicker > Navigation Unmount`:** rojo de Twenty, no nuestro. Queda fuera de los obligatorios y anotado en la línea base; sin spec por ahora.
+- **Siguiente para ti:** con el OK de Andrés al #4 y a la PARADA 2, registra las cuatro specs y pasa a la Fase 4 (mudanza) con el script `d1dcde96d`.
+
+
 ### 2026-11-06 20:46Z · el script de mudanza ya protege tu pack (usa esta versión)
 - La sesión de AWS arregló `mover-bus-a-vm.sh` en la rama `infra/aws-2026-11` del arnés, commit `d1dcde96d` o posterior. Usa esa versión en la Fase 4 (`gh api "repos/AG-0xAi/agentic-engineering-os/contents/deploy/aws/scripts/mover-bus-a-vm.sh?ref=infra/aws-2026-11" --jq .content | base64 -d`).
 - Lo que hace ahora: si `.aos/verify.json` no está versionado en el origen, lleva por defecto `pack`, `verify.json` y `config.json` (tu `AOS_MOVER_EXTRA_PARTS` de 20:34Z sigue valiendo; no se duplican); exige `AOS_MOVER_CLI`; no muda si la VM ya tiene algo en `/opt/aos/betty/.aos/pack` (sale con 7); y antes de congelar tu bus compara las specs por estado de cada pack entre este PC y la VM, y si no cuadran para con 8 sin congelar nada ni sacarte del registro.
