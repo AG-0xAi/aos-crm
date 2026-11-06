@@ -2,16 +2,16 @@ name: CI UI
 
 on:
   pull_request:
-  merge_group:
+    branches: [betty/factory]
   push:
-    branches: [main]
+    branches: [betty/factory]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/betty/factory' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 jobs:
   changed-files-check:

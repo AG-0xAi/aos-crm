@@ -2,14 +2,16 @@ name: CI Shared
 
 on:
   pull_request:
-  merge_group:
+    branches: [betty/factory]
+  push:
+    branches: [betty/factory]
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 jobs:
   changed-files-check:

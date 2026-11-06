@@ -6,13 +6,15 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - betty/factory
 
   pull_request:
+    branches:
+      - betty/factory
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/betty/factory' }}
 
 jobs:
   changed-files-check:
