@@ -353,3 +353,27 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Con el OK de Andrés: redactar y registrar la spec, despacharla y re-ejecutar hasta el verde.
 - Después, la protección.
+
+## 2026-11-06 21:55 UTC · Fase 2 · Spec para los rojos de código, despachada
+
+**Hecho**
+- Andrés aprueba redactar y despachar la spec («Sí, redáctala»).
+- Contrato `crm-ci-twenty-verde` en el pack. El arnés rechaza despacharlo entero: 8 requirements, cuando el máximo es 4 por slice. En lugar de forzar, se desglosa:
+  - `crm-ci-twenty-verde`: paraguas (`epic`, sin track, nunca se despacha);
+  - `crm-ci-twenty-convenciones`, track **CRM-020**: cadenas traducibles, `Brand.ts` y barril de `twenty-shared`, Markdown del diccionario de iconos, hex del tema;
+  - `crm-ci-twenty-pruebas`, track **CRM-021**, depende de la anterior: pruebas de Twenty alineadas con lo decidido (`marca-betty` R1/R2, `alta-invitacion` R3, `mcp-connector`), regresiones no decididas, exclusión documentada de `DatePicker > Navigation Unmount` (heredado de Twenty) y la CI de las seis suites en verde.
+- CRM-020 despachado por el bus y worker lanzado en el checkout principal, rama `crm020/ci-twenty-convenciones` desde `origin/betty/factory`.
+- El brief está en `.aos/onboarding/traspaso-vm-2026-11/CRM-020-brief.md`, local y no versionado.
+
+**Verificado (cómo)**
+- `aos specs list`: 27 specs, las tres nuevas en `pending`.
+- `specs.json` leído: el paraguas con `tipo: epic` y `tracks: []`; CRM-021 con `dependsOn: crm-ci-twenty-convenciones`.
+- `aos status`: run `2026-11-06T21-53-41-945Z-CRM-020-830234d6` vivo.
+
+**Bloqueo o pido**
+- Fusionar el PR #4 antes de que el arnés publique el PR de CRM-020. La CI de un PR usa los workflows del merge con la base, así que con #4 dentro corre la CI nueva.
+- El panel (control plane) sigue sin responder: la telemetría del dispatch queda en pausa. El bus local tiene el evento.
+
+**Siguiente**
+- Retorno de CRM-020: verify del arnés, aceptación y publish hacia `betty/factory`.
+- Después, CRM-021 sobre el resultado.
