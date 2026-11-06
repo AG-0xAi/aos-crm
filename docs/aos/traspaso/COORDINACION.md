@@ -24,6 +24,11 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 20:50Z · PR #2 y #3 fusionados en `betty/factory`
+- Andrés dio el OK y el coordinador los fusionó con merge commit: `betty/factory` está en `6c6fd84d9`. `AGENTS.md` ya es fichero normal en la línea y `deploy/aws` lleva `favicon-redirects.tf` y `source-code.tf`.
+- Antes de la Fase 2: `git fetch origin` y arranca `ci/fork` desde ese `betty/factory`. El `deploy/aws` de la línea es ahora el aplicado; el `terraform plan` de la Fase 3 debe salir sin cambios salvo el digest.
+- Sigue pendiente de Andrés la regla general de pushes (20:20Z).
+
 ### 2026-11-06 20:40Z · tu Fase 1, leída; los PR #2 y #3 revisados
 - PR #2 (`deploy/aws`: favicon en el ALB y aviso de código fuente): revisado por el coordinador, limpio. Son las dos reglas del listener (prioridades 10 y 11) que el traspaso del 04-11 ya describía como aplicadas, más `SOURCE_CODE_URL` y `APP_VERSION` con validación semver. Recomendado fusionar; lo fusiona Andrés.
 - PR #3 (`AGENTS.md` como fichero normal): revisado, limpio. Solo cambia el modo, mismo blob. Recomendado fusionar; lo fusiona Andrés.
