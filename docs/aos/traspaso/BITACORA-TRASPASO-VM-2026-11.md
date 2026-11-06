@@ -180,3 +180,32 @@ f) Lo desplegado en AWS (perfil `aos-crm-dev`, usuario `aos-agente`)
 
 **Siguiente**
 - Con esa respuesta: subir `codex/crm019-favicon-alb`, abrir su PR hacia `betty/factory` y hacer el PR de `AGENTS.md`.
+
+## 2026-11-06 20:05 UTC · Fase 1 · Respaldo con override y PR de `AGENTS.md`
+
+**Hecho**
+- Andrés autoriza en el chat el override de la guarda `pre-push` para las dos piezas con trabajo único («Sí, con override»).
+- `codex/crm019-favicon-alb` subida con override (motivo registrado en el bus).
+  - PR hacia `betty/factory`: https://github.com/AG-0xAi/aos-crm/pull/2
+  - Fusiona sin conflictos: 3 ficheros de `deploy/aws`, +76.
+- `AGENTS.md` como fichero normal en `fix/agents-md-fichero` (`394cf37a`).
+  - Solo cambia el modo, de `120000` a `100644`, con el mismo blob `cd3d936e`.
+  - Subida con override; PR hacia `betty/factory`: https://github.com/AG-0xAi/aos-crm/pull/3
+  - Detalle: en este PC `.git/info/exclude` (puesto por `aos init`) excluye `/AGENTS.md`. Hubo que añadirlo con `git add -f` y commitear desde el índice, porque con `core.symlinks=false` un commit con pathspec conserva el modo del enlace.
+- Las 33 ramas `codex/*` sin commits propios no se suben: su contenido ya está en `betty/factory`. `aos-private/*` queda fuera del fork, por decisión de Andrés.
+
+**Verificado (cómo)**
+- `git rev-list --left-right --count <rama>...origin/<rama>`: 0/0 en `betty/factory`, `codex/crm016-alta-invitacion`, `codex/crm019-marca-betty`, `codex/crm019-favicon-alb`, `fix/agents-md-fichero` y `traspaso/vm-2026-11`.
+- `scan-secrets.sh` sobre el `deploy/aws` de `codex/crm019-favicon-alb`: exit 0.
+- `git archive <ref> AGENTS.md | tar -tv`:
+  - antes: `lrwxrwxrwx ... AGENTS.md -> # AOS-CRM ...`;
+  - después: `-rw-rw-r-- ... 11323 ... AGENTS.md`.
+- `.aos/` fuera del repo y sin `.env` ni `tfvars` en la historia (Fase 0, punto c).
+
+**Bloqueo o pido**
+- Los dos overrides dejaron un evento `gate.override` (`UNTRACKED`, Needs S-00 = yes) en la cola de aceptación del bus. Lo cierra S-00 o Andrés, no este agente.
+- Fusionar los PR #2 y #3 en `betty/factory` (Andrés). No hay CI todavía: la evidencia es la de cada PR.
+- **Antes de la Fase 2:** una regla para los pushes del traspaso. Cada iteración de CI es un push, y la guarda exige un gate local de hora y media por commit u override.
+
+**Siguiente**
+- Fase 2 (poda de workflows y CI en `ci/fork` hacia `betty/factory`), en cuanto haya regla de pushes.
