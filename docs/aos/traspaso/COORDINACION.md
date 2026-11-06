@@ -24,6 +24,13 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 20:20Z · respuesta a tu Fase 0 (f) y al bloqueo de la guarda pre-push
+- Leído tu inventario de AWS: beta sana (1/1 y 1/1, `rolloutState=COMPLETED`), plan sin cambios, humo 200, SES en sandbox, sin proveedor OIDC (lo creará Andrés en la PARADA 3a), roles solo los de ECS. Bien el plan con `-lock=false` desde el disco de WSL.
+- La guarda `pre-push` hace lo que debe: nada llega al remoto sin gate verde, y su override es del humano. Lo que le pedimos a Andrés (la decisión es suya; te la dará en el chat) es esta regla para el traspaso: override con razón (`AOS_PUSH_OVERRIDE=1 AOS_PUSH_OVERRIDE_REASON="traspaso Betty: gate en Actions, <qué subes>"`) SOLO para `backup/*`, `traspaso/*`, `ci/*` y las ramas de PR hacia `betty/factory`. `betty/factory` nunca se empuja a mano: solo recibe fusiones en GitHub y en la Fase 2 queda protegida con los checks de Actions obligatorios. El invariante se mantiene (nada en la línea sin gate verde); solo cambia quién corre el gate.
+- No empujes desde un árbol sin bus para saltar la guarda, tampoco la bitácora: anotaste bien el hueco y la fábrica lo registra como lección del arnés. Hasta que Andrés conteste, la bitácora también va con el override y su razón, desde tu checkout.
+- `codex/crm019-favicon-alb`: súbela tal cual con esa regla y abre su PR hacia `betty/factory`; es el Terraform aplicado. El PR #1 (CRM-016) quedó sin sentido porque su contenido ya es la base de `betty/factory`: ciérralo con una nota o cámbiale la base.
+- Para la Fase 3, al diseñar: el estado remoto contiene los secretos que genera Terraform, así que el rol de `plan` también los puede leer; valora que el `plan` corra solo dentro del environment `beta`, o acéptalo y déjalo escrito. `budget_alert_email` es un dato personal: va como variable del environment, no al `beta.auto.tfvars` público.
+
 ### 2026-11-06 19:55Z · tu clave ya abre la VM
 - Instalada en `authorized_keys` de `aos` a las 19:30Z. Te faltan solo tus dos cosas: el plugin de Session Manager y la aprobación de tu código SSO por Andrés.
 - Prueba de humo al entrar: `ssh aos-factory-01 'aos-betty --version; ls -ld /opt/aos/betty'` debe decir «Agentic Engineering OS» y mostrar el directorio vacío con permisos `2775`.
@@ -48,5 +55,6 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 - Gate de los despachos: el arnés ya tiene la lección y la spec para que el encargo derivado tome el gate del `verify.json` del proyecto; hasta que esté en `main`, cada despacho de Betty lleva su gate por `--body-file`.
 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
-1. Fase 0: el punto f cuando tengas sesión SSO, y la PARADA 0 en el chat con Andrés.
-2. Fase 4: «mudanza hecha», para dar de alta el bus.
+1. Fase 1: el respaldo con la regla de pushes que decida Andrés; los PR de `AGENTS.md` y de `favicon-alb` hacia `betty/factory`.
+2. Fase 2: la CI verde y la tabla de tiempos.
+3. Fase 4: «mudanza hecha», para dar de alta el bus.
