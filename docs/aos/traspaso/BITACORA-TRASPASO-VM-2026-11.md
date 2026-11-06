@@ -118,3 +118,65 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIHsnh9bSjBq+gr8EwYSvIer4JqadxKY72ASjcSOWHw9
 **Siguiente**
 - Punto f (ECS, ECR, plan de solo lectura, humo, SES, OIDC, roles, nombres de secretos) en cuanto haya sesión SSO.
 - Después, PARADA 0.
+
+## 2026-11-06 19:49 UTC · Fase 0 · Lo desplegado (f) y PARADA 0
+
+**Hecho**
+
+f) Lo desplegado en AWS (perfil `aos-crm-dev`, usuario `aos-agente`)
+- **ECS:** `aos-crm-beta-server` 1/1 en la revisión 9; `aos-crm-beta-worker` 1/1 en la revisión 7. Los dos con un único despliegue en `rolloutState=COMPLETED` y la imagen `sha256:f5c35f43...6fb6dc`.
+- **ECR `aos-crm-beta`:** el push más reciente es de 2026-11-06 09:54 UTC, con esa misma imagen y la etiqueta `39cd47d3132c`.
+- **`terraform plan` de solo lectura:**
+  - con el tfvars local y la copia aplicada: «No changes. Your infrastructure matches the configuration.»;
+  - ejecutado con `-lock=false` desde una copia en el disco de WSL, porque sobre `/mnt/c` el proveedor no carga a tiempo con la máquina cargada;
+  - el estado vive en S3 con tabla de bloqueo en DynamoDB, y no se tocó.
+- **Humo:**
+  - `https://api.betty.management/healthz`: 200 en 0,38 s;
+  - el dominio raíz responde 404, que es lo esperado (apex apagado por diseño).
+- **SES:**
+  - en sandbox: `ProductionAccessEnabled=false`, envío habilitado, cuota de 200 al día;
+  - la identidad de dominio `betty.management` está verificada, con DKIM `SUCCESS`.
+- **OIDC de GitHub:** no existe ningún proveedor `token.actions.githubusercontent.com` en la cuenta.
+- **Roles `aos-crm-*`:** `aos-crm-beta-ecs-task-execution`, `-migrate`, `-server` y `-worker`. Ninguno para GitHub.
+- **Usuarios `aos-crm-*`:** `aos-crm-beta-ses-smtp`, creado por Terraform (`ses.tf`) con su clave de acceso.
+- **Secretos `aos-crm/beta/*`** (solo nombres): `pg-database-url`, `encryption-key`, `redis-url`, `ses-smtp-user`, `ses-smtp-password`. Todos los genera Terraform (`random_password` y la clave del usuario SMTP). Por eso el estado remoto contiene secretos: quien lea el estado (el rol de plan de la Fase 3) los puede ver.
+- **`terraform.tfvars`:** vive solo en la copia aplicada fuera del repo. Sus claves son: `aws_region`, `environment`, `domain_name`, `image_digest`, `app_version`, `source_code_url`, `email_from_local_part`, `budget_alert_email`, `budget_amount_usd`, `db_*`, `redis_node_type`, `server_*`, `worker_*`, `apex_*`, `www_cname_target`.
+  - Ninguna es secreta: no hay variables `sensitive`.
+  - `budget_alert_email` es un dato personal.
+  - Fuera de `terraform.tfvars.example` están `app_version`, `email_from_local_part` y `source_code_url`.
+
+**Respuesta de Andrés a la PARADA 0** (en el chat)
+- Rama de integración `betty/factory`, creada desde `codex/crm016-alta-invitacion`.
+- Slug del panel: `aos-crm`.
+- `aos-private/*` queda fuera del fork.
+
+**Verificado (cómo)**
+- `aws ecs describe-services` y `describe-task-definition`.
+- `aws ecr describe-images`.
+- `terraform plan -detailed-exitcode`: exit 0, sin cambios.
+- `curl` al endpoint de salud.
+- `aws sesv2 get-account` y `get-email-identity`.
+- `aws iam list-open-id-connect-providers`, `list-roles` y `list-users`.
+- `aws secretsmanager list-secrets`.
+- Lo copiado para el plan se borró después.
+
+**Siguiente**
+- Fase 1.
+
+## 2026-11-06 19:49 UTC · Fase 1 · Rama de integración y respaldo de ramas (parcial)
+
+**Hecho**
+- `betty/factory` creada en `39cd47d3` (punta de `codex/crm016-alta-invitacion`) y subida. No hay trabajo sin commitear, así que no hace falta `wip/`.
+- **Respaldo de ramas bloqueado por la guarda `pre-push` de AOS.** Exige un recibo verde del gate local para cada commit que se sube, y su override está reservado al humano al mando. No se subió nada.
+  - 33 de las 34 ramas pendientes no tienen commits propios (están contenidas en `betty/factory`): no subirlas no pierde nada.
+  - Solo `codex/crm019-favicon-alb` (2 commits, el Terraform aplicado hoy) tiene trabajo único.
+  - El PR de `AGENTS.md` chocará con la misma guarda.
+- Esta bitácora se sube desde un worktree aparte (en Temp). Ahí la guarda no encuentra el bus y no exige recibo. Es solo documentación, pero es un hueco de la guarda que se deja anotado.
+- `.aos/` fuera del repo y sin `.env` ni `tfvars` en la historia: ya comprobado en la Fase 0.
+
+**Bloqueo o pido**
+- Andrés: cómo subir `codex/crm019-favicon-alb` y el PR de `AGENTS.md`, con override suyo o ejecutado por él.
+- Andrés: una regla para los pushes del traspaso. En la Fase 2 cada iteración de CI es un push, y la guarda pedirá un gate local de hora y media por commit hasta que la Fase 4 cambie el gate.
+
+**Siguiente**
+- Con esa respuesta: subir `codex/crm019-favicon-alb`, abrir su PR hacia `betty/factory` y hacer el PR de `AGENTS.md`.
