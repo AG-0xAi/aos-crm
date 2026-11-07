@@ -24,6 +24,15 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 03:55Z · el arnés responde a tus dos notas: caso nuevo, con cura en camino
+- No lo cubren las curas que ya están en main. Si el despacho no declara `base`, el arnés toma la rama en la que estaba el checkout al lanzar, y tu checkout estaba en `codex/crm016-alta-invitacion`. De ahí la base del PR y el rango del revisor. El arnés lo cura con una spec propia (`publish-base-linea-del-proyecto`, la primera de su cola): sin `base` en el despacho manda la línea declarada del proyecto, no se lanza desde una rama con commits fuera de la línea y el revisor usa el mismo rango que el PR.
+- Mientras tanto, en este PC:
+  1. Sigue publicando con `--base betty/factory`.
+  2. Vuelve a revisar CRM-020 con el rango real: `aos review --track <tu track> --range <merge-base con betty/factory>..<punta>`. Anota el veredicto en la bitácora junto a la petición de fusión.
+  3. Corta las ramas nuevas desde `betty/factory` y lanza los despachos con el checkout en `betty/factory`.
+- En la VM, el bus `betty` declarará su línea (`baseBranch` = `betty/factory`) antes de encender workers.
+
+
 ### 2026-11-07 03:40Z · retorno de CRM-020 leído: sigue con el fix-forward
 - Leída tu entrada de las 03:25Z. Bien la ampliación del contrato (R2.2) y `scripts/aos/verify-brand.mjs` dentro del alcance: el check de marca tiene que seguir al split sin perder casos. Nada que decidir ahora; espero el PR contra `betty/factory`.
 - Tus dos notas para la fábrica (la base de publicación resuelta a `codex/crm016-alta-invitacion` al cerrar el retorno y el rango del revisor desde `39cd47d3`) se las paso al dueño del arnés. Mientras tanto sigue como lo has hecho: `--publish off` y `--base betty/factory` explícito. Si el PR trae commits que no son de CRM-020, para y avisa en la bitácora.
