@@ -561,3 +561,29 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - CI del PR #5 sobre `2b09f008`. Si los únicos rojos son los de CRM-021: aceptación de CRM-020 y petición de fusión aquí.
 - Registradas como `pending`: `crm-traducciones-marca`. Falta el desglose de CRM-021 por área.
+
+## 2026-11-07 · Fase 2 · CI del PR #5 sobre `2b09f008`: CRM-020 cumplido; aceptación pendiente de override
+
+**Hecho**
+- CI del PR #5 terminada: 61 checks en verde y 15 en rojo. Ya no corre ningún `pull_request_target` de `main`.
+- En verde lo que faltaba de CRM-020:
+  - `server-validation`, con los generados de front y el cliente del SDK;
+  - `front-task (lint)`;
+  - `server-lint-typecheck`, que mide ya el typecheck del servidor y su `lingui:extract`.
+- `aos done --archive --track CRM-020` rechazado: toma el verify del retorno del worker, que se cortó en `verify-server-specs` por el límite de construcción («exited unmeasured»), y no el recibo posterior del mismo commit (`.aos/receipts/2b09f008.json`, 32/32). Para aceptar hace falta `--force`, que queda auditado como `gate.override`. Lo decide Andrés.
+- Registradas como `pending` para la VM: `crm-traducciones-marca` y `crm-antibots-alta` (captcha y correo verificado antes de abrir el registro; pregunta de Andrés de hoy).
+
+**Verificado (cómo): logs de los jobs en rojo de las dos ejecuciones, comparados por prueba**
+- Mismas pruebas en rojo que en la ejecución anterior (`5ef15d20`): `front-task (test, 2)` 11/11, `server-test (2)` 4/4, `front-sb-test-modules (2)`, `ui-sb-test` y los mismos ficheros en `server-integration-test` 1, 4, 7, 8, 9, 11 y 13. Es la lista de CRM-021.
+- Dos fallos sueltos más, en código de upstream que no tocamos (`git diff 15e4826d..HEAD` vacío en las dos rutas) y dentro de jobs que ya estaban en rojo:
+  - `DatePicker > Navigation Unmount`, el intermitente heredado que ya fallaba en la CI de Twenty;
+  - `DraggableList > Pointer Grip Reorder`, en `front-sb-test-modules (7)`.
+  - Los dos son para la lista de CRM-021, como intermitentes que vigilar.
+
+**Bloqueo o pido**
+- Andrés: OK para aceptar CRM-020 con `--force`, con la razón «verify del retorno sin medir por tiempo de construcción; mismo commit 32/32 en el recibo 2b09f008».
+- Fusión del PR #5 en `betty/factory` (cabeza `2b09f008`), una vez aceptado. Coordinador: queda tu lectura de los veredictos del revisor de la entrada anterior.
+
+**Siguiente**
+- Con el OK: aceptación de CRM-020 y comprobación de que la spec queda en `done`.
+- Con #5 fusionado y sin runs en vuelo: mudanza (Fase 4), cuando la VM tenga capacidad.
