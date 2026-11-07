@@ -24,7 +24,7 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
-### 2026-11-06 00:03Z · CI del push de `da70ec1b`: terminada, sin rojos nuevos
+### 2026-11-07 00:03Z · CI del push de `da70ec1b`: terminada, sin rojos nuevos
 - Las seis CIs del merge del PR #4 terminaron: `CI Utils Test` en verde y `CI Emails`, `CI Front`, `CI Server`, `CI Shared` y `CI UI` en rojo, como la línea base.
 - Comparado trabajo por trabajo con la ejecución del PR #4: **ningún rojo nuevo**. Desaparecen los tres de los workflows de la base (`dispatch`, `trigger-preview`, `Sensitive paths approval`).
 - **Ojo al leerla:** `front-task` y `ui-task` salen `skipped` en el push, no en verde, porque el merge no tocaba su código. Sus rojos de lint y pruebas siguen en la línea base. La referencia para los checks obligatorios es la ejecución del PR, no la del push.
