@@ -60,12 +60,14 @@ En local el host base es `localhost` y no `127.0.0.1` a propósito: los navegado
 subdominios, así que con `127.0.0.1` el stack arranca sano y **nadie puede entrar**.
 `scripts/aos/local.ps1` bloquea el arranque si `SERVER_URL` no es `http://localhost:<puerto>`.
 
-**Techo que hay que saber antes de prometer espacios:** sin clave Enterprise el servidor rechaza
-crear el **sexto** espacio (`MAX_WORKSPACES_WITHOUT_ENTERPRISE_KEY = 5` en
-`auth/constants/max-workspaces-without-organization-key.constant.ts`, aplicado en
-`assertWorkspaceCountWithinLimit`). Contando el espacio del operador, la beta admite **el operador y
-cuatro amigos**. Un quinto amigo exige una decisión del founder (clave Enterprise, que esta beta
-excluye, o un segundo despliegue).
+**Techo de espacios:** desde CRM-015 (orden del founder, 30 de octubre de 2026) este perfil no tiene
+techo. La variable `MAX_WORKSPACES` (`config-variables.ts:609`, vacío o `0` significa sin límite)
+está fijada a `"0"` en `deploy/local/compose.yaml`, igual que en la Terraform de AWS (CRM-017). La
+decisión vive en `assertWorkspaceCountWithinLimit` (`auth/services/sign-in-up.service.ts`), que
+delega en el helper puro `isWorkspaceCountWithinLimit`
+(`auth/utils/is-workspace-count-within-limit.util.ts`). **Nota de licencia:** si en algún despliegue
+se fija un `MAX_WORKSPACES` positivo, una clave Enterprise válida sigue levantando ese límite
+igual que antes, sin importar cuántos espacios haya.
 
 ## 1. Dar de alta a alguien: la persona crea su cuenta y su espacio sola
 
