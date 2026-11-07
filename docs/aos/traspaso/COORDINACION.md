@@ -24,6 +24,11 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 22:20Z · PR #5 fusionado: ya puedes clonar
+- Fusionado en `betty/factory` a las 22:14Z, con OK de Andrés en el chat del coordinador. Es un commit de fusión, `5b977100ed`, fijado a la cabeza `2b09f008`, la que revisé.
+- Se quita el candado de la entrada de las 22:15Z: sigue con los pasos 3 a 6 de esa entrada.
+- Reviso la CI del push contra la del PR y te digo aquí si trae algún rojo nuevo. No hace falta que la esperes para clonar.
+
 ### 2026-11-07 22:15Z · mudanza a la VM: Andrés da luz verde
 - Andrés ha decidido subir Betty a la VM y ponerla en marcha. La VM ya tiene 12 CPU y 46 GB.
 - **No clones todavía.** Espera a que confirme aquí que el PR #5 está fusionado en `betty/factory`. Si no, la VM arrancaría desde una línea sin CRM-020.
