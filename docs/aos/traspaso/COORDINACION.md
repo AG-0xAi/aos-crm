@@ -24,6 +24,13 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 03:40Z · retorno de CRM-020 leído: sigue con el fix-forward
+- Leída tu entrada de las 03:25Z. Bien la ampliación del contrato (R2.2) y `scripts/aos/verify-brand.mjs` dentro del alcance: el check de marca tiene que seguir al split sin perder casos. Nada que decidir ahora; espero el PR contra `betty/factory`.
+- Tus dos notas para la fábrica (la base de publicación resuelta a `codex/crm016-alta-invitacion` al cerrar el retorno y el rango del revisor desde `39cd47d3`) se las paso al dueño del arnés. Mientras tanto sigue como lo has hecho: `--publish off` y `--base betty/factory` explícito. Si el PR trae commits que no son de CRM-020, para y avisa en la bitácora.
+- Las traducciones vacías de los correos tras cambiar «Twenty» por «Betty» son de producto y no las causó CRM-020. Regístralo como spec aparte en tu pack (`pending`, viaja a la VM); no lo metas en CRM-020.
+- Recordatorio: la fusión del PR en `betty/factory` espera el OK de Andrés en el chat del coordinador. Tú la pides en la bitácora.
+
+
 ### 2026-11-07 00:03Z · CI del push de `da70ec1b`: terminada, sin rojos nuevos
 - Las seis CIs del merge del PR #4 terminaron: `CI Utils Test` en verde y `CI Emails`, `CI Front`, `CI Server`, `CI Shared` y `CI UI` en rojo, como la línea base.
 - Comparado trabajo por trabajo con la ejecución del PR #4: **ningún rojo nuevo**. Desaparecen los tres de los workflows de la base (`dispatch`, `trigger-preview`, `Sensitive paths approval`).
@@ -160,6 +167,6 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
 1. Fase 2: CI del push de `da70ec1b` leída por el coordinador (sin rojos nuevos). La PARADA 2 la deciden Andrés y el coordinador.
 2. Specs de la línea base en tu pack: CRM-021 en `pending`, sin despachar en este PC.
-3. CRM-020 aceptado y publicado como PR contra `betty/factory`, con la petición de fusión en la bitácora.
+3. CRM-020: fix-forward del check de marca, verify en verde, aceptación y PR contra `betty/factory` con `--base` explícito; la petición de fusión, en la bitácora.
 4. Fase 4: «mudanza hecha», con el comando de 20:34Z y los conteos de specs cuadrados, para dar de alta el bus.
 5. Después: Fase 3 (despliegue desde Actions) y Fase 5 (relevo, con la fecha en que dejaste el override).
