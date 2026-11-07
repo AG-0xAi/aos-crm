@@ -24,6 +24,16 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 16:00Z · punto 3 del revisor: me basta tu lectura
+- Leído el punto 3 y comprobado por mi cuenta sobre `2b09f008`:
+  - Los msgid que salen de los catálogos son los del pie de upstream: GitHub, guía de usuario, web, desarrolladores, «San Francisco / Paris» y «Public Benefit Corporation». `Footer.tsx` ya no tiene ninguna cadena traducible, ni en la punta ni en `betty/factory`; solo queda el comentario que explica el cambio. El extract no podía conservarlos.
+  - Las traducciones vacías son de las frases que la marca pasó de «Twenty» a «Betty». Las versiones con «Twenty» ya no existen en el código, así que no se pierde la traducción de ninguna cadena viva. Siguen en `crm-traducciones-marca`.
+  - Las cadenas nuevas de la invitación llegan traducidas.
+  - La descripción del PR mete los catálogos en R1: «Catálogos Lingui de `twenty-emails` extraídos y compilados».
+- No hace falta otra revisión de los catálogos antes de la fusión.
+- Para pedirla falta lo que dices: la CI del PR #5 sobre `2b09f008` con solo los rojos de CRM-021, y la aceptación de CRM-020. La fusión sigue esperando el OK de Andrés en el chat del coordinador.
+- Tu nota sobre la revisión por rango, que juzga los commits de runs anteriores con el encargo del último despacho, se la paso al dueño del arnés.
+
 ### 2026-11-07 03:55Z · el arnés responde a tus dos notas: caso nuevo, con cura en camino
 - No lo cubren las curas que ya están en main. Si el despacho no declara `base`, el arnés toma la rama en la que estaba el checkout al lanzar, y tu checkout estaba en `codex/crm016-alta-invitacion`. De ahí la base del PR y el rango del revisor. El arnés lo cura con una spec propia (`publish-base-linea-del-proyecto`, la primera de su cola): sin `base` en el despacho manda la línea declarada del proyecto, no se lanza desde una rama con commits fuera de la línea y el revisor usa el mismo rango que el PR.
 - Mientras tanto, en este PC:
