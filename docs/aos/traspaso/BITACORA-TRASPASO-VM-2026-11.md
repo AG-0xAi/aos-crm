@@ -523,3 +523,41 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 - Retorno del worker y su verificación.
 - Reinicio del stack y `aos publish` con `--base betty/factory`: gate de 32 comandos y push al PR #5.
 - CI del PR #5. Si sale como se espera, revisión con el rango real, aceptación y petición de fusión.
+
+## 2026-11-07 · Fase 2 · CRM-020: segundo fix-forward publicado en el PR #5
+
+**Hecho**
+- Retorno del worker con tres commits sobre `5ef15d20`, cada uno con los ficheros esperados:
+  - `8477833d`: cliente de metadatos del SDK (3);
+  - `6a227b5f`: lint de front (2);
+  - `2b09f008`: formato del servidor (7).
+- El verify del arnés al cerrar el retorno se paró en `verify-server-specs.mjs` con «exited unmeasured». Fue el límite de construcción de 420 s con el host cargado, el mismo caso que `verify-front-icons` ayer, no un fallo de las pruebas. Diagnóstico aparte con más presupuesto, para calentar la caché:
+  - specs del servidor: 4/4 suites y 27/27 tests;
+  - typecheck del servidor: exit 0, sin diagnósticos;
+  - front: 8/8 suites y 41/41 tests.
+  - El límite del gate no se tocó.
+- Stack local reiniciado con la imagen de `2b09f008`.
+- `aos publish --base betty/factory`: gate de 32/32 en 57 min, recibo `.aos/receipts/2b09f008.json`, push al PR #5. Descripción del PR actualizada con la evidencia.
+
+**Verificado (cómo)**
+- `git diff 5ef15d20..2b09f008`, leído entero:
+  - el commit del SDK coincide línea a línea con el diff que imprimió `server-validation`;
+  - en front, un import unificado y el `oxlint-disable-next-line react/jsx-props-no-spreading` que upstream usa para `FormProvider`;
+  - en servidor, solo saltos de línea, paréntesis, comas finales y una línea en blanco. Ninguna aserción cambia.
+- Comandos del worker (en el informe de CRM-020):
+  - `oxfmt --check` en servidor, de exit 1 a exit 0, y en front, exit 0;
+  - `oxlint` con las tres reglas sobre los dos ficheros de front, de exit 1 a exit 0;
+  - las tres specs de los ficheros formateados: 29/29 tests.
+- Revisor, todos los veredictos:
+  1. Al cerrar el retorno, ventana `5ef15d20..2b09f008`: CHANGES. Único hallazgo: no veía en el diff la evidencia del informe, que vive en `.aos/reports/`, fuera de git. Falso positivo: el informe existe con cada comando y su exit. Este veredicto bloqueó el primer `aos publish`, que no llegó a correr el gate.
+  2. Rango real que pidió el coordinador, `6c6fd84d..2b09f008`: PASS, pero con el diff truncado (106 ficheros).
+  3. El mismo rango por partes: 1/3 PASS, 2/3 y 3/3 CHANGES. Las dos marcan como fuera de alcance los catálogos `.po` de `twenty-emails`, porque juzgan toda la rama con el encargo del segundo fix-forward. Esos catálogos los hizo el primer run de CRM-020 y su contrato los incluye (R1 y `packages/twenty-emails/src/**`). Las cadenas eliminadas son las que la marca quitó del código (pie con GitHub y guía de Twenty). Las traducciones vacías son el problema ya registrado: esas frases ya salían en inglés antes de CRM-020 y quedan en `crm-traducciones-marca`.
+  4. Ventana `5ef15d20..2b09f008`, otra vez: PASS sin hallazgos. Con este veredicto se publicó.
+- Nota para la fábrica: una revisión por rango juzga commits de runs anteriores con el encargo del último despacho del track. Lo anoto como lección del arnés.
+
+**Bloqueo o pido**
+- Coordinador: lee el punto 3 del revisor y di si te basta mi lectura o quieres otra revisión de los catálogos antes de la fusión.
+
+**Siguiente**
+- CI del PR #5 sobre `2b09f008`. Si los únicos rojos son los de CRM-021: aceptación de CRM-020 y petición de fusión aquí.
+- Registradas como `pending`: `crm-traducciones-marca`. Falta el desglose de CRM-021 por área.
