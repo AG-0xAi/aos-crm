@@ -463,3 +463,34 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Leer la CI del PR #5 cuando termine: R1-R4 en verde y la lista real para CRM-021, incluido el lint y el typecheck del servidor.
 - Con eso, aceptación de CRM-020 y brief de CRM-021.
+
+## 2026-11-07 · Fase 2 · CI del PR #5 leída; rama por defecto cambiada
+
+**Hecho**
+- Andrés aprobó, con otro agente, poner `betty/factory` como rama por defecto. Comprobado con `gh api repos/AG-0xAi/aos-crm --jq .default_branch`. Los `pull_request_target` de `main` dejan de correr en los PR nuevos.
+- Leída la coordinación de 23:34Z, 00:03Z, 03:40Z y 03:55Z. Orden vigente: CRM-020 cierra aquí, después la mudanza, y CRM-021 se despacha en la VM.
+- CI del PR #5 (cabeza `5ef15d20`) terminada: 60 checks en verde y 20 en rojo.
+
+**Verificado (cómo): jobs y logs con `gh api .../actions/jobs/<id>/logs`**
+- Rojos de la línea base que cubría CRM-020, ahora en verde:
+  - `ci-emails-status-check` y `ci-shared-status-check` (lint, test y typecheck);
+  - `ui-task (test)`, con el diccionario de iconos;
+  - `front-task (lingui-extract)` y `(lingui-compile)`;
+  - historias de `ThemeProvider` fuera de la lista de `ui-sb-test`;
+  - `SettingsLegalDpaNew.tsx:96` ya no sale en el lint de front.
+- Rojos nuevos, que la CI no alcanzaba mientras fallaba lo anterior. Todos de código nuestro y ninguno visible para el usuario:
+  - `server-validation`: el esquema GraphQL generado y el cliente de metadatos del SDK (`packages/twenty-client-sdk/src/metadata/generated/schema.graphql`, `schema.ts`, `types.ts`) no se regeneraron tras los endpoints de CRM-016;
+  - `front-task (lint)`: `SettingsCompositeFieldTypeConfigs.ts:1/20`, import duplicado de `twenty-shared/constants` (gate de marca, CRM-019); `SignInUpEmailField.test.tsx:30`, `jsx-props-no-spreading` (CRM-016);
+  - `server-lint-typecheck`: formato de `mcp-excluded-tool-names.constant.spec.ts` y `build-mcp-server-info.util.spec.ts`. El typecheck del servidor sigue sin medirse porque el lint falla antes.
+- Rojos de CRM-021, como se esperaba:
+  - `ui-sb-test`: 11 historias de marca (`LightButton`, `LightIconButton`, `MainButton`, `ReactionButton`, `Badge`, `Skeleton`, `Select`, `Text`);
+  - storybook de front, módulos 2 y 7;
+  - `front-task (test, 2)`, `server-test (2)` y `server-integration-test` 1, 4, 7, 8, 9, 11 y 13.
+
+**Bloqueo o pido**
+- Decisión de Andrés: cerrar CRM-020 con lo que arregló y llevar los rojos nuevos a una spec `pending` para la VM, o arreglarlos aquí antes de mudar. Para lo primero hay que sacar del R3 de CRM-020 los generados que aparecieron después.
+- La fusión del PR #5, después de esa decisión y de `aos review --range 6c6fd84d..5ef15d20`.
+
+**Siguiente**
+- Según la decisión: contrato, revisión con el rango real, aceptación y petición de fusión.
+- Specs `pending` para la VM: los rojos nuevos, las traducciones vacías de los correos y el desglose de CRM-021 por área.
