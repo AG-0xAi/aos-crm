@@ -437,3 +437,29 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Retorno del fix: restart del stack para el commit nuevo y `aos publish --base betty/factory`.
 - Con el PR abierto, la CI de GitHub mide storybook, integración y el lint y el typecheck del servidor.
+
+## 2026-11-07 07:40 UTC · Fase 2 · CRM-020 publicado (PR #5) y corrección sobre `pull_request_target`
+
+**Hecho**
+- Fix-forward de CRM-020 (`5ef15d20`, un fichero): `verify-brand.mjs` lee todos los `Brand*.ts` y `BrandSocialPreviewImageUrl.ts`; el self-test conserva sus casos negativos.
+- Stack local reconstruido para `5ef15d20`.
+- Segundo `aos publish`: rojo en `verify-front-icons.mjs` (21/32). El build de librerías superó su límite interno de 900 s sin error de código (contención del host). Corrido aparte con `AOS_CRM_FRONT_SOURCES_TIMEOUT_MS=2400000` como diagnóstico: 8/8 suites, 41/41 tests, typecheck de front en 0, build en 646 s. Deja la capa en la caché de Docker.
+- Tercer `aos publish`: gate 32/32 y PR #5 abierto contra `betty/factory`. Título y cuerpo del PR reescritos con la evidencia.
+
+**Verificado (cómo)**
+- `node scripts/aos/verify-brand.mjs` y `--self-test` re-ejecutados: exit 0. Prueba negativa con una ruta inexistente en `BrandAssetPaths.ts`: exit 1 con el fichero correcto; árbol restaurado con `git checkout`.
+- Recibo `.aos/receipts/5ef15d20.json`: 32 comandos con exit 0, `verdict: pass`, 83 min.
+- `gh pr view 5`: base `betty/factory`, cabeza `5ef15d20`, `MERGEABLE`.
+
+**Corrección**
+- La entrada de las 21:24 del 06/11 decía que `dispatch`, `trigger-preview` y `Sensitive paths approval` desaparecerían al fusionar #4. Es falso. Desde el cambio de GitHub de diciembre de 2025, los workflows con `pull_request_target` se leen de la rama por defecto del repo, no de la base del PR. La rama por defecto es `main`, la copia de upstream con sus 59 workflows.
+- Medido en el PR #5: `Preview Environment Dispatch` (`.github/workflows/preview-env-dispatch.yaml`) y `PR Review Dispatch` (`pr-review-dispatch.yaml`) corren y fallan. Ninguno de los dos ficheros existe en `betty/factory`.
+
+**Bloqueo o pido**
+- Decisión de Andrés, porque es un ajuste del repo. Dos opciones:
+  - poner `betty/factory` como rama por defecto: los `pull_request_target`, `workflow_run` y `schedule` pasan a leerse de ahí, y `main` queda intacta;
+  - deshabilitar uno a uno los workflows de upstream que no aplican.
+
+**Siguiente**
+- Leer la CI del PR #5 cuando termine: R1-R4 en verde y la lista real para CRM-021, incluido el lint y el typecheck del servidor.
+- Con eso, aceptación de CRM-020 y brief de CRM-021.
