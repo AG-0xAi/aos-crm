@@ -494,3 +494,32 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Según la decisión: contrato, revisión con el rango real, aceptación y petición de fusión.
 - Specs `pending` para la VM: los rojos nuevos, las traducciones vacías de los correos y el desglose de CRM-021 por área.
+
+## 2026-11-07 · Fase 2 · Andrés: los rojos nuevos de CRM-020 se arreglan aquí
+
+**Hecho**
+- Andrés eligió arreglar en este PC, antes de mudar, los rojos nuevos del PR #5.
+- Medidos los tres con su lista exacta, desde los logs de los jobs:
+  - `server-validation`: solo el cliente de metadatos del SDK (`schema.graphql`, `schema.ts`, `types.ts`). Faltan `helpCenterUrl` y `sourceCodeUrl` en `ClientConfig`, y `signUpInvitationToken` en `signUp` y `SignUpInNewWorkspaceInput`. Los tres `graphql:generate` de front no dan diff.
+  - `front-task (lint)`: los dos errores ya anotados de `oxlint`.
+  - `server-lint-typecheck`: `oxfmt` marca siete ficheros, no dos: los dos de MCP, `sign-in-up.service.ts`, `base-schema.utils.ts`, `sign-up-invitation.service.ts` y su spec, y `create-company.service.ts`.
+- Contrato de CRM-020 ampliado, sin spec nueva:
+  - R3.2: el cliente del SDK regenerado;
+  - R1.2 y R1.3: el resto del lint de front y servidor, solo formato donde se queja `oxfmt` y sin tocar aserciones;
+  - alcance con `packages/twenty-client-sdk/src/metadata/generated/**` y el formato de `packages/twenty-server/src/**`.
+- El gate de despacho rechazó un R5 aparte (máximo 4 requisitos por slice). Lo integré en R1 porque es el mismo job de lint. Sin `--force` ni override.
+- Fix-forward despachado por el bus con `--publish off`, con el checkout en la rama de CRM-020.
+
+**Verificado (cómo)**
+- El diff del cliente del SDK sale del log de `server-validation`, que lo imprime entero: es la salida del generador en la CI. Aplica limpio sobre `5ef15d20` (`git apply --check`). En local no se puede regenerar porque el stack rechaza la introspección sin credencial.
+- `oxfmt` 0.72.0 en local, con la imagen de dependencias del gate:
+  - `twenty-front/src` limpio;
+  - `twenty-server` marca los mismos siete ficheros que la CI. Un octavo, `twenty-next-versions.constant.ts`, lo excluye el `.prettierignore` del paquete.
+
+**Bloqueo o pido**
+- Nada por ahora.
+
+**Siguiente**
+- Retorno del worker y su verificación.
+- Reinicio del stack y `aos publish` con `--base betty/factory`: gate de 32 comandos y push al PR #5.
+- CI del PR #5. Si sale como se espera, revisión con el rango real, aceptación y petición de fusión.
