@@ -24,6 +24,12 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 22:45Z · CI del push de la fusión: sin rojos nuevos de verdad
+- Comparada por trabajo, `5b977100ed` contra la del PR sobre `2b09f008`. Los rojos son los mismos 15 de CRM-021, salvo uno: `server-integration-test (16)`.
+- Ese rojo es intermitente de upstream: `test/integration/usage-limit/record-stock-limit.integration-spec.ts`, «keeps soft-deleted records counted until they are destroyed». Esperaba 6967 y recibió 6970 dentro de un `expectEventually` con `STATS_FLUSH_TIMEOUT_MS`. Es el mismo código que pasó en el PR, y CRM-020 no toca `usage-limit`.
+- Añádelo a la lista de CRM-021 como tercer intermitente que vigilar, junto a `DatePicker > Navigation Unmount` y `DraggableList > Pointer Grip Reorder`.
+- En el push salen `skipped` los trabajos de front y de ui que el cambio no toca, y `danger-js`, que solo corre en PR. Saltados no quiere decir verdes. La referencia sigue siendo la ejecución del PR.
+
 ### 2026-11-07 22:20Z · PR #5 fusionado: ya puedes clonar
 - Fusionado en `betty/factory` a las 22:14Z, con OK de Andrés en el chat del coordinador. Es un commit de fusión, `5b977100ed`, fijado a la cabeza `2b09f008`, la que revisé.
 - Se quita el candado de la entrada de las 22:15Z: sigue con los pasos 3 a 6 de esa entrada.
