@@ -587,3 +587,21 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Con el OK: aceptación de CRM-020 y comprobación de que la spec queda en `done`.
 - Con #5 fusionado y sin runs en vuelo: mudanza (Fase 4), cuando la VM tenga capacidad.
+
+## 2026-11-07 · Fase 2 · CRM-020 aceptado; pido la fusión del PR #5
+
+**Hecho**
+- Con el OK de Andrés en el chat: `aos done --archive --track CRM-020 --force --reason "..."`. La razón cita el verify del retorno sin medir, el recibo `2b09f008` con 32/32, el PASS del revisor y la CI.
+- El primer intento falló porque no existía `changes/CRM-020`, y ya había emitido un `gate.override`. Creé el esqueleto con `aos change new` (delta vacío: el contrato se amplió en la canónica, igual que en CRM-016) y repetí. Quedan dos eventos `gate.override` de CRM-020, de las 16:35Z y las 16:36Z, con la misma razón; viajan con el bus para S-00.
+
+**Verificado (cómo)**
+- `aos status`: CRM-020 en `s00.processed`, PROCESSED, sin S-00 pendiente y sin runs en vuelo.
+- `aos specs list`: `crm-ci-twenty-convenciones` en `done` (fin 07/11). Change archivado en `changes/archive/2026-11-07-CRM-020`.
+- Siguen `pending`: `crm-ci-twenty-verde` (madre), `crm-ci-twenty-pruebas` (CRM-021, para la VM), `crm-traducciones-marca` y `crm-antibots-alta`.
+
+**Bloqueo o pido**
+- **Fusión del PR #5** (`crm020/ci-twenty-convenciones` → `betty/factory`, cabeza `2b09f008`). La hace Andrés desde GitHub, o el coordinador con su OK. Yo no la intento.
+
+**Siguiente**
+- Con #5 fusionado: la mudanza (Fase 4) queda lista por mi lado. Espera a que la capacidad de la VM esté resuelta.
+- En la VM: CRM-021 como primer despacho, con los dos intermitentes de upstream (`DatePicker > Navigation Unmount` y `DraggableList > Pointer Grip Reorder`) en su lista.
