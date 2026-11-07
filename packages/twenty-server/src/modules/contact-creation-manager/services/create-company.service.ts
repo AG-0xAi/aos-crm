@@ -313,5 +313,4 @@ export class CreateCompanyService {
 
     return lastCompanyPosition ?? 0;
   }
-
 }

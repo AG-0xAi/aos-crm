@@ -38,18 +38,15 @@ describe('buildMcpServerInfo', () => {
 
   // An http icon is refused by assistants as mixed content and an https one on
   // an http-only deployment would not answer: no icon is the honest answer.
-  it.each([
-    ['http://localhost:3000'],
-    ['not a url'],
-    [''],
-  ])('withholds the icons when the origin is %p rather than inventing one', (
-    requestBaseUrl,
-  ) => {
-    const serverInfo = buildMcpServerInfo(requestBaseUrl);
+  it.each([['http://localhost:3000'], ['not a url'], ['']])(
+    'withholds the icons when the origin is %p rather than inventing one',
+    (requestBaseUrl) => {
+      const serverInfo = buildMcpServerInfo(requestBaseUrl);
 
-    expect(serverInfo.icons).toBeUndefined();
-    expect(serverInfo.title).toBe(BRAND_NAME);
-  });
+      expect(serverInfo.icons).toBeUndefined();
+      expect(serverInfo.title).toBe(BRAND_NAME);
+    },
+  );
 
   it('never advertises a Twenty-hosted icon', () => {
     const serialized = JSON.stringify(
