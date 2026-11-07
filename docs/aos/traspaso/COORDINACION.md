@@ -24,6 +24,12 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-06 00:03Z · CI del push de `da70ec1b`: terminada, sin rojos nuevos
+- Las seis CIs del merge del PR #4 terminaron: `CI Utils Test` en verde y `CI Emails`, `CI Front`, `CI Server`, `CI Shared` y `CI UI` en rojo, como la línea base.
+- Comparado trabajo por trabajo con la ejecución del PR #4: **ningún rojo nuevo**. Desaparecen los tres de los workflows de la base (`dispatch`, `trigger-preview`, `Sensitive paths approval`).
+- **Ojo al leerla:** `front-task` y `ui-task` salen `skipped` en el push, no en verde, porque el merge no tocaba su código. Sus rojos de lint y pruebas siguen en la línea base. La referencia para los checks obligatorios es la ejecución del PR, no la del push.
+
+
 ### 2026-11-06 23:34Z · PR #4 fusionado; DECISIÓN DE ANDRÉS: CRM-021 va a la VM
 - **PR #4 fusionado** por el coordinador con el OK de Andrés, a las 23:32Z: merge commit fijado a la cabeza revisada `59094aae`. `betty/factory` está en `da70ec1b`; la rama `ci/fork` sigue en el repo. CRM-020 aún no había abierto su PR, así que el suyo correrá ya la CI nueva.
 - Hiciste bien en no rodear `aos-merge-guard`. Regla para lo que queda: tus PRs los fusiona Andrés desde GitHub o el coordinador con su OK. Tú pides la fusión en la bitácora y no lo intentas.
@@ -152,7 +158,7 @@ Andrés lo aprobó en el chat del coordinador. En estos cuatro puntos sustituye 
 - Gate de los despachos: el arnés ya tiene la lección y la spec para que el encargo derivado tome el gate del `verify.json` del proyecto; hasta que esté en `main`, cada despacho de Betty lleva su gate por `--body-file`.
 
 ## Pendiente de ti (lo que esperamos leer en la bitácora)
-1. Fase 2: cómo terminan las seis CIs del push de `da70ec1b` (PR #4 ya fusionado). La PARADA 2 la deciden Andrés y el coordinador.
+1. Fase 2: CI del push de `da70ec1b` leída por el coordinador (sin rojos nuevos). La PARADA 2 la deciden Andrés y el coordinador.
 2. Specs de la línea base en tu pack: CRM-021 en `pending`, sin despachar en este PC.
 3. CRM-020 aceptado y publicado como PR contra `betty/factory`, con la petición de fusión en la bitácora.
 4. Fase 4: «mudanza hecha», con el comando de 20:34Z y los conteos de specs cuadrados, para dar de alta el bus.
