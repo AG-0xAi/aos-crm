@@ -64,6 +64,16 @@ msgid "After that, the workspace and all of its data will be permanently deleted
 msgstr "Μετά από αυτό, ο χώρος εργασίας και όλα τα δεδομένα του θα διαγραφούν οριστικά — και δεν θα μπορούμε να τον επαναφέρουμε."
 
 #. js-lingui-explicit-id
+#: src/components/WhatIsTwenty.tsx
+msgid "An assistant for your business relationships: it keeps your contacts and conversations in one place and helps you prepare what comes next."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/BaseHead.tsx
+msgid "Betty email"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Confirm new email"
 msgstr ""
@@ -80,18 +90,18 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
-msgid "Connect to Twenty"
-msgstr "Συνδεθείτε στο Twenty"
+msgid "Connect to Betty"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Create my workspace"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Dear {userName},"
 msgstr "Αγαπητέ/ή {userName},"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Developers"
-msgstr "Προγραμματιστές"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -107,11 +117,6 @@ msgstr "Ενεργοποιημένο"
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Full admin panel access: {fullAdminStatus}"
 msgstr "Πλήρης πρόσβαση στον πίνακα διαχείρισης: {fullAdminStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Github"
-msgstr "Github"
 
 #. js-lingui-explicit-id
 #: src/emails/warn-suspended-workspace.email.tsx
@@ -138,14 +143,14 @@ msgid "Hi {userName},"
 msgstr "Γεια σου {userName},"
 
 #. js-lingui-explicit-id
+#: src/emails/billing-trial-converting.email.tsx
+msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "If this was not you, contact your workspace administrator and change your password."
 msgstr "Αν δεν ήσασταν εσείς, επικοινωνήστε με τον διαχειριστή του χώρου εργασίας σας και αλλάξτε τον κωδικό πρόσβασής σας."
-
-#. js-lingui-explicit-id
-#: src/emails/billing-trial-converting.email.tsx
-msgid "If Twenty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr "Αν το Twenty σας εξυπηρετεί, είστε καλυμμένοι — δεν χρειάζεται να κάνετε τίποτα. Αν δεν είναι η κατάλληλη λύση, μπορείτε να ακυρώσετε με ένα κλικ πριν από τότε και δεν θα χρεωθείτε."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -169,18 +174,13 @@ msgstr "Αν δεν κάνετε τίποτα, θα θέσουμε τον χώρ
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
-msgid "If you'd ever like to give Twenty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr "Αν θελήσετε κάποια στιγμή να δώσετε στο Twenty άλλη μια ευκαιρία, μπορείτε να ξεκινήσετε έναν νέο χώρο εργασίας μέσα σε λίγα λεπτά — θα χαρούμε πολύ να σας έχουμε ξανά μαζί μας."
+msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Impersonation: {impersonateStatus}"
 msgstr "Προσποίηση ταυτότητας: {impersonateStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/WhatIsTwenty.tsx
-msgid "It's a CRM, a software to help businesses manage their customer data and relationships efficiently."
-msgstr "Είναι ένα CRM, ένα λογισμικό που βοηθά τις επιχειρήσεις να διαχειρίζονται αποτελεσματικά τα δεδομένα και τις σχέσεις με τους πελάτες τους."
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
@@ -189,8 +189,8 @@ msgstr "Τα δεδομένα του έχουν αφαιρεθεί και δεν
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
-msgid "Join your team on Twenty"
-msgstr "Συμμετέχετε στην ομάδα σας στο Twenty"
+msgid "Join your team on Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -209,6 +209,11 @@ msgid "No action is needed if you'd like to continue. If you'd rather not renew,
 msgstr "Δεν χρειάζεται να κάνετε κάτι αν θέλετε να συνεχίσετε. Αν προτιμάτε να μην ανανεώσετε, μπορείτε να ακυρώσετε οποιαδήποτε στιγμή πριν από τότε."
 
 #. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Open this link to create your account and your own workspace. It only works for this address and only once, and it expires in {duration}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Password updated"
 msgstr "Ο κωδικός έχει ενημερωθεί"
@@ -224,11 +229,6 @@ msgid "Reactivate workspace"
 msgstr "Επανενεργοποίηση χώρου εργασίας"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Read Twenty's user guide"
-msgstr "Διαβάστε τον οδηγό χρήστη του Twenty"
-
-#. js-lingui-explicit-id
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset"
 msgstr "Επαναφορά"
@@ -237,11 +237,6 @@ msgstr "Επαναφορά"
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset your password 🗝"
 msgstr "Επαναφέρετε τον κωδικό σας 🗝"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "San Francisco / Paris"
-msgstr "Σαν Φρανσίσκο / Παρίσι"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -275,8 +270,8 @@ msgstr "Δοκιμαστικό email"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "Thanks for registering for an account on Twenty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr "Σας ευχαριστούμε που κάνατε εγγραφή για λογαριασμό στο Twenty! Πριν ξεκινήσουμε, πρέπει να επιβεβαιώσουμε ότι είστε εσείς. Κάντε κλικ παρακάτω για να επαληθεύσετε τη διεύθυνση email σας."
+msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -299,21 +294,6 @@ msgid "To keep your workspace and everything you've built, add a payment method 
 msgstr "Για να διατηρήσετε τον χώρο εργασίας σας και όλα όσα έχετε δημιουργήσει, προσθέστε μια μέθοδο πληρωμής και επιλέξτε ένα πρόγραμμα."
 
 #. js-lingui-explicit-id
-#: src/components/BaseHead.tsx
-msgid "Twenty email"
-msgstr "Email του Twenty"
-
-#. js-lingui-explicit-id
-#: src/components/Logo.tsx
-msgid "Twenty logo"
-msgstr "Λογότυπο του Twenty"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Twenty.com, Public Benefit Corporation"
-msgstr "Twenty.com, Δημόσια Οφέλη Εταιρεία"
-
-#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
 msgid "Two-factor authentication recovery code issued"
 msgstr "Εκδόθηκε κωδικός ανάκτησης για έλεγχο ταυτότητας δύο παραγόντων"
@@ -322,11 +302,6 @@ msgstr "Εκδόθηκε κωδικός ανάκτησης για έλεγχο �
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "Two-factor authentication reset"
 msgstr "Επαναφορά ελέγχου ταυτότητας δύο παραγόντων"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "User guide"
-msgstr "Οδηγός Χρήστη"
 
 #. js-lingui-explicit-id
 #: src/emails/validate-approved-access-domain.email.tsx
@@ -340,45 +315,30 @@ msgid "Verify Email"
 msgstr "Επαληθεύστε το Email"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's developer documentation"
-msgstr "Επισκεφτείτε την τεκμηρίωση για προγραμματιστές του Twenty"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's GitHub repository"
-msgstr "Επισκεφτείτε το αποθετήριο του Twenty στο GitHub"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's website"
-msgstr "Επισκεφτείτε την ιστοσελίδα του Twenty"
-
-#. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "We don't like surprise charges, so here's a friendly heads up."
 msgstr "Δεν μας αρέσουν οι απρόσμενες χρεώσεις, οπότε σας στέλνουμε αυτή τη φιλική υπενθύμιση."
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "We received a request to change the email address associated with your Twenty account. Click below to confirm this change."
-msgstr "Λάβαμε ένα αίτημα για την αλλαγή της διεύθυνσης email που συνδέεται με τον λογαριασμό σας στο Twenty. Κάντε κλικ παρακάτω για να επιβεβαιώσετε αυτή την αλλαγή."
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Website"
-msgstr "Ιστοσελίδα"
+msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
-msgid "What is Twenty?"
-msgstr "Τι είναι το Twenty;"
+msgid "What is Betty?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 #: src/emails/validate-approved-access-domain.email.tsx
 msgid "Workspace logo"
 msgstr "Λογότυπο Workspace"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You have been invited to Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx

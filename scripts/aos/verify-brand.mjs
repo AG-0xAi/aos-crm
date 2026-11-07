@@ -546,14 +546,25 @@ export const BRAND_PUBLIC_ROOT = 'packages/twenty-front/public';
 // the BRAND_ASSET_PATHS registry, and the `/brand/...` literals that Linaria
 // template literals carry (a styled block cannot interpolate the registry, so
 // those paths are typed out by hand).
+//
+// R2 split Brand.ts into one file per constant, so this reads every
+// Brand*.ts under twenty-shared/constants rather than a single known name --
+// whichever of them carries a `/brand/...` literal is still found.
 export function collectBrandAssetReferences(root = REPO_ROOT) {
-  const brandSource = readFileSync(
-    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
-    'utf8',
-  );
-  const declared = [...brandSource.matchAll(/'(\/brand\/[^']+)'/g)].map(
-    (match) => ({ path: match[1], from: 'twenty-shared/constants/Brand.ts' }),
-  );
+  const brandConstantFiles = globSync(
+    'packages/twenty-shared/src/constants/Brand*.ts',
+    { cwd: root },
+  )
+    .map((p) => p.split(sep).join(posix.sep))
+    .sort();
+  const declared = brandConstantFiles.flatMap((relativePath) => {
+    const source = readFileSync(resolve(root, relativePath), 'utf8');
+
+    return [...source.matchAll(/'(\/brand\/[^']+)'/g)].map((match) => ({
+      path: match[1],
+      from: relativePath.replace('packages/', '').replace('/src/', '/'),
+    }));
+  });
   const referenced = SCANNED_GLOBS.flatMap((pattern) =>
     globSync(pattern, { cwd: root }),
   )
@@ -578,8 +589,9 @@ export function checkBrandAssetsExist(root = REPO_ROOT) {
 
   if (references.length === 0) return ['no brand asset path was read at all'];
 
-  // One report per missing path, not one per place it is written: Brand.ts is
-  // both the registry and a scanned source, so it sees its own entries twice.
+  // One report per missing path, not one per place it is written: each
+  // Brand*.ts file is both the registry and a scanned source, so it sees its
+  // own entries twice.
   const missing = new Map();
 
   for (const reference of references) {
@@ -602,12 +614,16 @@ export const SOCIAL_PREVIEW_META = [
 ];
 
 // index.html is static and cannot import a constant, so the URL is written
-// twice. This reads the one in Brand.ts -- the file whose whole job is to be
-// the single place the brand's own URLs live -- and requires index.html to
-// agree with it, so the pair cannot drift apart silently.
+// twice. This reads the one in BrandSocialPreviewImageUrl.ts -- R2 split it
+// out of Brand.ts, but it is still the single place the brand's own social
+// image URL lives -- and requires index.html to agree with it, so the pair
+// cannot drift apart silently.
 export function readDeclaredSocialPreviewImage(root = REPO_ROOT) {
   const source = readFileSync(
-    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
+    resolve(
+      root,
+      'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts',
+    ),
     'utf8',
   );
 
@@ -626,7 +642,10 @@ export function checkSocialPreviewMetadata(root = REPO_ROOT) {
   );
   const failures = [];
   const declared = existsSync(
-    resolve(root, 'packages/twenty-shared/src/constants/Brand.ts'),
+    resolve(
+      root,
+      'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts',
+    ),
   )
     ? readDeclaredSocialPreviewImage(root)
     : undefined;
@@ -661,7 +680,7 @@ export function checkSocialPreviewMetadata(root = REPO_ROOT) {
 
   if (declared === undefined) {
     failures.push(
-      'packages/twenty-shared/src/constants/Brand.ts declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL for index.html to agree with',
+      'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL for index.html to agree with',
     );
   }
 
@@ -952,7 +971,7 @@ function selfTest() {
     try {
       const brandPath = resolve(
         sandbox,
-        'packages/twenty-shared/src/constants/Brand.ts',
+        'packages/twenty-shared/src/constants/BrandAssetPaths.ts',
       );
 
       mkdirSync(dirname(brandPath), { recursive: true });
@@ -1028,7 +1047,7 @@ function selfTest() {
       const htmlPath = resolve(sandbox, 'packages/twenty-front/index.html');
       const brandPath = resolve(
         sandbox,
-        'packages/twenty-shared/src/constants/Brand.ts',
+        'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts',
       );
 
       mkdirSync(dirname(htmlPath), { recursive: true });

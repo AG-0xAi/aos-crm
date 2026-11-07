@@ -5,16 +5,16 @@
 // neutral scale has more steps than the palette has colours, a value repeats
 // rather than a new one being invented.
 export const BETTY_PALETTE = {
-  charcoal: '#35362E',
-  taupe: '#BDA58D',
-  beige: '#EADDCA',
-  terracotta: '#C87452',
-  ivory: '#F9F5EC',
-  paperWhite: '#FFFDF9',
-  terracottaInk: '#96442D',
-  mutedText: '#725F50',
+  charcoal: '#35362e',
+  taupe: '#bda58d',
+  beige: '#eaddca',
+  terracotta: '#c87452',
+  ivory: '#f9f5ec',
+  paperWhite: '#fffdf9',
+  terracottaInk: '#96442d',
+  mutedText: '#725f50',
   // Derived in the brand token file itself, for the carbon CTA hover and the
   // link/accent hover.
-  charcoalHover: '#2A2B24',
-  terracottaInkHover: '#7D3824',
+  charcoalHover: '#2a2b24',
+  terracottaInkHover: '#7d3824',
 } as const;

@@ -621,8 +621,8 @@ export class SignInUpService {
     const workspaceCustomApplicationId = v4();
 
     try {
-      const { user, workspace } =
-        await this.dataSource.transaction(async (entityManager) => {
+      const { user, workspace } = await this.dataSource.transaction(
+        async (entityManager) => {
           const queryRunner = entityManager.queryRunner as QueryRunner;
 
           const workspaceToCreate = this.workspaceRepository.create({
@@ -708,7 +708,8 @@ export class SignInUpService {
           );
 
           return { user, workspace };
-        });
+        },
+      );
 
       void this.eventLogEmitterService
         .createContext({ workspaceId })

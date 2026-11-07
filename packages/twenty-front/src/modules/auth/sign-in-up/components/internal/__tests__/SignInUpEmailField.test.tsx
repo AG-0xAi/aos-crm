@@ -27,7 +27,10 @@ const FieldUnderTest = () => {
   const { isSignUpInvitation } = useSignUpInvitationToken();
 
   return (
-    <FormProvider {...(form as UseFormReturn<Form>)}>
+    <FormProvider
+      // oxlint-disable-next-line react/jsx-props-no-spreading
+      {...(form as UseFormReturn<Form>)}
+    >
       <SignInUpEmailField showErrors={false} isLocked={isSignUpInvitation} />
     </FormProvider>
   );
