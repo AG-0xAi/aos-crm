@@ -64,6 +64,16 @@ msgid "After that, the workspace and all of its data will be permanently deleted
 msgstr "之後，該工作區及其所有資料將被永久刪除——而且我們將無法將其還原。"
 
 #. js-lingui-explicit-id
+#: src/components/WhatIsTwenty.tsx
+msgid "An assistant for your business relationships: it keeps your contacts and conversations in one place and helps you prepare what comes next."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/BaseHead.tsx
+msgid "Betty email"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Confirm new email"
 msgstr ""
@@ -80,18 +90,18 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
-msgid "Connect to Twenty"
-msgstr "連接到 Twenty"
+msgid "Connect to Betty"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Create my workspace"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Dear {userName},"
 msgstr "親愛的 {userName},"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Developers"
-msgstr "開發人員"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -107,11 +117,6 @@ msgstr "已啟用"
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Full admin panel access: {fullAdminStatus}"
 msgstr "完整管理面板存取權：{fullAdminStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Github"
-msgstr "Github"
 
 #. js-lingui-explicit-id
 #: src/emails/warn-suspended-workspace.email.tsx
@@ -138,14 +143,14 @@ msgid "Hi {userName},"
 msgstr "嗨 {userName}，"
 
 #. js-lingui-explicit-id
+#: src/emails/billing-trial-converting.email.tsx
+msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "If this was not you, contact your workspace administrator and change your password."
 msgstr "如果這不是您本人所為，請聯絡您的工作區管理員並變更密碼。"
-
-#. js-lingui-explicit-id
-#: src/emails/billing-trial-converting.email.tsx
-msgid "If Twenty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr "如果 Twenty 符合您的需求，一切都已就緒——您無需做任何事。若您認為它不太適合，您可以在此之前一鍵取消，且不會被收費。"
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -169,18 +174,13 @@ msgstr "如果您不做任何操作，我們將暫停您的工作區，並在 {d
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
-msgid "If you'd ever like to give Twenty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr "如果您之後想再試用 Twenty，您可以在幾分鐘內建立一個全新的工作區——我們非常歡迎您回來。"
+msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Impersonation: {impersonateStatus}"
 msgstr "身分模擬：{impersonateStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/WhatIsTwenty.tsx
-msgid "It's a CRM, a software to help businesses manage their customer data and relationships efficiently."
-msgstr "它是一個CRM，是一款幫助企業有效管理客戶資料和關係的軟件。"
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
@@ -189,8 +189,8 @@ msgstr "其資料已被移除，且無法再復原。"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
-msgid "Join your team on Twenty"
-msgstr "加入您的團隊，使用 Twenty"
+msgid "Join your team on Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -209,6 +209,11 @@ msgid "No action is needed if you'd like to continue. If you'd rather not renew,
 msgstr "如果您想繼續使用，無需採取任何行動。若您不想續約，您可以在此之前的任何時間取消。"
 
 #. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Open this link to create your account and your own workspace. It only works for this address and only once, and it expires in {duration}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Password updated"
 msgstr "密碼已更新"
@@ -224,11 +229,6 @@ msgid "Reactivate workspace"
 msgstr "重新啟用工作區"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Read Twenty's user guide"
-msgstr "閱讀Twenty的用戶指南"
-
-#. js-lingui-explicit-id
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset"
 msgstr "重設"
@@ -237,11 +237,6 @@ msgstr "重設"
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset your password 🗝"
 msgstr "重設您的密碼 🗝"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "San Francisco / Paris"
-msgstr "三藩市 / 巴黎"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -275,8 +270,8 @@ msgstr "測試電子郵件"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "Thanks for registering for an account on Twenty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr "感謝您在 Twenty 註冊帳戶！在開始之前，我們需要確認是您本人。請點擊以下驗證您的電子郵件地址。"
+msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -299,21 +294,6 @@ msgid "To keep your workspace and everything you've built, add a payment method 
 msgstr "若要保留您的工作區以及您建立的一切，請新增付款方式並選擇方案。"
 
 #. js-lingui-explicit-id
-#: src/components/BaseHead.tsx
-msgid "Twenty email"
-msgstr "Twenty 電子郵件地址"
-
-#. js-lingui-explicit-id
-#: src/components/Logo.tsx
-msgid "Twenty logo"
-msgstr "Twenty 標誌"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Twenty.com, Public Benefit Corporation"
-msgstr "Twenty.com, 公益公司"
-
-#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
 msgid "Two-factor authentication recovery code issued"
 msgstr "已發出雙重身份驗證復原代碼"
@@ -322,11 +302,6 @@ msgstr "已發出雙重身份驗證復原代碼"
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "Two-factor authentication reset"
 msgstr "雙重身份驗證重設"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "User guide"
-msgstr "用戶指南"
 
 #. js-lingui-explicit-id
 #: src/emails/validate-approved-access-domain.email.tsx
@@ -340,45 +315,30 @@ msgid "Verify Email"
 msgstr "驗證電子郵件"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's developer documentation"
-msgstr "訪問Twenty的開發者文檔"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's GitHub repository"
-msgstr "訪問Twenty的GitHub 儲存庫"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's website"
-msgstr "訪問Twenty的網站"
-
-#. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "We don't like surprise charges, so here's a friendly heads up."
 msgstr "我們不喜歡讓人被突然收費，因此先在這裡貼心提醒您。"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "We received a request to change the email address associated with your Twenty account. Click below to confirm this change."
-msgstr "我們收到變更與您的 Twenty 帳戶關聯之電子郵件地址的請求。請按一下下方以確認此變更。"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Website"
-msgstr "網站"
+msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
-msgid "What is Twenty?"
-msgstr "什麼是Twenty？"
+msgid "What is Betty?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 #: src/emails/validate-approved-access-domain.email.tsx
 msgid "Workspace logo"
 msgstr "工作區標誌"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You have been invited to Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx

@@ -6,6 +6,7 @@ import { MainText } from 'src/components/MainText';
 import { Title } from 'src/components/Title';
 import { createI18nInstance } from 'src/utils/i18n.utils';
 import { BRAND_DOMAIN } from 'twenty-shared/constants';
+import { doNotTranslate } from 'twenty-shared/i18n';
 import { type APP_LOCALES } from 'twenty-shared/translations';
 
 type SignUpInviteLinkEmailProps = {
@@ -41,7 +42,7 @@ export const SignUpInviteLinkEmail = ({
 };
 
 SignUpInviteLinkEmail.PreviewProps = {
-  duration: '7 days',
+  duration: doNotTranslate('7 days'),
   link: `https://app.${BRAND_DOMAIN}/welcome?signUpInvitationToken=123&email=ana%40example.com`,
   locale: 'en',
 } as SignUpInviteLinkEmailProps;

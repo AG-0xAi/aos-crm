@@ -93,7 +93,9 @@ export const SettingsLegalDpaNew = () => {
 
       await downloadFile(
         result.downloadUrl,
-        `DPA-${result.agreement.templateVersion}-${safeLegalEntityName}.pdf`,
+        doNotTranslate(
+          `DPA-${result.agreement.templateVersion}-${safeLegalEntityName}.pdf`,
+        ),
       );
 
       enqueueToast({

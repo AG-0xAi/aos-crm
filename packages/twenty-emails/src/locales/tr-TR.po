@@ -64,6 +64,16 @@ msgid "After that, the workspace and all of its data will be permanently deleted
 msgstr "Bundan sonra, çalışma alanı ve tüm verileri kalıcı olarak silinecek — ve biz de geri getiremeyeceğiz."
 
 #. js-lingui-explicit-id
+#: src/components/WhatIsTwenty.tsx
+msgid "An assistant for your business relationships: it keeps your contacts and conversations in one place and helps you prepare what comes next."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/BaseHead.tsx
+msgid "Betty email"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Confirm new email"
 msgstr ""
@@ -80,18 +90,18 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
-msgid "Connect to Twenty"
-msgstr "Twenty'e bağlan"
+msgid "Connect to Betty"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Create my workspace"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Dear {userName},"
 msgstr "Sevgili {userName},"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Developers"
-msgstr "Geliştiriciler"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -107,11 +117,6 @@ msgstr "Etkin"
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Full admin panel access: {fullAdminStatus}"
 msgstr "Tam yönetici paneli erişimi: {fullAdminStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Github"
-msgstr "Github"
 
 #. js-lingui-explicit-id
 #: src/emails/warn-suspended-workspace.email.tsx
@@ -138,14 +143,14 @@ msgid "Hi {userName},"
 msgstr "Merhaba {userName},"
 
 #. js-lingui-explicit-id
+#: src/emails/billing-trial-converting.email.tsx
+msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "If this was not you, contact your workspace administrator and change your password."
 msgstr "Bunu siz yapmadıysanız çalışma alanı yöneticinizle iletişime geçin ve parolanızı değiştirin."
-
-#. js-lingui-explicit-id
-#: src/emails/billing-trial-converting.email.tsx
-msgid "If Twenty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr "Twenty sizin için işe yarıyorsa, her şey hazır — yapmanız gereken bir şey yok. Eğer size uygun değilse, o zamana kadar tek tıklamayla iptal edebilir ve hiçbir ücret ödemezsiniz."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -169,18 +174,13 @@ msgstr "Hiçbir şey yapmazsanız, çalışma alanınızı duraklatacağız ve f
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
-msgid "If you'd ever like to give Twenty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr "Eğer Twenty'ye bir gün yeniden şans vermek isterseniz, birkaç dakika içinde yeni bir çalışma alanı başlatabilirsiniz — sizi tekrar aramızda görmekten memnuniyet duyarız."
+msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Impersonation: {impersonateStatus}"
 msgstr "Kimliğe bürünme: {impersonateStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/WhatIsTwenty.tsx
-msgid "It's a CRM, a software to help businesses manage their customer data and relationships efficiently."
-msgstr "Bu bir CRM, işletmelerin müşteri verilerini ve ilişkilerini verimli bir şekilde yönetmelerine yardımcı olan bir yazılım."
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
@@ -189,8 +189,8 @@ msgstr "Verileri kaldırıldı ve artık geri getirilemez."
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
-msgid "Join your team on Twenty"
-msgstr "Takımına Twenty üzerinden katıl"
+msgid "Join your team on Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -209,6 +209,11 @@ msgid "No action is needed if you'd like to continue. If you'd rather not renew,
 msgstr "Devam etmek istiyorsanız herhangi bir işlem yapmanız gerekmiyor. Yenilemek istemezseniz, o zamana kadar dilediğiniz zaman iptal edebilirsiniz."
 
 #. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Open this link to create your account and your own workspace. It only works for this address and only once, and it expires in {duration}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Password updated"
 msgstr "Şifre güncellendi"
@@ -224,11 +229,6 @@ msgid "Reactivate workspace"
 msgstr "Çalışma alanını yeniden etkinleştir"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Read Twenty's user guide"
-msgstr "Twenty'nin kullanıcı rehberini okuyun"
-
-#. js-lingui-explicit-id
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset"
 msgstr "Sıfırla"
@@ -237,11 +237,6 @@ msgstr "Sıfırla"
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset your password 🗝"
 msgstr "Şifreni sıfırla 🗝"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "San Francisco / Paris"
-msgstr "San Francisco / Paris"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -275,8 +270,8 @@ msgstr "Test e-postası"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "Thanks for registering for an account on Twenty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr "Twenty'de bir hesap kaydı yaptığınız için teşekkürler! Başlamadan önce, bunun siz olduğunuzu doğrulamamız gerekiyor. E-posta adresinizi doğrulamak için aşağıya tıklayın."
+msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -299,21 +294,6 @@ msgid "To keep your workspace and everything you've built, add a payment method 
 msgstr "Çalışma alanınızı ve oluşturduğunuz her şeyi korumak için bir ödeme yöntemi ekleyin ve bir plan seçin."
 
 #. js-lingui-explicit-id
-#: src/components/BaseHead.tsx
-msgid "Twenty email"
-msgstr "Twenty e-posta"
-
-#. js-lingui-explicit-id
-#: src/components/Logo.tsx
-msgid "Twenty logo"
-msgstr "Twenty logosu"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Twenty.com, Public Benefit Corporation"
-msgstr "Twenty.com, Kamu Yararına Şirket"
-
-#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
 msgid "Two-factor authentication recovery code issued"
 msgstr "İki faktörlü kimlik doğrulama kurtarma kodu oluşturuldu"
@@ -322,11 +302,6 @@ msgstr "İki faktörlü kimlik doğrulama kurtarma kodu oluşturuldu"
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "Two-factor authentication reset"
 msgstr "İki faktörlü kimlik doğrulama sıfırlandı"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "User guide"
-msgstr "Kullanıcı Rehberi"
 
 #. js-lingui-explicit-id
 #: src/emails/validate-approved-access-domain.email.tsx
@@ -340,45 +315,30 @@ msgid "Verify Email"
 msgstr "E-postayı Doğrula"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's developer documentation"
-msgstr "Twenty'nin geliştirici dokümantasyonunu ziyaret edin"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's GitHub repository"
-msgstr "Twenty'nin GitHub deposunu ziyaret edin"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's website"
-msgstr "Twenty'nin web sitesini ziyaret edin"
-
-#. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "We don't like surprise charges, so here's a friendly heads up."
 msgstr "Beklenmedik ücretleri sevmiyoruz, bu yüzden size dostça bir bilgilendirme gönderiyoruz."
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "We received a request to change the email address associated with your Twenty account. Click below to confirm this change."
-msgstr "Twenty hesabınızla ilişkili e-posta adresini değiştirme talebi aldık. Bu değişikliği onaylamak için aşağıya tıklayın."
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Website"
-msgstr "Web Sitesi"
+msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
-msgid "What is Twenty?"
-msgstr "Twenty nedir?"
+msgid "What is Betty?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 #: src/emails/validate-approved-access-domain.email.tsx
 msgid "Workspace logo"
 msgstr "İş Alanı logosu"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You have been invited to Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx

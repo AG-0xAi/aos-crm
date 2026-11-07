@@ -37,7 +37,10 @@ describe('MCP_EXCLUDED_TOOL_NAMES', () => {
     ACTION_TOOL_IDS.filter(
       (id) => DESTINATION_BY_ACTION_TOOL[id] === 'third_party',
     ),
-  )('should exclude %s, which sends workspace content to a third party', (id) => {
-    expect(MCP_EXCLUDED_TOOL_NAMES.has(id)).toBe(true);
-  });
+  )(
+    'should exclude %s, which sends workspace content to a third party',
+    (id) => {
+      expect(MCP_EXCLUDED_TOOL_NAMES.has(id)).toBe(true);
+    },
+  );
 });

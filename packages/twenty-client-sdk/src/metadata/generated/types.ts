@@ -2734,6 +2734,9 @@ export default {
             "frontDomain": [
                 1
             ],
+            "helpCenterUrl": [
+                1
+            ],
             "isAttachmentPreviewEnabled": [
                 4
             ],
@@ -2802,6 +2805,9 @@ export default {
             ],
             "signInPrefilled": [
                 4
+            ],
+            "sourceCodeUrl": [
+                1
             ],
             "support": [
                 490
@@ -8275,6 +8281,9 @@ export default {
                         1,
                         "String!"
                     ],
+                    "signUpInvitationToken": [
+                        1
+                    ],
                     "verifyEmailRedirectPath": [
                         1
                     ]
@@ -12297,6 +12306,9 @@ export default {
                 1
             ],
             "partner": [
+                1
+            ],
+            "signUpInvitationToken": [
                 1
             ],
             "subdomain": [

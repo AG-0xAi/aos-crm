@@ -64,6 +64,16 @@ msgid "After that, the workspace and all of its data will be permanently deleted
 msgstr "Daarna sal die werksruimte en al sy data permanent uitgevee word — en ons sal dit nie kan terugbring nie."
 
 #. js-lingui-explicit-id
+#: src/components/WhatIsTwenty.tsx
+msgid "An assistant for your business relationships: it keeps your contacts and conversations in one place and helps you prepare what comes next."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/components/BaseHead.tsx
+msgid "Betty email"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Confirm new email"
 msgstr ""
@@ -80,18 +90,18 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
-msgid "Connect to Twenty"
-msgstr "Konnekteer met Twenty"
+msgid "Connect to Betty"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Create my workspace"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Dear {userName},"
 msgstr "Liewe {userName},"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Developers"
-msgstr "Ontwikkelaars"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -107,11 +117,6 @@ msgstr "Geaktiveer"
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Full admin panel access: {fullAdminStatus}"
 msgstr "Volledige toegang tot die administrasiepaneel: {fullAdminStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Github"
-msgstr "Github"
 
 #. js-lingui-explicit-id
 #: src/emails/warn-suspended-workspace.email.tsx
@@ -138,14 +143,14 @@ msgid "Hi {userName},"
 msgstr "Hallo {userName},"
 
 #. js-lingui-explicit-id
+#: src/emails/billing-trial-converting.email.tsx
+msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "If this was not you, contact your workspace administrator and change your password."
 msgstr "As dit nie jy was nie, kontak jou werkruimte-administrateur en verander jou wagwoord."
-
-#. js-lingui-explicit-id
-#: src/emails/billing-trial-converting.email.tsx
-msgid "If Twenty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr "As Twenty vir jou werk, is jy reg — daar is niks om te doen nie. As dit nie die regte pas is nie, kan jy voor dan met een kliek kanselleer en jy sal nie gehef word nie."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -169,18 +174,13 @@ msgstr "As jy niks doen nie, sal ons jou werksruimte pouseer en jou data vir {da
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
-msgid "If you'd ever like to give Twenty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr "As jy Twenty ooit weer wil probeer, kan jy binne minute ’n nuwe werksruimte begin — ons sal dit waardeer om jou terug te hê."
+msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
 msgid "Impersonation: {impersonateStatus}"
 msgstr "Nabootsing: {impersonateStatus}"
-
-#. js-lingui-explicit-id
-#: src/components/WhatIsTwenty.tsx
-msgid "It's a CRM, a software to help businesses manage their customer data and relationships efficiently."
-msgstr "Dit is 'n CRM, 'n sagteware om besighede te help om hul kliëntedata en verhoudings doeltreffend te bestuur."
 
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
@@ -189,8 +189,8 @@ msgstr "Die data daarvan is verwyder en kan nie meer herstel word nie."
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
-msgid "Join your team on Twenty"
-msgstr "Sluit aan by jou span op Twenty"
+msgid "Join your team on Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -209,6 +209,11 @@ msgid "No action is needed if you'd like to continue. If you'd rather not renew,
 msgstr "Geen aksie is nodig as jy wil voortgaan nie. As jy liewer nie wil hernu nie, kan jy enige tyd voor dan kanselleer."
 
 #. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Open this link to create your account and your own workspace. It only works for this address and only once, and it expires in {duration}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Password updated"
 msgstr "Wagwoord opgedateer"
@@ -224,11 +229,6 @@ msgid "Reactivate workspace"
 msgstr "Heraktiveer werksruimte"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Read Twenty's user guide"
-msgstr "Lees Twenty se gebruikersgids"
-
-#. js-lingui-explicit-id
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset"
 msgstr "Stel terug"
@@ -237,11 +237,6 @@ msgstr "Stel terug"
 #: src/emails/password-reset-link.email.tsx
 msgid "Reset your password 🗝"
 msgstr "Stel jou wagwoord terug 🗝"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "San Francisco / Paris"
-msgstr "San Francisco / Parys"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -275,8 +270,8 @@ msgstr "Toets e-pos"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "Thanks for registering for an account on Twenty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr "Dankie dat jy vir 'n rekening op Twenty geregistreer het! Voor ons begin, moet ons net bevestig dat dit jy is. Klik hieronder om jou e-posadres te verifieer."
+msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -299,21 +294,6 @@ msgid "To keep your workspace and everything you've built, add a payment method 
 msgstr "Om jou werksruimte en alles wat jy gebou het te behou, voeg ’n betaalmetode by en kies ’n plan."
 
 #. js-lingui-explicit-id
-#: src/components/BaseHead.tsx
-msgid "Twenty email"
-msgstr "Twenty-e-pos"
-
-#. js-lingui-explicit-id
-#: src/components/Logo.tsx
-msgid "Twenty logo"
-msgstr "Twenty-logo"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Twenty.com, Public Benefit Corporation"
-msgstr "Twenty.com, Openbare Voordeelkorporasie"
-
-#. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
 msgid "Two-factor authentication recovery code issued"
 msgstr "Twee-faktor-outentikasie-herstelkode uitgereik"
@@ -322,11 +302,6 @@ msgstr "Twee-faktor-outentikasie-herstelkode uitgereik"
 #: src/emails/two-factor-authentication-reset.email.tsx
 msgid "Two-factor authentication reset"
 msgstr "Twee-faktor-outentikasie teruggestel"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "User guide"
-msgstr "Gebruikersgids"
 
 #. js-lingui-explicit-id
 #: src/emails/validate-approved-access-domain.email.tsx
@@ -340,45 +315,30 @@ msgid "Verify Email"
 msgstr "Verifieer E-pos"
 
 #. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's developer documentation"
-msgstr "Besoek Twenty se ontwikkelaar dokumentasie"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's GitHub repository"
-msgstr "Besoek Twenty se GitHub-bewaarplek"
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Visit Twenty's website"
-msgstr "Besoek Twenty se webwerf"
-
-#. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "We don't like surprise charges, so here's a friendly heads up."
 msgstr "Ons hou nie van verrassingskoste nie, so hier is ’n vriendelike waarskuwing."
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
-msgid "We received a request to change the email address associated with your Twenty account. Click below to confirm this change."
-msgstr "Ons het 'n versoek ontvang om die e-posadres wat met jou Twenty-rekening geassosieer word, te verander. Klik hieronder om hierdie verandering te bevestig."
-
-#. js-lingui-explicit-id
-#: src/components/Footer.tsx
-msgid "Website"
-msgstr "Webwerf"
+msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
-msgid "What is Twenty?"
-msgstr "Wat is Twenty?"
+msgid "What is Betty?"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 #: src/emails/validate-approved-access-domain.email.tsx
 msgid "Workspace logo"
 msgstr "Werkruimte logo"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You have been invited to Betty"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
