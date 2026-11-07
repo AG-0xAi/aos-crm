@@ -411,3 +411,29 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 
 **Siguiente**
 - Retorno de CRM-020: el worker sigue vivo, con dos commits en `crm020/ci-twenty-convenciones` (R2).
+
+## 2026-11-07 03:25 UTC · Fase 2 · Retorno de CRM-020 y gate rojo en el check de marca
+
+**Hecho**
+- El worker de CRM-020 devuelve seis commits sobre `6c6fd84d` (cabeza `2eccd3ac`): `Brand.ts` partido en once ficheros y barril regenerado (R2), cuatro cadenas con `doNotTranslate` y catálogos de `twenty-emails` extraídos y compilados (R1), Markdown del diccionario de iconos (R3), hex del tema en minúsculas con los cinco ficheros regenerados (R4).
+- No commitea los catálogos de `twenty-front`: el diff de su extract es deuda ajena a Betty y la CI no compara catálogos tras el extract. Queda documentado en su informe.
+- Verify del arnés al retorno: rojo en `verify-image-build` (15/32) porque el stack local corría la imagen de `39cd47d3`. Reconstruido con `local.ps1 -Action Restart` para `2eccd3ac`.
+- `aos publish --base betty/factory`, solo: rojo en el comando 19/32, `verify-brand.mjs`, que lee `Brand.ts` y ya no existe. El brief había vetado `scripts/aos/**` al worker, así que nadie lo adaptó.
+- Contrato ampliado con el escenario R2.2 (el check de marca sigue al split sin perder casos) y `scripts/aos/verify-brand.mjs` añadido al alcance de la spec. Fix-forward despachado en CRM-020 con `--publish off`.
+
+**Verificado (cómo)**
+- Diff revisado contra R1-R4. `doNotTranslate` existe en upstream (`twenty-shared/src/i18n/do-not-translate.ts`) y Twenty lo usa en front.
+- Revisor del arnés: PASS, con un hallazgo menor (catálogos de front).
+- Stack tras el restart: server y worker con la imagen `...-aos2eccd3ac85e3`, `/healthz` 200.
+- Recibo `.aos/receipts/2eccd3ac.json`: comandos 1 a 18 en 0 y el 19 en 1. Los comandos 20 a 32 no corrieron.
+- `git grep`: `verify-brand.mjs` es el único script del gate que nombra `Brand.ts`.
+
+**Bloqueo o pido**
+- Nada a Andrés. Dos notas para la fábrica:
+  - al cerrar el retorno, el arnés resolvió como base de publicación `codex/crm016-alta-invitacion` y no `betty/factory`, de ahí `--publish off` y `--base` explícito;
+  - el revisor del arnés tomó el rango desde `39cd47d3`, no desde la base real.
+- Hallazgo de producto, no causado por CRM-020: al cambiar «Twenty» por «Betty» en las cadenas en inglés, sus traducciones quedaron vacías, y esas frases de los correos llegan en inglés en todos los idiomas. El catálogo compilado lo hace visible.
+
+**Siguiente**
+- Retorno del fix: restart del stack para el commit nuevo y `aos publish --base betty/factory`.
+- Con el PR abierto, la CI de GitHub mide storybook, integración y el lint y el typecheck del servidor.
