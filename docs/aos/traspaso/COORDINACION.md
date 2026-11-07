@@ -24,6 +24,22 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-07 22:15Z · mudanza a la VM: Andrés da luz verde
+- Andrés ha decidido subir Betty a la VM y ponerla en marcha. La VM ya tiene 12 CPU y 46 GB.
+- **No clones todavía.** Espera a que confirme aquí que el PR #5 está fusionado en `betty/factory`. Si no, la VM arrancaría desde una línea sin CRM-020.
+- Mientras tanto, en tu PC:
+  1. S-00 apagado y ningún run en vuelo en tu bus.
+  2. `session-manager-plugin` instalado y tu SSO de `aos-crm-dev` aprobado por Andrés. Las sesiones de Identity Center duran ahora 30 días, así que basta con una aprobación al mes.
+- Con el #5 fusionado:
+  3. En la VM, como `aos`: `git clone -b betty/factory https://github.com/AG-0xAi/aos-crm.git /opt/aos/betty`, más las dependencias que pida tu gate. Yarn va por corepack, y Node 24.22.2 ya está instalado.
+  4. La mudanza la lanzas desde tu PC con `mover-bus-a-vm.sh`, que está en `deploy/aws/scripts/` de `main` del arnés: `AOS_MOVER_CLI=/opt/aos/cli AOS_MOVER_AOS_HOME=/home/aos/.aos-betty mover-bus-a-vm.sh "<ruta POSIX de tu checkout>" aos-factory-01 /opt/aos/betty`. Viajan el pack, `verify.json` y `config.json`. Si la VM no consigue leer el bus, el script se detiene antes de congelar el tuyo.
+  5. Fase 0 en la VM: corre tu gate de worker en `/opt/aos/betty` midiendo cada comando. Son lint, typecheck y unit de lo afectado. El objetivo es menos de 20 min y menos de 10 GB.
+  6. En la bitácora: «mudanza hecha», el slug de tu pack y la ruta del informe de la Fase 0.
+- Con eso, el dueño de la VM hace la parte de root: el alta del bus, `baseBranch = betty/factory`, el panel de `aos-crm`, los workers encendidos con tope 2 y tu S-00.
+- La CLI de la VM está fijada en el `main` del arnés de hoy, con los arreglos de base de publicación, de revisión y del S-00.
+- Tu bus en la VM tendrá como mucho 2 workers de 12 GB cada uno.
+- Pauta para tus encargos: la evidencia que mides en runtime, como «50 de 50 con carga», va commiteada en la rama junto al cambio, o la vuelve a medir el gate. El revisor no lee `.aos/reports/`.
+
 ### 2026-11-07 16:00Z · punto 3 del revisor: me basta tu lectura
 - Leído el punto 3 y comprobado por mi cuenta sobre `2b09f008`:
   - Los msgid que salen de los catálogos son los del pie de upstream: GitHub, guía de usuario, web, desarrolladores, «San Francisco / Paris» y «Public Benefit Corporation». `Footer.tsx` ya no tiene ninguna cadena traducible, ni en la punta ni en `betty/factory`; solo queda el comentario que explica el cambio. El extract no podía conservarlos.
