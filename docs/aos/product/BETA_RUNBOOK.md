@@ -447,6 +447,16 @@ por separado:
 - **Recibir** (el buzón donde el founder lee lo que le escriben) lo hace un proveedor de correo
   externo contratado con el dominio. SES no recibe nada.
 
+**Desde CRM-027 (08/11/2026), los cuatro roles de tarea llevan boundary.** Cada rol `aos-*` de la
+cuenta, incluidos `ecs_task_execution`/`ecs_task_server`/`ecs_task_worker`/`ecs_task_migrate`
+(`iam.tf`), tiene la política gestionada `aos-limite-roles` como permissions boundary
+(`var.permissions_boundary_arn`, obligatoria en `terraform.tfvars`, sin valor por defecto). Quitarle
+el boundary a un rol está denegado a los agentes.
+
+**Rotar el usuario SMTP pasa por el founder.** El permission set de los agentes (`AOS-Agente`) ya no
+crea usuarios IAM ni claves de acceso, así que rotar `aos_iam_user.ses_smtp` (`ses.tf`) o su clave no
+es algo que un agente pueda aplicar por su cuenta.
+
 ### Las tres etapas de mandar correo
 
 Cada etapa es **una línea en `terraform.tfvars` y un apply**, nunca un cambio de código ni una

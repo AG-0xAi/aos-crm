@@ -32,8 +32,9 @@ data "aws_iam_policy_document" "ecs_tasks_assume_role" {
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
-  name               = "aos-crm-${var.environment}-ecs-task-execution"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  name                 = "aos-crm-${var.environment}-ecs-task-execution"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_managed" {
@@ -62,13 +63,15 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
 }
 
 resource "aws_iam_role" "ecs_task_server" {
-  name               = "aos-crm-${var.environment}-ecs-task-server"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  name                 = "aos-crm-${var.environment}-ecs-task-server"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 resource "aws_iam_role" "ecs_task_worker" {
-  name               = "aos-crm-${var.environment}-ecs-task-worker"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  name                 = "aos-crm-${var.environment}-ecs-task-worker"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 # No inline policy on purpose: the migrate task only runs
@@ -76,8 +79,9 @@ resource "aws_iam_role" "ecs_task_worker" {
 # driver, so it gets no S3/KMS grant that ecs_task_server/worker need and it
 # does not.
 resource "aws_iam_role" "ecs_task_migrate" {
-  name               = "aos-crm-${var.environment}-ecs-task-migrate"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  name                 = "aos-crm-${var.environment}-ecs-task-migrate"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 data "aws_iam_policy_document" "ecs_task_s3" {
