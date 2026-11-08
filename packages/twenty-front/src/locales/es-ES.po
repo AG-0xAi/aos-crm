@@ -29860,3 +29860,33 @@ msgstr "Invitación anulada"
 #: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
 msgid "Could not revoke the invitation. Please try again later."
 msgstr "No se pudo anular la invitación. Inténtalo más tarde."
+
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "About Betty"
+msgstr "Acerca de Betty"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Version {version}"
+msgstr "Versión {version}"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "License"
+msgstr "Licencia"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is free software under the GNU AGPL-3.0."
+msgstr "Betty es software libre bajo la GNU AGPL-3.0."
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Read the license"
+msgstr "Leer la licencia"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Source code"
+msgstr "Código fuente"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
+msgstr "Betty está basado en Twenty (twentyhq/twenty), con licencia GNU AGPL-3.0, con algunos archivos bajo licencia comercial."

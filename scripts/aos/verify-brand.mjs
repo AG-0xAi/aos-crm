@@ -302,6 +302,12 @@ export const ALLOWLIST = [
     reason:
       "The CLI's own command reference. It documents the npm package above, is hosted by GitHub rather than by Twenty, and the tab is server-admin only.",
   },
+  {
+    file: 'packages/twenty-front/src/pages/settings/about/SettingsAbout.tsx',
+    match: 'Betty is based on Twenty (twentyhq/twenty)',
+    reason:
+      'CRM-026: the AGPL open-source credit, naming the upstream project this fork is built from. The founder asked for this attribution explicitly, on a page only a signed-in user reaches.',
+  },
 ];
 
 export function isScannedPath(relativePath) {
