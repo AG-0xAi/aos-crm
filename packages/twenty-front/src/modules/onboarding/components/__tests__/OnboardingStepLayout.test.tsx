@@ -10,6 +10,7 @@ import { currentUserState } from '@/auth/states/currentUserState';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { onboardingConfigState } from '@/client-config/states/onboardingConfigState';
 import { type OnboardingConfig } from '@/client-config/types/OnboardingConfig';
+import { OnboardingLayout } from '@/onboarding/components/OnboardingLayout';
 import { OnboardingStepLayout } from '@/onboarding/components/OnboardingStepLayout';
 import { ONBOARDING_FREE_CREDITS_DEFAULT_VALUE } from '@/onboarding/constants/OnboardingFreeCreditsDefaultValue';
 import { onboardingFreeCreditsFamilyState } from '@/onboarding/states/onboardingFreeCreditsFamilyState';
@@ -35,6 +36,19 @@ jest.mock(
 jest.mock('@/onboarding/components/OnboardingTransitionOutlet', () => ({
   OnboardingTransitionOutlet: () => null,
 }));
+
+// Spies through to the real implementation, so the other tests in this file
+// (which rely on OnboardingLayout actually rendering headerRightComponent and
+// children) keep working, while letting the backgroundComponent assertions
+// below inspect the exact props OnboardingStepLayout passed it.
+jest.mock('@/onboarding/components/OnboardingLayout', () => {
+  const actual: typeof import('@/onboarding/components/OnboardingLayout') =
+    jest.requireActual('@/onboarding/components/OnboardingLayout');
+  return {
+    ...actual,
+    OnboardingLayout: jest.fn(actual.OnboardingLayout),
+  };
+});
 
 i18n.load({ [SOURCE_LOCALE]: messages });
 i18n.activate(SOURCE_LOCALE);
@@ -69,6 +83,7 @@ describe('OnboardingStepLayout', () => {
     localStorage.clear();
     resetJotaiStore();
     jotaiStore.set(currentWorkspaceState.atom, mockCurrentWorkspace);
+    jest.mocked(OnboardingLayout).mockClear();
   });
 
   it('should invite to earn the email reward on the first step', async () => {
@@ -109,7 +124,7 @@ describe('OnboardingStepLayout', () => {
     expect(screen.queryByText('Earn 2')).not.toBeInTheDocument();
   });
 
-  it('should never mount a construction site canvas, on any step', () => {
+  it('should never pass a backgroundComponent to OnboardingLayout, on the first step', () => {
     jotaiStore.set(onboardingConfigState.atom, onboardingConfig);
     setOnboardingStatus(OnboardingStatus.SYNC_EMAIL);
 
@@ -117,10 +132,14 @@ describe('OnboardingStepLayout', () => {
       wrapper: Wrapper,
     });
 
+    expect(jest.mocked(OnboardingLayout)).toHaveBeenCalled();
+    for (const [props] of jest.mocked(OnboardingLayout).mock.calls) {
+      expect(props.backgroundComponent).toBeUndefined();
+    }
     expect(container.querySelector('canvas')).not.toBeInTheDocument();
   });
 
-  it('should never mount a construction site canvas on the last onboarding step', () => {
+  it('should never pass a backgroundComponent to OnboardingLayout, on the last onboarding step', () => {
     jotaiStore.set(onboardingConfigState.atom, onboardingConfig);
     setOnboardingStatus(OnboardingStatus.PLAN_REQUIRED);
 
@@ -128,6 +147,10 @@ describe('OnboardingStepLayout', () => {
       wrapper: Wrapper,
     });
 
+    expect(jest.mocked(OnboardingLayout)).toHaveBeenCalled();
+    for (const [props] of jest.mocked(OnboardingLayout).mock.calls) {
+      expect(props.backgroundComponent).toBeUndefined();
+    }
     expect(container.querySelector('canvas')).not.toBeInTheDocument();
   });
 });
