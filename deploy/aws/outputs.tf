@@ -26,6 +26,21 @@ output "ecs_cluster_name" {
   value = aws_ecs_cluster.this.name
 }
 
+output "ecs_server_service_name" {
+  description = "ECS service name for the server, used by deploy-beta.yaml's `aws ecs wait services-stable` (CRM-024 R2)."
+  value       = aws_ecs_service.server.name
+}
+
+output "ecs_worker_service_name" {
+  description = "ECS service name for the worker, same use as ecs_server_service_name."
+  value       = aws_ecs_service.worker.name
+}
+
+output "image_digest" {
+  description = "Digest of the image currently deployed (var.image_digest). Read before apply so deploy-beta.yaml can print the previous digest alongside the new one in its job summary (CRM-024 R2)."
+  value       = var.image_digest
+}
+
 output "ecs_migrate_task_definition_arn" {
   description = "Run with `aws ecs run-task` before every deploy; see AWS_DEPLOYMENT_PLAN.md."
   value       = aws_ecs_task_definition.migrate.arn
