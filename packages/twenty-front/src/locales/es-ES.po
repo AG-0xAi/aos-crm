@@ -12740,6 +12740,7 @@ msgstr "Obtener clave de Organización"
 msgid "Get the most out of your workspace by inviting your team."
 msgstr "Aproveche al máximo su espacio de trabajo invitando a su equipo."
 
+#. js-lingui-id: pdrR95
 #: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
 msgid "Get the most out of Betty by inviting your team. You can also do this later from Settings."
 msgstr "Aprovecha más a Betty invitando a tu equipo. También puedes hacerlo más tarde desde Configuración."
@@ -29437,6 +29438,7 @@ msgstr "No tiene permiso para crear registros en este objeto"
 msgid "You can either create a private app or share it to others"
 msgstr "Puedes crear una aplicación privada o compartirla con otras personas"
 
+#. js-lingui-id: U1T50A
 #: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
 msgid "You can invite up to {maxEmails} teammates at a time"
 msgstr "Puedes invitar hasta {maxEmails} compañeros de equipo a la vez"
