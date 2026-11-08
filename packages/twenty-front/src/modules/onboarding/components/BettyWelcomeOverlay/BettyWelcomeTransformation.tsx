@@ -39,6 +39,12 @@ const glyphTimingMs = (index: number) => {
   return { strandStartMs, outlineStartMs };
 };
 
+// The real <img> wordmark (BettyWelcomeOverlay's StyledWordmark) starts
+// fading in at the same moment, right on top of this same spot: crossfade
+// this traced layer out over it, so it doesn't linger, filled, through the
+// dimming and iris beats.
+const FADE_OUT_DELAY_MS = BETTY_WELCOME_TRANSFORMATION_START_MS + 1450;
+
 const StyledContainer = styled.div`
   left: 50%;
   position: absolute;
@@ -48,8 +54,10 @@ const StyledContainer = styled.div`
 
   // The crouch + jump that hands off from BettyWelcomeFigure (same transform
   // shape as its own jump keyframe), then holds while the strands draw.
-  animation: bettyTransformSettle 0.3s ${EASE_OUT}
-    ${BETTY_WELCOME_TRANSFORMATION_START_MS}ms both;
+  animation:
+    bettyTransformSettle 0.3s ${EASE_OUT}
+      ${BETTY_WELCOME_TRANSFORMATION_START_MS}ms both,
+    bettyTransformFadeOut 500ms linear ${FADE_OUT_DELAY_MS}ms forwards;
 
   @keyframes bettyTransformSettle {
     from {
@@ -57,6 +65,12 @@ const StyledContainer = styled.div`
     }
     to {
       transform: translate(-50%, -50%);
+    }
+  }
+
+  @keyframes bettyTransformFadeOut {
+    to {
+      opacity: 0;
     }
   }
 `;
