@@ -38,8 +38,15 @@ jobs:
           REF: ${{ inputs.ref }}
           IMAGE_DIGEST: ${{ inputs.image_digest }}
         run: |
-          if ! [[ "$REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "ref '$REF' has characters outside [A-Za-z0-9._/-]" >&2
+          if ! [[ "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || \
+             [[ "$REF" == -* ]] || [[ "$REF" == *".."* ]] || \
+             [[ "$REF" == *"//"* ]] || [[ "$REF" == *"/" ]] || \
+             [[ "$REF" == *".lock" ]]; then
+            echo "ref '$REF' is not a plausible branch/tag name" >&2
+            exit 1
+          fi
+          if ! git check-ref-format --branch "$REF" >/dev/null 2>&1; then
+            echo "ref '$REF' fails git check-ref-format --branch" >&2
             exit 1
           fi
           if [ -n "$IMAGE_DIGEST" ] && ! [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
