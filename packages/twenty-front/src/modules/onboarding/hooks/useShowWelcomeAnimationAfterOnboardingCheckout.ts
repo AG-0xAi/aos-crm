@@ -2,7 +2,6 @@ import { currentUserState } from '@/auth/states/currentUserState';
 import { isOnboardingAiChatEnabledState } from '@/client-config/states/isOnboardingAiChatEnabledState';
 import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
 import { isOnboardingCheckoutPendingState } from '@/onboarding/states/isOnboardingCheckoutPendingState';
-import { isWelcomeAnimationVisibleState } from '@/onboarding/states/isWelcomeAnimationVisibleState';
 import { shouldOpenAiChatAfterOnboardingState } from '@/onboarding/states/shouldOpenAiChatAfterOnboardingState';
 import { useStore } from 'jotai';
 import { OnboardingStatus } from '~/generated-metadata/graphql';
@@ -26,7 +25,6 @@ export const useShowWelcomeAnimationAfterOnboardingCheckout = () => {
     );
 
     store.set(isOnboardingCheckoutPendingState.atom, false);
-    store.set(isWelcomeAnimationVisibleState.atom, true);
     store.set(isBettyWelcomeVisibleState.atom, true);
     store.set(
       shouldOpenAiChatAfterOnboardingState.atom,
