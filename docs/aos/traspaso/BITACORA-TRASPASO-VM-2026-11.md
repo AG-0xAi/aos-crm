@@ -672,3 +672,138 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 
 **Siguiente**
 - Retornos de CRM-015 y CRM-022; después, CRM-021.
+
+## 2026-11-08 09:45 UTC · Fase 5 · «Betty (VM)» toma el mando: lo que dejo a medias
+
+**Hecho**
+- Leída la orden de Andrés en este chat y la entrada de COORDINACION `608d64200`: desde las 09:07Z el bus `betty` lo orquesta «Betty (VM)». Desde entonces no despacho, no acepto y no empujo ramas de trabajo en ese bus. Solo escribo aquí.
+- Leí el bus de la VM, sin tocarlo, para dejar el estado exacto. Lo que tenía a medias:
+  - **CRM-015** (sin tope de espacios). El run de las 08:07Z sí devolvió:
+    - retorno a las 08:13Z, `STRUCTURAL_PASS`, commit `a669efb95f`;
+    - revisor PASS a las 08:13Z;
+    - el publicador abrió el [PR #6](https://github.com/AG-0xAi/aos-crm/pull/6) hacia `betty/factory` a las 08:14Z.
+    - La fusión con `betty/factory` salió limpia: la rama y CRM-020 ya coincidían en el formato. La evidencia e2e quedó commiteada en `docs/aos/evidence/CRM-015-e2e-2026-11-08.md`.
+    - Pero el S-00 ya lo había aceptado a las 08:11:53Z, cuatro minutos después de arrancar ese run. Resolvió los eventos viejos (retorno BLOCKED y gate CHANGES del 07/11). El retorno real quedó como `LATE_RETURN`. La spec figura `done` y el cambio está archivado (`2026-11-08-CRM-015`) con el PR #6 sin fusionar.
+    - CI del PR #6 sobre `a669efb9`: 9 rojos, todos del servidor y ninguno nuevo. Comparado suite a suite con el push de `5b977100ed` en `betty/factory`:
+      - las 7 suites de integración que fallan en el PR también fallan en la base, que además tiene `record-stock-limit`;
+      - `server-test (2)` falla en los dos por los mismos 2 tests de `getRecordImageIdentifier`.
+    - Falta la fusión del PR #6 y, después, el despliegue a la beta, que es LIVE.
+  - **CRM-022** (bienvenida de Betty): lo despaché a las 08:09Z y su run sigue vivo en la VM, en la rama `aos/crm-022`. Encargo en `.aos/onboarding/bienvenida-2026-11-07/CRM-022-brief-vm.md`; el paquete de diseño está en la misma carpeta.
+  - **CRM-017** (correo con SES): no empecé la revisión que prometí. Va en los pendientes del relevo.
+  - **CRM-021** (pruebas de la CI): sin despachar y sin encargo para la VM.
+
+**Verificado (cómo)**
+- `aos-betty status` a las 09:37Z.
+- `return.json` y `run.json` del run de CRM-015.
+- Eventos `s00.processed` (08:11Z y 08:22Z) y `gate.result` (review PASS; publish con `pr: 6`).
+- `git ls-remote origin`: `crm015/sin-tope-espacios` en `a669efb95f`.
+- CI: `gh pr checks 6` y `gh run view --log-failed` de la ejecución del PR y de `CI Server` sobre `5b977100ed`, con las suites fallidas comparadas una a una.
+
+**Bloqueo o pido**
+- **Fusión del PR #6** (CRM-015 → `betty/factory`). La hace Andrés desde GitHub, o el coordinador con su OK. Yo no la intento.
+
+**Siguiente**
+- Nada más por mi lado en el bus. El relevo, en la entrada siguiente.
+
+## 2026-11-08 09:45 UTC · Fase 5 · Relevo para «Betty (VM)»
+
+### Estado de las specs abiertas (09:37Z)
+- `crm-sin-tope-espacios` (CRM-015): `done` por el S-00; PR #6 abierto, sin fusionar.
+- `crm-bienvenida-betty` (CRM-022): run vivo. La spec sigue `pending` aunque haya worker: el estado de la spec no refleja los runs. Mira la tabla Runs de `aos-betty status`.
+- `crm-correo-ses` (CRM-017): `in-progress`, escalado por el S-00 (`NEEDS_S00`).
+  - Su último retorno, del 30/10, es `BLOCKED_PROTOCOL_VIOLATION`.
+  - Su Terraform ya está en `betty/factory`.
+  - El R3 del contrato pide verificación de correo forzada, pero Andrés decidió dejarla como variable por etapas.
+- `crm-ci-twenty-pruebas` (CRM-021): `pending`. Su contrato, en `specs/ci-twenty-pruebas/`, se escribió para el PC.
+- `crm-ci-twenty-verde`: `pending`. Es la madre de CRM-020 (`done`) y de CRM-021.
+- `crm-traducciones-marca`: `pending`, talla S. Son 9 msgid de correo con «Betty», sin traducir en 33 idiomas. Espera a que Andrés decida cómo traducir.
+- `crm-antibots-alta`: `pending`, talla S, depende de `crm-correo-ses`.
+- Otras `pending` que no toqué en el traspaso:
+  - `crm-bootstrap` y `crm-bootstrap-delivery`;
+  - `crm-open-beta` y `crm-mcp-menu`;
+  - `crm-invitar-equipo` y `crm-licencia-ajustes`;
+  - `crm-errores-extensiones`, que es XS: despáchala con `--model` y talla S como mínimo.
+
+### Decisiones tomadas
+- El bus vive en la VM desde el 08/11. El `.aos` del PC está congelado (`CONGELADO.md`) y fuera del registro del PC; no se vuelve a operar desde allí.
+- El gate de los workers en la VM tiene 12 comandos:
+  - instalación por worktree con `YARN_NM_MODE=hardlinks-global`;
+  - privacidad y marca, con sus autopruebas;
+  - build de `twenty-shared`;
+  - `nx affected` de lint y typecheck;
+  - jest y vitest con `--changedSince=origin/betty/factory`.
+  - El gate de 32 comandos del PC está guardado en `.aos/docs/verify-windows-2026-11-08.json`.
+- `betty/factory` es la línea de integración y la rama por defecto del fork. Nunca se empuja directo: fusiona Andrés, o el coordinador con su OK.
+- El S-00 está en modo «acepta y rescata»: no fusiona ni despacha. Workers: tope de 2, de 12 GB cada uno.
+- CRM-020 se aceptó con override, con OK de Andrés, el 07/11. Sus rojos restantes son de CRM-021 o intermitentes de upstream.
+- CRM-021 va a la VM (decisión de Andrés del 06/11). El coordinador sugiere partirlo por áreas, en piezas de talla S.
+- La evidencia de ejecución se commitea en la rama, bajo `docs/aos/evidence/`, porque el revisor no lee `.aos/reports/` (pauta del coordinador).
+- Producto:
+  - la invitación crea una cuenta y un espacio propios del invitado; no lo une al espacio de quien invita;
+  - `MAX_WORKSPACES=0` significa sin tope, y se conserva el camino de la clave comercial;
+  - la bienvenida sustituye la animación WebGL de Twenty. La frase en inglés es «Relationships worth keeping.», que eligió Andrés; la firma en inglés generada tiene su SHA-256 registrado en el contrato;
+  - en el correo, la verificación forzada es una variable por etapas (R3 de `crm-correo-ses`).
+
+### Pendientes
+- **De Andrés:**
+  - fusionar el PR #6 y dar su OK para desplegar CRM-015 a la beta (LIVE);
+  - **SES:** AWS denegó el acceso de producción el 06/11 y Andrés respondió al caso el 07/11. Si lo aprueban, activar el envío es LIVE: rehacer `terraform.tfvars`, un `plan` sin cambios inesperados y el OK de Andrés;
+  - decisiones de producto:
+    - el modelo de facturación: Stripe propio o merchant of record;
+    - el proveedor de captcha y su cuenta, para `crm-antibots-alta`. Propuse Turnstile, más correo verificado y SES en producción;
+    - cómo traducir las cadenas de marca.
+- **De «Betty (VM)»:**
+  - **CRM-022.** Al volver, comprueba:
+    - el SHA-256 de cada SVG contra el manifiesto y el contrato;
+    - las cadenas en inglés como fuente, con su traducción en `es-ES.po`, sin `extract` completo;
+    - las pruebas de una sola vez, recarga, Esc, omitir y movimiento reducido, con su prueba negativa;
+    - las capturas de Storybook commiteadas en `docs/aos/evidence/CRM-022/`.
+    - Las capturas del alta real van después del despliegue.
+  - **CRM-017.** Proponer a Andrés cómo cerrarlo. Mi propuesta, sin haber revisado aún el diff:
+    1. enmendar el R3 del contrato para que diga lo decidido (variable por etapas);
+    2. revisar el commit contra el contrato enmendado;
+    3. si cumple, aceptarlo con OK de Andrés; si no, fix-forward.
+    - La activación de la verificación va con `crm-antibots-alta`.
+  - **CRM-021.** Escribir el encargo para Linux, como el de CRM-022, partido por áreas. Su lista lleva los intermitentes de upstream:
+    - `DatePicker > Navigation Unmount`;
+    - `DraggableList > Pointer Grip Reorder`;
+    - `record-stock-limit`, shard 16 de integración.
+  - **Hallazgo no bloqueante del revisor en CRM-015.** Las pruebas unitarias cubren solo el helper, no su uso en `assertWorkspaceCountWithinLimit`. Volver a la constante dentro del servicio no rompería ninguna unitaria; lo cubre el e2e. Para cumplir el R2.1 al pie de la letra hace falta un fix-forward pequeño.
+  - **Bus-guard del fork** (nota del coordinador de las 01:35Z): sin decidir. Recomiendo añadirlo. Es configuración del repo, así que va por PR y con OK de Andrés. Aparte, `aos-betty status` da el merge-guard como «solo-repo».
+  - **Camino de extremo a extremo.** El gate de la VM no declara ninguno, y `aos-betty status` lo marca incompleto. Los e2e de CRM-015 corrieron en el stack local del PC; en la VM no hay stack local montado.
+  - **Fase 3** (despliegue desde Actions con OIDC): no la empecé.
+  - **Override de la guarda pre-push.** Vale solo durante el traspaso, con el motivo «traspaso Betty: …». Falta fijar la fecha en que deja de usarse.
+- **En el PC de Andrés:** el stack local sigue arrancado con la imagen de CRM-015. Se puede parar; no afecta al bus.
+
+### Trampas que vi
+1. **El S-00 puede aceptar con un run en vuelo.** CRM-015 se aceptó a las 08:11Z sobre eventos viejos, con el fix-forward corriendo. Su retorno real quedó como `LATE_RETURN` y la barra se movió antes de la fusión. Antes de despachar un fix-forward sobre un track escalado, decide el escalado, o cuenta con que el S-00 lo cierre.
+2. **El gate del retorno puede ir acotado.** En CRM-015 corrió 4 de 12 comandos, solo privacidad y marca («acotado a las suites que nombran los files de la spec»). Lint, typecheck y jest los corrió el worker y solo él los declara; el arnés no los observó en el retorno. Mira `verifyResult.scope` en `run.json`.
+3. **El recibo de publicación vive dentro del worktree** (`.aos/worktrees/<run>/.aos/receipts/`) y desaparece cuando se limpia el worktree. El de `a669efb9` ya no existe.
+4. **El revisor solo lee el diff de git.** La evidencia de ejecución tiene que estar commiteada. En las revisiones por rango juzga commits viejos contra el último encargo: revisa por ventana (`aos review --range <último aceptado>..<punta>`) o por partes (`--part N/M`).
+5. **La guarda del worktree no deja escribir el `.aos/reports/<T>.md` del bus.** El worker deja su informe en `.aos/reports/claude-worker-report.md` de su worktree. No le pidas en el encargo que escriba el informe del bus.
+6. **`worktreeLinks` no sirve en este monorepo.** Los paquetes del workspace son enlaces relativos y resolverían al checkout principal. Cada worktree instala con `YARN_NM_MODE=hardlinks-global` y ocupa unos 4 GB.
+7. **Despacho:**
+   - como mucho 4 Requirements por spec: pliega antes que usar `--force`;
+   - pasa siempre `--model` y nunca menos de S: XS va a Haiku y falla;
+   - `aos specs add/update` exige `--files`;
+   - los contratos viven en `.aos/pack/aos-crm/specs/<capacidad>/spec.md`.
+8. **Aceptación:** `aos done --archive` necesita `changes/<track>/`, que se crea con `aos change new <T> --pack aos-crm --capability <cap>`. Un `--force` que falla deja igualmente un evento `gate.override`.
+9. **CI de Twenty:**
+   - el lint del front depende de `lint:unlocalized-strings`; después van `oxlint` y `oxfmt --check`;
+   - la comprobación de código generado es `twenty-client-sdk:generate-metadata-client` más el `graphql:generate` del front;
+   - jest en server, front y shared; vitest en `twenty-ui` y `twenty-client-sdk`;
+   - nunca hagas un `lingui extract` completo del front, porque trae ruido ajeno: añade solo las entradas y compila;
+   - con `betty/factory` como rama por defecto, `pull_request_target` corre los workflows de `betty/factory`.
+10. **Rojos de base en `betty/factory` (`5b977100ed`):**
+    - CI Server: integración en los shards 1, 4, 7, 8, 9, 11, 13 y 16, y `server-test (2)` con 2 tests de `getRecordImageIdentifier`;
+    - CI Front y CI UI.
+    - Son de CRM-021 o intermitentes. Antes de atribuir un rojo a un PR, compáralo suite a suite con la base.
+11. **El título del PR es el resumen del revisor.** El publicador lo pone así: el #6 empieza «CRM-015: R1 to R3 are implemented…».
+12. **El fork es público.** Nada de secretos, IDs de cuenta o de instancia, ARNs ni URLs internas. Escanea antes de cada push.
+
+### Lo que haría a continuación
+1. Pedir a Andrés que fusione el PR #6, cuyos rojos son de base, y su OK para desplegar CRM-015 a la beta.
+2. Recibir CRM-022 y verificarlo contra el contrato.
+3. Cerrar CRM-017 con la enmienda del R3 y el OK de Andrés.
+4. Escribir el encargo de CRM-021 para Linux, partido por áreas, y usar el segundo slot de worker en paralelo con lo que quede.
+5. Añadir un camino de extremo a extremo al gate de la VM, con un stack local en la VM o con e2e contra staging, para que las pruebas de alta y de espacios dejen de depender del PC.
