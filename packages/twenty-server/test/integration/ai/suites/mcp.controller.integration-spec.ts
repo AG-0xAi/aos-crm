@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { BRAND_NAME } from 'twenty-shared/constants';
 
 import { MCP_PROTOCOL_VERSION } from 'src/engine/api/mcp/constants/mcp-protocol-version.const';
 
@@ -87,7 +88,7 @@ describe('MCP Controller (integration)', () => {
         expect(res.body.result.protocolVersion).toBe(MCP_PROTOCOL_VERSION);
         expect(res.body.result.capabilities).toBeDefined();
         expect(res.body.result.serverInfo).toBeDefined();
-        expect(res.body.result.serverInfo.name).toBe('Twenty MCP Server');
+        expect(res.body.result.serverInfo.name).toBe(`${BRAND_NAME} MCP Server`);
         expect(typeof res.body.result.instructions).toBe('string');
       });
   });

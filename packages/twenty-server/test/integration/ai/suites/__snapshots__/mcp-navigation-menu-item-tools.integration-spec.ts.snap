@@ -58,7 +58,7 @@ Note: creating a new custom object via create_object_metadata already auto-creat
     "inputSchema": {
       "$defs": {
         "__schema0": {
-          "description": "'user' creates a personal favorite, visible only to the current user. 'workspace' creates a shared navigation menu item visible to everyone (requires the LAYOUTS permission). Twenty has no separate Favorites concept — favorites are just navigation menu items with scope=user.",
+          "description": "'user' creates a personal favorite, visible only to the current user. 'workspace' creates a shared navigation menu item visible to everyone (requires the LAYOUTS permission). Betty has no separate Favorites concept — favorites are just navigation menu items with scope=user.",
           "enum": [
             "workspace",
             "user",
