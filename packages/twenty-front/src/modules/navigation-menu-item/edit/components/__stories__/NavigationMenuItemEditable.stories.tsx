@@ -16,6 +16,7 @@ import { NavigationSections } from '@/navigation-menu-item/common/constants/Navi
 import { NavigationItemDropTarget } from '@/navigation-menu-item/display/dnd/components/NavigationItemDropTarget';
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
+import { BRAND_NAME } from 'twenty-shared/constants';
 import { NavigationMenuItemType } from 'twenty-shared/types';
 import { IconLink } from 'twenty-ui/icon';
 import { type NavigationMenuItem } from '~/generated-metadata/graphql';
@@ -188,7 +189,7 @@ export const PreviewInsertion: Story = {
       ),
     ).toEqual(['Select a menu item', 'Docs', 'Status']);
     await userEvent.click(await body.findByText('Link'));
-    await expect(await body.findByDisplayValue('Twenty')).toBeVisible();
+    await expect(await body.findByDisplayValue(BRAND_NAME)).toBeVisible();
     await waitFor(() =>
       expect(canvas.queryByText('Select a menu item')).not.toBeInTheDocument(),
     );
