@@ -605,3 +605,46 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 **Siguiente**
 - Con #5 fusionado: la mudanza (Fase 4) queda lista por mi lado. Espera a que la capacidad de la VM esté resuelta.
 - En la VM: CRM-021 como primer despacho, con los dos intermitentes de upstream (`DatePicker > Navigation Unmount` y `DraggableList > Pointer Grip Reorder`) en su lista.
+
+## 2026-11-08 · Fase 4 · Mudanza hecha: el bus de Betty vive en aos-factory-01
+
+**Hecho**
+- Leída la coordinación de 22:15Z y 22:20Z: luz verde de Andrés, PR #5 fusionado (`5b977100ed`) y VM con 12 CPU y 46 GB.
+- Este PC ya alcanza la VM: Andrés instaló el plugin de Session Manager y aprobó el SSO de `aos-crm-dev` (30 días). Bloque `aos-factory-01` en `~/.ssh/config` con la clave `aos-factory-01-betty`.
+- En la VM:
+  - clon de `betty/factory` en `/opt/aos/betty`;
+  - `yarn install` y medición del gate de los workers.
+  - Informe de la Fase 0: `docs/aos/traspaso/FASE0-VM-BETTY-2026-11-08.md`, en esta rama.
+- Hallazgo de la Fase 0: `worktreeLinks` no sirve en este monorepo. Los paquetes del workspace resolverían al checkout principal. Cada worktree instala sus dependencias con `YARN_NM_MODE=hardlinks-global` como primer comando del gate. Gate de 12 comandos, 12/12 en verde, 389 s y 8,5 GB.
+- CRM-015 (sin tope de espacios) verificado de verdad en el PC antes de mudar. Su worker no pudo reconstruir el stack porque la lectura entre Windows y WSL iba a unos 5 ficheros/s; tras un `wsl --shutdown` de Andrés subió a unos 65.
+  - Stack reconstruido sobre `a0e1042098` en 82 min.
+  - `crm015-no-workspace-cap-e2e`: 3/3. Seis espacios por encima del tope de 5, el espacio del fundador intacto, y los seis borrados.
+  - `crm-signup-invitation-e2e`: 7/7.
+  - Salida en `.aos/reports/CRM-015-e2e-orquestador.md` del bus.
+- Mudanza con `mover-bus-a-vm.sh` (`d1dcde96d6`), `AOS_MOVER_CLI=/opt/aos/cli`, `AOS_MOVER_AOS_HOME=/home/aos/.aos-betty` y `AOS_MOVER_EXTRA_PARTS="runs reports artifacts onboarding docs"`: 606 MB y exit 0.
+- `AOS_S00_OFF=1` puesto antes de mudar y quitado después (antes no estaba definido).
+
+**Verificado (cómo)**
+- Specs de `aos-crm` cuadradas por el script antes de congelar: PC y VM con `done=16 in-progress=2 pending=12`.
+- En la VM, `aos-betty status` y `aos-betty specs list`:
+  - mismos conteos;
+  - 23 contratos;
+  - `verify.json` con 12 comandos y `config.json` presentes;
+  - CRM-015 en `gate.result CHANGES` con S-00 pendiente.
+- En el PC: existe `.aos/CONGELADO.md` y `aos projects list` ya no muestra este checkout.
+- Slug del pack: `aos-crm`.
+
+**Bloqueo o pido**
+- PIDO A AWS:
+  - alta del bus `betty`, con `baseBranch = betty/factory`;
+  - `aos-health-beat@betty`;
+  - token del panel de `aos-crm`;
+  - S-00 del bus;
+  - con OK de Andrés, workers encendidos.
+- Lo primero cuando haya workers:
+  - **CRM-015**: llevar la rama a `betty/factory`. La fusión choca en `sign-in-up.service.ts` porque CRM-020 formateó el mismo bloque. Después, publicar con su evidencia e2e en la rama, por la pauta nueva del revisor.
+  - **CRM-022** (bienvenida de Betty): encargo y paquete de diseño ya en el bus.
+  - **CRM-021**.
+
+**Siguiente**
+- Esperar el alta en la coordinación y seguir el primer run en la VM.
