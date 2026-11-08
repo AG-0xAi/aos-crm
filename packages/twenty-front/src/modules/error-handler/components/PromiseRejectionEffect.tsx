@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 
 import { checkIfItsAViteStaleChunkLazyLoadingError } from '@/error-handler/utils/checkIfItsAViteStaleChunkLazyLoadingError';
 import { getToastOptionsFromError } from '@/error-handler/utils/getToastOptionsFromError';
+import { isBrowserExtensionError } from '@/error-handler/utils/isBrowserExtensionError';
 import {
   CombinedGraphQLErrors,
   CombinedProtocolErrors,
@@ -35,8 +36,21 @@ export const PromiseRejectionEffect = () => {
   const handlePromiseRejection = useCallback(
     async (event: PromiseRejectionEvent) => {
       const error = event.reason;
-      if (isApolloError(error)) {
+
+      const showToast = () => {
+        if (isBrowserExtensionError(error)) {
+          // oxlint-disable-next-line no-console
+          console.warn(
+            'Ignoring unhandled rejection from a browser extension:',
+            error,
+          );
+          return;
+        }
         enqueueToast(getToastOptionsFromError({ error }));
+      };
+
+      if (isApolloError(error)) {
+        showToast();
         return; // already handled by apolloLink
       }
 
@@ -51,7 +65,7 @@ export const PromiseRejectionEffect = () => {
         checkIfItsAViteStaleChunkLazyLoadingError(error);
 
       if (!isAbortError && !isViteStaleChunkLazyLoadingError) {
-        enqueueToast(getToastOptionsFromError({ error }));
+        showToast();
       }
 
       try {
