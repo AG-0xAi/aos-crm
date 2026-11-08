@@ -29855,3 +29855,29 @@ msgstr "Invitation revoked"
 #: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
 msgid "Could not revoke the invitation. Please try again later."
 msgstr "Could not revoke the invitation. Please try again later."
+
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "About Betty"
+msgstr "About Betty"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "License"
+msgstr "License"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is free software under the GNU AGPL-3.0."
+msgstr "Betty is free software under the GNU AGPL-3.0."
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Read the license"
+msgstr "Read the license"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Source code"
+msgstr "Source code"
+
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
+msgstr "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."

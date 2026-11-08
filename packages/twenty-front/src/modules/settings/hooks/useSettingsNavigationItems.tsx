@@ -25,6 +25,7 @@ import {
   IconDoorEnter,
   IconHelpCircle,
   IconHierarchy,
+  IconInfoCircle,
   IconMail,
   IconMessage,
   IconMessageCircle,
@@ -210,6 +211,11 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
           // No help centre configured: an entry that opens nothing is worse
           // than no entry (CRM-019 R2).
           isHidden: !isDefined(helpCenterUrl),
+        },
+        {
+          label: t`About Betty`,
+          path: SettingsPath.About,
+          Icon: IconInfoCircle,
         },
         {
           label: t`Logout`,

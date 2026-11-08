@@ -219,6 +219,24 @@ describe('useSettingsNavigationItems', () => {
     ]);
   });
 
+  it('should show About Betty to a non-admin member', () => {
+    setPermissionFlags([]);
+
+    const { result } = renderHook(() => useSettingsNavigationItems(), {
+      wrapper: Wrapper,
+    });
+
+    const otherSection = result.current.find(
+      (section) => section.label === 'Other',
+    );
+    const aboutItem = otherSection?.items.find(
+      (item) => item.path === SettingsPath.About,
+    );
+
+    expect(aboutItem).toBeDefined();
+    expect(aboutItem?.isHidden).toBeFalsy();
+  });
+
   it('should show App preferences without sub-items when app preferences are on', () => {
     setPermissionFlags([PermissionFlagType.CONNECTED_ACCOUNTS]);
     jotaiStore.set(currentWorkspaceState.atom, {
