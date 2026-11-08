@@ -1,7 +1,7 @@
 import { getOperationName } from '~/utils/getOperationName';
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { HttpResponse, graphql } from 'msw';
-import { within } from 'storybook/test';
+import { userEvent, within } from 'storybook/test';
 import { AppPath } from 'twenty-shared/types';
 
 import { OnboardingStatus } from '~/generated-metadata/graphql';
@@ -48,6 +48,20 @@ export const Default: Story = {
     await canvas.findByText('Connect your assistant');
     await canvas.findByText('Claude');
     await canvas.findByText('ChatGPT');
-    await canvas.findByRole('button', { name: 'Go to the CRM' });
+    await canvas.findByRole('button', { name: 'Continue' });
+  },
+};
+
+export const InviteYourTeam: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Continue' }),
+    );
+
+    await canvas.findByText('Invite your team');
+    await canvas.findByRole('button', { name: /Send invitations/ });
+    await canvas.findByRole('button', { name: 'Skip' });
   },
 };

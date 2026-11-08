@@ -12735,6 +12735,11 @@ msgstr "Get Organization Key"
 msgid "Get the most out of your workspace by inviting your team."
 msgstr "Get the most out of your workspace by inviting your team."
 
+#. js-lingui-id: pdrR95
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "Get the most out of Betty by inviting your team. You can also do this later from Settings."
+msgstr "Get the most out of Betty by inviting your team. You can also do this later from Settings."
+
 #. js-lingui-id: 7SwUXR
 #: src/modules/object-record/record-sharing/utils/getRecordShareRoleAccessNote.ts
 msgid "Gets this record only: their role can't access {objectLabelPlural}"
@@ -29427,6 +29432,11 @@ msgstr "You are not allowed to create records for this object"
 #: src/pages/settings/developers/tabs/SettingsDevelopersAppsTab.tsx
 msgid "You can either create a private app or share it to others"
 msgstr "You can either create a private app or share it to others"
+
+#. js-lingui-id: U1T50A
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "You can invite up to {maxEmails} teammates at a time"
+msgstr "You can invite up to {maxEmails} teammates at a time"
 
 #. js-lingui-id: CNAoaw
 #: src/modules/workflow/workflow-steps/workflow-actions/logic-function-action/components/WorkflowEditActionLogicFunction.tsx

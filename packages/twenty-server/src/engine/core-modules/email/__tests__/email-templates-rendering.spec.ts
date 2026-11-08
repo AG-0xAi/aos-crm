@@ -196,6 +196,39 @@ describe('email templates rendering', () => {
   });
 });
 
+describe('SendInviteLinkEmail branding', () => {
+  beforeAll(() => {
+    jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    jest.useFakeTimers();
+  });
+
+  const buildInviteEmail = (locale: 'en' | 'es-ES') =>
+    SendInviteLinkEmail({
+      link: 'https://app.betty.management/invite/token',
+      workspace: { name: 'Acme Inc', logo: undefined },
+      sender: {
+        email: 'tim@example.com',
+        firstName: 'Tim',
+        lastName: 'Apple',
+      },
+      serverUrl: 'https://app.betty.management',
+      locale,
+    });
+
+  it.each(['en', 'es-ES'] as const)(
+    'should render Betty branding with no visible Twenty for locale %s',
+    async (locale) => {
+      const html = await renderEmail(buildInviteEmail(locale));
+
+      expect(html).toContain('Betty');
+      expect(html).not.toMatch(/twenty/i);
+    },
+  );
+});
+
 describe('renderEmail guard', () => {
   beforeAll(() => {
     jest.useRealTimers();
