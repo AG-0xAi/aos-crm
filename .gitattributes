@@ -26,3 +26,6 @@
 *.ttf binary
 *.eot binary
 
+
+# Compiled Lingui catalogs: one generated line per locale. Reviewed through the .po sources.
+packages/*/src/locales/generated/*.ts -diff
