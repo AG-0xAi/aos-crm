@@ -1,14 +1,21 @@
 # Copy to terraform.tfvars (gitignored, see .gitignore in this directory)
-# and fill in the two REPLACE_ME values before `terraform plan`/`apply`.
+# and fill in the three REPLACE_ME values before `terraform plan`/`apply`.
 # Region, budget and environment below are the beta's real settings (founder
-# decision, 29/10/2026); the domain and the alert address are placeholders,
-# because a real domain or email in this public fork identifies the business.
+# decision, 29/10/2026); the domain, the alert address and the boundary ARN
+# are placeholders, because a real domain, email or account id in this public
+# fork identifies the business.
 
 environment        = "beta"
 aws_region         = "eu-west-1"        # founder decision (Ireland)
 budget_amount_usd  = 500                # founder decision: alarm, not a cap
 domain_name        = "REPLACE_ME"       # apex of the beta namespace, e.g. yourdomain.tld
 budget_alert_email = "REPLACE_ME"       # who AWS Budgets notifies
+
+# ARN of the account's aos-limite-roles managed policy (CRM-027). Every
+# aos-* IAM role carries it as a permissions boundary since 08/11/2026;
+# removing it is denied to agents, so this has no default. REPLACE_ME stands
+# in for the account id, same reasoning as domain_name/budget_alert_email.
+permissions_boundary_arn = "arn:aws:iam::REPLACE_ME:policy/aos-limite-roles"
 
 # Hosted zone for domain_name is looked up by name (data.tf). Uncomment only
 # to override that lookup -- see variables.tf.

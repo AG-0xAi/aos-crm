@@ -29,6 +29,22 @@ variable "aws_region" {
   }
 }
 
+variable "permissions_boundary_arn" {
+  description = <<-EOT
+    ARN of the account's `aos-limite-roles` managed policy. Since 08/11/2026
+    every `aos-*` IAM role in the account carries this as its permissions
+    boundary (CRM-027), and removing a boundary is explicitly denied to
+    agents, so there is no safe default to fall back to here: a missing or
+    wrong value must fail validate/plan, not apply with no boundary.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:policy/.+$", var.permissions_boundary_arn))
+    error_message = "permissions_boundary_arn must look like an IAM policy ARN: arn:aws:iam::<12-digit account id>:policy/<policy name>."
+  }
+}
+
 variable "domain_name" {
   description = <<-EOT
     Public domain this stack serves. It is the apex of the beta's namespace,

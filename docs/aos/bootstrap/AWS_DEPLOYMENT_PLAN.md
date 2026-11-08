@@ -522,6 +522,12 @@ creación de roles. La lectura de IAM va sin recorrer `Resource` porque `plan` r
 políticas que no creó él (la política gestionada `AmazonECSTaskExecutionRolePolicy`, por ejemplo).
 Nada de claves estáticas: `aws sso login` por sesión, igual que en CRM-011.
 
+**Actualización (CRM-027, 08/11/2026):** el permission set de despliegue ya no es `PowerUserAccess`,
+es `AOS-Agente`, y desde esa misma fecha todo rol `aos-*` de la cuenta lleva la política gestionada
+`aos-limite-roles` como permissions boundary (`var.permissions_boundary_arn`, sin valor por defecto
+en `deploy/aws/variables.tf`, obligatoria en `terraform.tfvars`). Quitarle el boundary a un rol está
+denegado a los agentes, así que un `plan` sin esta variable falla en `validate`, no en `apply`.
+
 **Correo saliente: no hay driver** (decisión del founder, 29/10). `EMAIL_DRIVER=LOGGER` es el valor
 por defecto de upstream y no envía nada: `LoggerDriver.send` escribe el correo entero —asunto, texto
 y HTML— en el log del servidor
@@ -996,6 +1002,11 @@ sustitución de la que ya tenía el permission set:
 `CreateAccessKey`/`DeleteAccessKey`/`ListAccessKeys` toman el ARN del usuario como recurso, igual
 que las acciones de usuario; por eso comparten el mismo `Resource` con el resto de la sentencia en
 vez de necesitar `"*"`.
+
+**Actualización (CRM-027, 08/11/2026):** `ManageAosCrmSmtpUsers` ya no está al alcance de los
+agentes: el permission set `AOS-Agente` no concede `iam:CreateUser`/`iam:CreateAccessKey` ni el
+resto de esta sentencia. Rotar el usuario SMTP de SES (`aws_iam_user.ses_smtp`, `ses.tf`) pasa por
+el founder, no por un apply de un agente.
 
 **Comprobaciones tras el `apply`** (coordinador, con SSO, después de dejar correr el `apply` y
 esperar a que el DNS propague -- minutos, no segundos):
