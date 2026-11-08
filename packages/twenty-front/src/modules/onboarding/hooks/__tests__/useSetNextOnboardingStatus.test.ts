@@ -394,7 +394,7 @@ describe('useSetNextOnboardingStatus', () => {
     expect(isBettyWelcomeVisible).toBe(true);
   });
 
-  it('should never trigger Twenty\'s own welcome animation, only Betty\'s, when onboarding completes', () => {
+  it("should never trigger Twenty's own welcome animation, only Betty's, when onboarding completes", () => {
     const { isBettyWelcomeVisible } = renderHooks(OnboardingStatus.INVITE_TEAM);
 
     expect(isBettyWelcomeVisible).toBe(true);

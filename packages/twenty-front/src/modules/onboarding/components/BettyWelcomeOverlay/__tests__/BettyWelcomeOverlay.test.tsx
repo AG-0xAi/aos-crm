@@ -153,7 +153,9 @@ describe('BettyWelcomeOverlay', () => {
     expect(screen.getByText('Initial setup · 1 of 1')).toBeInTheDocument();
     expect(screen.getByText('Account created')).toBeInTheDocument();
     expect(screen.queryByText('Sources authorized')).not.toBeInTheDocument();
-    expect(screen.queryByText('Connect your assistant')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Connect your assistant'),
+    ).not.toBeInTheDocument();
   });
 
   it('should fall back to the nameless greeting when the profile has no first name', () => {

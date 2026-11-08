@@ -49,7 +49,7 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
     resetJotaiStore();
   });
 
-  it('should show the Betty welcome layer, and never Twenty\'s own welcome animation, when the onboarding checkout is confirmed', () => {
+  it("should show the Betty welcome layer, and never Twenty's own welcome animation, when the onboarding checkout is confirmed", () => {
     renderAndShow({
       isOnboardingCheckoutPending: true,
       onboardingStatus: OnboardingStatus.COMPLETED,
