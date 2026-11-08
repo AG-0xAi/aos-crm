@@ -600,6 +600,17 @@ export class ConfigVariables {
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.ADVANCED_SETTINGS,
     description:
+      'Maximum number of workspaces allowed without a valid enterprise key. Empty or 0 means no limit. A valid Organization key lifts this limit regardless of its value.',
+    type: ConfigVariableType.NUMBER,
+  })
+  @CastToPositiveNumber()
+  @IsInt()
+  @IsOptional()
+  MAX_WORKSPACES = 0;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description:
       'When enabled, server admins can toggle any feature flag for any workspace from the admin panel. Always enabled in development mode and when billing is enabled.',
     type: ConfigVariableType.BOOLEAN,
   })

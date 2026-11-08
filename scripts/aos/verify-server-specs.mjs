@@ -94,6 +94,8 @@ const SPECS = [
   // one, and a resend of an already redeemed or revoked invitation.
   'src/engine/core-modules/sign-up-invitation/services/__tests__/sign-up-invitation.service.spec.ts',
   'src/engine/core-modules/sign-up-invitation/utils/__tests__/get-sign-up-invitation-status.util.spec.ts',
+  // CRM-015: the workspace-count-limit decision behind MAX_WORKSPACES.
+  'src/engine/core-modules/auth/utils/__tests__/is-workspace-count-within-limit.util.spec.ts',
 ];
 const EXPECTED_SUITES = SPECS.length;
 
@@ -507,7 +509,7 @@ function selfTest() {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     assert(/npx jest --config jest\.config\.mjs --runInBand/.test(source), 'the specs are no longer run with the project jest config in band');
     assert(/'--network', 'none'/.test(source), 'the specs container is no longer isolated from the network');
-    assert(SPECS.length === 4, `expected exactly the 2 CRM-003 specs and the 2 CRM-016 ones, got ${SPECS.length}`);
+    assert(SPECS.length === 5, `expected exactly the 2 CRM-003 specs, the 2 CRM-016 ones and the CRM-015 one, got ${SPECS.length}`);
     assert(SPECS.filter((spec) => spec.includes('/sign-up-invitation/')).length === 2,
       'the CRM-016 sign-up-invitation specs are no longer in this gate');
   });

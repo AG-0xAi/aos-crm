@@ -95,6 +95,10 @@ x-aos-crm-env: &aos-crm-env
   # (sign-in-up.service.ts:842-850, hasServerAdmin), so on this deployment the
   # operator is that first user and every friend invited afterwards is not.
   IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS: "true"
+  # CRM-015: the founder removed the AGPL five-workspace cap for this fork.
+  # 0 means no limit (config-variables.ts MAX_WORKSPACES); the AWS beta sets
+  # the same value via Terraform (CRM-017).
+  MAX_WORKSPACES: "0"
   # The subdomain of the bare-domain landing host. It is deliberately NOT any
   # workspace's subdomain: get-subdomain-and-custom-domain-from-hostname.util.ts
   # maps it back to "no workspace", which is what makes
