@@ -198,6 +198,10 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
+  # elasticache:DescribeCacheClusters is not here: it has no resource type in
+  # ElastiCache's IAM reference, so it lives in
+  # NoResourceLevelPermissionReadForPlanRefresh below instead of on this
+  # resource-scoped statement.
   statement {
     sid    = "ElastiCacheReadForPlanRefresh"
     effect = "Allow"
@@ -216,8 +220,10 @@ data "aws_iam_policy_document" "permissions" {
 
   # aws_s3_bucket's own Read (s3.tf) still calls every one of these Get*
   # actions regardless of which sub-resources are actually declared
-  # (ACL/CORS/lifecycle/logging/ownership-controls/website have no Terraform
-  # resource here, but the provider reads them on every refresh anyway).
+  # (ACL/CORS/lifecycle/logging/ownership-controls/website/acceleration/
+  # request-payment/replication/object-lock have no Terraform resource here,
+  # but the provider reads them on every refresh anyway, for the resource's
+  # own backward-compatible computed attributes).
   statement {
     sid    = "S3ReadFilesBucketForPlanRefresh"
     effect = "Allow"
@@ -233,6 +239,10 @@ data "aws_iam_policy_document" "permissions" {
       "s3:GetBucketPublicAccessBlock",
       "s3:GetBucketTagging",
       "s3:GetBucketWebsite",
+      "s3:GetAccelerateConfiguration",
+      "s3:GetBucketRequestPayment",
+      "s3:GetReplicationConfiguration",
+      "s3:GetBucketObjectLockConfiguration",
       "s3:ListBucket",
     ]
     resources = ["arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"]
@@ -253,13 +263,15 @@ data "aws_iam_policy_document" "permissions" {
     resources = ["arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:aos-crm/${var.app_environment}/*"]
   }
 
+  # logs:DescribeLogGroups is a list call (it takes a name pattern, not an
+  # ARN) and has no resource-level permission in CloudWatch Logs' IAM
+  # reference: it lives in NoResourceLevelPermissionReadForPlanRefresh below,
+  # not here. logs:ListTagsForResource does support a log-group ARN, so it
+  # stays scoped.
   statement {
-    sid    = "LogsReadForPlanRefresh"
-    effect = "Allow"
-    actions = [
-      "logs:DescribeLogGroups",
-      "logs:ListTagsForResource",
-    ]
+    sid       = "LogsReadForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["logs:ListTagsForResource"]
     resources = ["arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/ecs/aos-crm-${var.app_environment}/*"]
   }
 
@@ -281,9 +293,13 @@ data "aws_iam_policy_document" "permissions" {
   # hosted zone id and an SES identity ARN are themselves account-specific
   # values (like domain_name in ../../aws/variables.tf) that this public fork
   # does not commit, so there is no name to scope by even in principle.
-  # Every action in this statement is read-only (Describe*/List*/Get*); no
-  # write verb for any of these five services appears anywhere in this
-  # policy.
+  # logs:DescribeLogGroups (it takes a name pattern, not an ARN) and
+  # elasticache:DescribeCacheClusters (no resource type in ElastiCache's IAM
+  # reference either -- aws_elasticache_replication_group's own Read calls it
+  # per member cluster to resolve engine_version_actual) are the same story
+  # for their own services. Every action in this statement is read-only
+  # (Describe*/List*/Get*); no write verb for any of these services appears
+  # anywhere in this policy.
   statement {
     sid    = "NoResourceLevelPermissionReadForPlanRefresh"
     effect = "Allow"
@@ -320,6 +336,8 @@ data "aws_iam_policy_document" "permissions" {
       "route53:ListTagsForResource",
       "sesv2:GetEmailIdentity",
       "sesv2:ListTagsForResource",
+      "logs:DescribeLogGroups",
+      "elasticache:DescribeCacheClusters",
     ]
     resources = ["*"]
   }
