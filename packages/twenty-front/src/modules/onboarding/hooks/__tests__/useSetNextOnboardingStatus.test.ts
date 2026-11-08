@@ -11,6 +11,7 @@ import { isOnboardingAiChatEnabledState } from '@/client-config/states/isOnboard
 import { ONBOARDING_BOOK_CALL_PENDING_USER_VAR_KEY } from '@/onboarding/constants/OnboardingBookCallPendingUserVarKey';
 import { useSetNextOnboardingStatus } from '@/onboarding/hooks/useSetNextOnboardingStatus';
 import { type OnboardingStepHistoryEffect } from '@/onboarding/types/OnboardingStepHistoryEffect';
+import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
 import { isWelcomeAnimationVisibleState } from '@/onboarding/states/isWelcomeAnimationVisibleState';
 import { shouldOpenAiChatAfterOnboardingState } from '@/onboarding/states/shouldOpenAiChatAfterOnboardingState';
 import { useAtomState } from '@/ui/utilities/state/jotai/hooks/useAtomState';
@@ -71,8 +72,8 @@ const renderHooks = (
         isBookCallOnboardingStepEnabledState,
       );
       const setNextOnboardingStatus = useSetNextOnboardingStatus();
-      const isWelcomeAnimationVisible = useAtomStateValue(
-        isWelcomeAnimationVisibleState,
+      const isBettyWelcomeVisible = useAtomStateValue(
+        isBettyWelcomeVisibleState,
       );
       const shouldOpenAiChatAfterOnboarding = useAtomStateValue(
         shouldOpenAiChatAfterOnboardingState,
@@ -85,7 +86,7 @@ const renderHooks = (
         setBilling,
         setIsBookCallOnboardingStepEnabled,
         setNextOnboardingStatus,
-        isWelcomeAnimationVisible,
+        isBettyWelcomeVisible,
         shouldOpenAiChatAfterOnboarding,
       };
     },
@@ -128,7 +129,7 @@ const renderHooks = (
     nextOnboardingStatus: result.current.currentUser?.onboardingStatus,
     previousOnboardingStatus:
       result.current.currentUser?.previousOnboardingStatus,
-    isWelcomeAnimationVisible: result.current.isWelcomeAnimationVisible,
+    isBettyWelcomeVisible: result.current.isBettyWelcomeVisible,
     shouldOpenAiChatAfterOnboarding:
       result.current.shouldOpenAiChatAfterOnboarding,
   };
@@ -144,53 +145,53 @@ describe('useSetNextOnboardingStatus', () => {
   it('should sync emails right after workspace activation', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.WORKSPACE_ACTIVATION);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.SYNC_EMAIL);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should create profile after syncing emails', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.SYNC_EMAIL);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.PROFILE_CREATION);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should invite the team right after profile creation', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.PROFILE_CREATION);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.INVITE_TEAM);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should complete after profile creation when more than 1 workspaceMember exist', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.PROFILE_CREATION, {
       withOneWorkspaceMember: false,
     });
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should require a plan after profile creation when billing is enabled and the workspace has no subscription', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.PROFILE_CREATION, {
       withOneWorkspaceMember: false,
@@ -198,53 +199,53 @@ describe('useSetNextOnboardingStatus', () => {
       withSubscription: false,
     });
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.PLAN_REQUIRED);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should complete after inviting the team when billing is disabled', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.INVITE_TEAM);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should complete after inviting the team when the workspace already has a subscription', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.INVITE_TEAM, {
       isBillingEnabled: true,
       withSubscription: true,
     });
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should require a plan after inviting the team when billing is enabled and the workspace has no subscription', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.INVITE_TEAM, {
       isBillingEnabled: true,
       withSubscription: false,
     });
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.PLAN_REQUIRED);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should book a call after inviting the team when the server flagged the step', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.INVITE_TEAM, {
       isBillingEnabled: true,
@@ -252,7 +253,7 @@ describe('useSetNextOnboardingStatus', () => {
       isBookCallOnboardingStepPending: true,
     });
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.BOOK_CALL);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
@@ -304,7 +305,7 @@ describe('useSetNextOnboardingStatus', () => {
   );
 
   it('should require a plan after booking a call when billing is enabled and the workspace has no subscription', () => {
-    const { nextOnboardingStatus, isWelcomeAnimationVisible } = renderHooks(
+    const { nextOnboardingStatus, isBettyWelcomeVisible } = renderHooks(
       OnboardingStatus.BOOK_CALL,
       {
         isBillingEnabled: true,
@@ -313,11 +314,11 @@ describe('useSetNextOnboardingStatus', () => {
       },
     );
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.PLAN_REQUIRED);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
   });
 
   it('should complete after booking a call when billing is disabled', () => {
-    const { nextOnboardingStatus, isWelcomeAnimationVisible } = renderHooks(
+    const { nextOnboardingStatus, isBettyWelcomeVisible } = renderHooks(
       OnboardingStatus.BOOK_CALL,
       {
         isBookCallOnboardingStepEnabled: true,
@@ -325,57 +326,131 @@ describe('useSetNextOnboardingStatus', () => {
       },
     );
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
   });
 
   it('should not show the welcome animation when the onboarding was already completed', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(OnboardingStatus.COMPLETED);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should not show the welcome animation when the onboarding status is unknown', () => {
     const {
       nextOnboardingStatus,
-      isWelcomeAnimationVisible,
+      isBettyWelcomeVisible,
       shouldOpenAiChatAfterOnboarding,
     } = renderHooks(null);
     expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isWelcomeAnimationVisible).toBe(false);
+    expect(isBettyWelcomeVisible).toBe(false);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should open the ai chat after onboarding when it is enabled', () => {
-    const { isWelcomeAnimationVisible, shouldOpenAiChatAfterOnboarding } =
+    const { isBettyWelcomeVisible, shouldOpenAiChatAfterOnboarding } =
       renderHooks(OnboardingStatus.INVITE_TEAM, {
         isOnboardingAiChatEnabled: true,
       });
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(true);
   });
 
   it('should not open the ai chat after onboarding for an invitee', () => {
-    const { isWelcomeAnimationVisible, shouldOpenAiChatAfterOnboarding } =
+    const { isBettyWelcomeVisible, shouldOpenAiChatAfterOnboarding } =
       renderHooks(OnboardingStatus.INVITE_TEAM, {
         isOnboardingAiChatEnabled: true,
         isWorkspaceCreator: false,
       });
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
   it('should still show the welcome animation when the ai chat is disabled', () => {
-    const { isWelcomeAnimationVisible, shouldOpenAiChatAfterOnboarding } =
+    const { isBettyWelcomeVisible, shouldOpenAiChatAfterOnboarding } =
       renderHooks(OnboardingStatus.INVITE_TEAM, {
         isOnboardingAiChatEnabled: false,
       });
-    expect(isWelcomeAnimationVisible).toBe(true);
+    expect(isBettyWelcomeVisible).toBe(true);
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
+  });
+
+  it('should still show the welcome layer when onboarding completes after a reload during the profile step', () => {
+    // beforeEach's resetJotaiStore() already gives this test a fresh store
+    // and cleared storage, standing in for a page reload: currentUserState
+    // is hydrated the same way it would be from a fresh server fetch after
+    // reload, still at PROFILE_CREATION. isBettyWelcomeVisibleState is a
+    // session-only atom, so it must come back false right after that
+    // hydration, before onboarding is completed normally from there.
+    const { result } = renderHook(
+      () => {
+        const setCurrentUser = useSetAtomState(currentUserState);
+        const setCurrentUserWorkspace = useSetAtomState(
+          currentUserWorkspaceState,
+        );
+        const setCurrentWorkspace = useSetAtomState(currentWorkspaceState);
+        const setBilling = useSetAtomState(billingState);
+        const setNextOnboardingStatus = useSetNextOnboardingStatus();
+        const currentUser = useAtomStateValue(currentUserState);
+        const isBettyWelcomeVisible = useAtomStateValue(
+          isBettyWelcomeVisibleState,
+        );
+        return {
+          currentUser,
+          setCurrentUser,
+          setCurrentWorkspace,
+          setCurrentUserWorkspace,
+          setBilling,
+          setNextOnboardingStatus,
+          isBettyWelcomeVisible,
+        };
+      },
+      { wrapper: Wrapper },
+    );
+
+    act(() => {
+      result.current.setCurrentUser({
+        ...mockedUserData,
+        onboardingStatus: OnboardingStatus.PROFILE_CREATION,
+      });
+      result.current.setCurrentUserWorkspace(
+        mockedUserData.currentUserWorkspace,
+      );
+      result.current.setCurrentWorkspace({
+        ...mockCurrentWorkspace,
+        billingSubscriptions: [],
+        workspaceMembersCount: 2,
+      });
+      result.current.setBilling({
+        __typename: 'Billing',
+        isBillingEnabled: false,
+        trialPeriods: [],
+      });
+    });
+
+    expect(result.current.isBettyWelcomeVisible).toBe(false);
+
+    act(() => {
+      result.current.setNextOnboardingStatus({
+        stepHistoryEffect: 'leaveUnchanged',
+      });
+    });
+
+    expect(result.current.currentUser?.onboardingStatus).toEqual(
+      OnboardingStatus.COMPLETED,
+    );
+    expect(result.current.isBettyWelcomeVisible).toBe(true);
+  });
+
+  it("should never trigger Twenty's own welcome animation, only Betty's, when onboarding completes", () => {
+    const { isBettyWelcomeVisible } = renderHooks(OnboardingStatus.INVITE_TEAM);
+
+    expect(isBettyWelcomeVisible).toBe(true);
+    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(false);
   });
 
   it('should make the left step the one to go back to when it was reversible', () => {

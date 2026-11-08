@@ -29903,3 +29903,39 @@ msgstr "Código fuente"
 #: src/pages/settings/about/SettingsAbout.tsx
 msgid "Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding."
 msgstr "Los servicios de Betty que no forman parte del CRM, como el asistente, la facturación y las integraciones, son software propietario de AOS Holding."
+
+#. js-lingui-id: 5UJjwl
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Initial setup · {stepCount} of {stepCount}"
+msgstr "Configuración inicial · {stepCount} de {stepCount}"
+
+#. js-lingui-id: Gq+sma
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Your space is ready."
+msgstr "Tu espacio está listo."
+
+#. js-lingui-id: Lf1geV
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Account created"
+msgstr "Cuenta creada"
+
+#. js-lingui-id: iNP53j
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Sources authorized"
+msgstr "Fuentes autorizadas"
+
+#. js-lingui-id: Os6zs4
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Welcome, {firstName}."
+msgstr "Te damos la bienvenida, {firstName}."
+
+#. js-lingui-id: YbCUR5
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Welcome."
+msgstr "Te damos la bienvenida."
+
+#. js-lingui-id: R64qbc
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Skip animation"
+msgstr "Saltar animación"
+
