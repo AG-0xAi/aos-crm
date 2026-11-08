@@ -21,7 +21,7 @@ type Story = StoryObj<typeof OnboardingSkipDialogAvatars>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() =>
-      expect(within(canvasElement).getAllByRole('presentation')).toHaveLength(
+      expect(canvasElement.querySelectorAll('.tabler-icon-plus')).toHaveLength(
         ONBOARDING_NETWORK_PREVIEW_SEATS_COUNT,
       ),
     );

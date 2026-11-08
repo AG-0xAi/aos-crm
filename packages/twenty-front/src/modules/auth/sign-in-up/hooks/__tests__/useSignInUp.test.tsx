@@ -112,6 +112,7 @@ describe('useSignInUp > submitCredentials > sign-up routing', () => {
       'someone@example.com',
       'Passw0rd!',
       'captcha-token',
+      undefined,
     );
     expect(signUpWithCredentialsMock).toHaveBeenCalledTimes(1);
     expect(signUpWithCredentialsInWorkspaceMock).not.toHaveBeenCalled();

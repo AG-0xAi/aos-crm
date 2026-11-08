@@ -1,6 +1,7 @@
 import { type TimelineActivity } from '@/activities/timeline-activities/types/TimelineActivity';
 import { getTimelineActivityAuthorFullName } from '@/activities/timeline-activities/utils/getTimelineActivityAuthorFullName';
 import { type CurrentWorkspaceMember } from '@/auth/states/currentWorkspaceMemberState';
+import { BRAND_NAME } from 'twenty-shared/constants';
 
 describe('getTimelineActivityAuthorFullName', () => {
   it('should return "You" if the current workspace member is the author', () => {
@@ -47,7 +48,7 @@ describe('getTimelineActivityAuthorFullName', () => {
     expect(result).toBe('Jane Smith');
   });
 
-  it('should return "Twenty" if the workspace member is not defined', () => {
+  it('should return the brand name if the workspace member is not defined', () => {
     const event = {};
     const currentWorkspaceMember = {
       id: '123',
@@ -58,6 +59,6 @@ describe('getTimelineActivityAuthorFullName', () => {
       currentWorkspaceMember as CurrentWorkspaceMember,
     );
 
-    expect(result).toBe('Twenty');
+    expect(result).toBe(BRAND_NAME);
   });
 });

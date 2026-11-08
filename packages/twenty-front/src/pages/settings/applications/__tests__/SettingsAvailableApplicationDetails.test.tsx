@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import { type ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TWENTY_STANDARD_APPLICATION_UNIVERSAL_IDENTIFIER } from 'twenty-shared/application';
+import { BRAND_NAME } from 'twenty-shared/constants';
 
 import {
   ApplicationRegistrationSourceType,
@@ -146,8 +147,7 @@ const renderPage = (availableApplicationId: string) =>
     </I18nProvider>,
   );
 
-const NOT_VETTED_WARNING =
-  'This application is not vetted by Twenty. Use at your own risk.';
+const NOT_VETTED_WARNING = `This application is not vetted by ${BRAND_NAME}. Use at your own risk.`;
 
 describe('SettingsAvailableApplicationDetails', () => {
   beforeEach(() => {
@@ -164,10 +164,12 @@ describe('SettingsAvailableApplicationDetails', () => {
 
     expect(screen.queryByText(NOT_VETTED_WARNING)).not.toBeInTheDocument();
     expect(
-      screen.getByText('The base data model every Twenty workspace runs on.'),
+      screen.getByText(
+        `The base data model every ${BRAND_NAME} workspace runs on.`,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByTestId('markdown-renderer')).toHaveTextContent(
-      'Every Twenty workspace starts with this app.',
+      `Every ${BRAND_NAME} workspace starts with this app.`,
     );
   });
 
