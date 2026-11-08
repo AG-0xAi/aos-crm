@@ -4,6 +4,7 @@ import { createElement } from 'react';
 
 import { currentUserState } from '@/auth/states/currentUserState';
 import { useShowWelcomeAnimationAfterOnboardingCheckout } from '@/onboarding/hooks/useShowWelcomeAnimationAfterOnboardingCheckout';
+import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
 import { isOnboardingCheckoutPendingState } from '@/onboarding/states/isOnboardingCheckoutPendingState';
 import { isWelcomeAnimationVisibleState } from '@/onboarding/states/isWelcomeAnimationVisibleState';
 import {
@@ -48,13 +49,14 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
     resetJotaiStore();
   });
 
-  it('should show the welcome animation when the onboarding checkout is confirmed', () => {
+  it("should show the Betty welcome layer, and never Twenty's own welcome animation, when the onboarding checkout is confirmed", () => {
     renderAndShow({
       isOnboardingCheckoutPending: true,
       onboardingStatus: OnboardingStatus.COMPLETED,
     });
 
-    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(true);
+    expect(jotaiStore.get(isBettyWelcomeVisibleState.atom)).toBe(true);
+    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(false);
   });
 
   it('should not show the welcome animation when no onboarding checkout is pending', () => {
@@ -63,7 +65,7 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
       onboardingStatus: OnboardingStatus.COMPLETED,
     });
 
-    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(false);
+    expect(jotaiStore.get(isBettyWelcomeVisibleState.atom)).toBe(false);
   });
 
   it('should not show the welcome animation while the onboarding is not completed yet', () => {
@@ -72,7 +74,7 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
       onboardingStatus: OnboardingStatus.PLAN_REQUIRED,
     });
 
-    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(false);
+    expect(jotaiStore.get(isBettyWelcomeVisibleState.atom)).toBe(false);
   });
 
   it('should consume the pending onboarding checkout so it cannot replay', () => {
@@ -83,7 +85,7 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
 
     expect(jotaiStore.get(isOnboardingCheckoutPendingState.atom)).toBe(false);
 
-    jotaiStore.set(isWelcomeAnimationVisibleState.atom, false);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, false);
 
     const { result } = renderHook(
       () => useShowWelcomeAnimationAfterOnboardingCheckout(),
@@ -94,6 +96,6 @@ describe('useShowWelcomeAnimationAfterOnboardingCheckout', () => {
       result.current();
     });
 
-    expect(jotaiStore.get(isWelcomeAnimationVisibleState.atom)).toBe(false);
+    expect(jotaiStore.get(isBettyWelcomeVisibleState.atom)).toBe(false);
   });
 });
