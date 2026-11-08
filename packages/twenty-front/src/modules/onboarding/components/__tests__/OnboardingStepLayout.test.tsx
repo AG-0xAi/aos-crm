@@ -11,6 +11,7 @@ import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { onboardingConfigState } from '@/client-config/states/onboardingConfigState';
 import { type OnboardingConfig } from '@/client-config/types/OnboardingConfig';
 import { OnboardingLayout } from '@/onboarding/components/OnboardingLayout';
+import type * as OnboardingLayoutModule from '@/onboarding/components/OnboardingLayout';
 import { OnboardingStepLayout } from '@/onboarding/components/OnboardingStepLayout';
 import { ONBOARDING_FREE_CREDITS_DEFAULT_VALUE } from '@/onboarding/constants/OnboardingFreeCreditsDefaultValue';
 import { onboardingFreeCreditsFamilyState } from '@/onboarding/states/onboardingFreeCreditsFamilyState';
@@ -42,8 +43,9 @@ jest.mock('@/onboarding/components/OnboardingTransitionOutlet', () => ({
 // children) keep working, while letting the backgroundComponent assertions
 // below inspect the exact props OnboardingStepLayout passed it.
 jest.mock('@/onboarding/components/OnboardingLayout', () => {
-  const actual: typeof import('@/onboarding/components/OnboardingLayout') =
-    jest.requireActual('@/onboarding/components/OnboardingLayout');
+  const actual: typeof OnboardingLayoutModule = jest.requireActual(
+    '@/onboarding/components/OnboardingLayout',
+  );
   return {
     ...actual,
     OnboardingLayout: jest.fn(actual.OnboardingLayout),
