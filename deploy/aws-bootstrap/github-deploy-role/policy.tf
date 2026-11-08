@@ -16,8 +16,8 @@
 #     "*" and the action list stays Describe/Get/List-only -- never a write
 #     verb rides on a "*" resource anywhere in this policy.
 locals {
-  ecr_repository_arn = "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/aos-crm-${var.app_environment}"
-  ecs_cluster_arn     = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:cluster/aos-crm-${var.app_environment}"
+  ecr_repository_arn              = "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/aos-crm-${var.app_environment}"
+  ecs_cluster_arn                 = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:cluster/aos-crm-${var.app_environment}"
   ecs_task_definition_arn_pattern = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/aos-crm-${var.app_environment}-*"
   ecs_service_arn_pattern         = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/aos-crm-${var.app_environment}/aos-crm-${var.app_environment}-*"
   ecs_task_role_arn_pattern       = "arn:aws:iam::${var.aws_account_id}:role/aos-crm-${var.app_environment}-ecs-task-*"
@@ -276,9 +276,9 @@ data "aws_iam_policy_document" "permissions" {
   }
 
   statement {
-    sid    = "TerraformStateBucketList"
-    effect = "Allow"
-    actions = ["s3:ListBucket"]
+    sid       = "TerraformStateBucketList"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
     resources = ["arn:aws:s3:::${var.state_bucket_name}"]
 
     condition {

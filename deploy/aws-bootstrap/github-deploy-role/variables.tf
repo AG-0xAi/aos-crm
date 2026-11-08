@@ -31,7 +31,7 @@ variable "app_environment" {
   description = <<-EOT
     Environment name the beta stack (deploy/aws) was applied with
     (var.environment there). Every resource this role's permission policy
-    scopes by name is built from this, e.g. "aos-crm-${app_environment}". Not
+    scopes by name is built from this, e.g. "aos-crm-<app_environment>". Not
     founder-identifying: "beta" is already the name used throughout this
     fork's docs and code.
   EOT
