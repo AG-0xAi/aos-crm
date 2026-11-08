@@ -1,0 +1,161 @@
+name: Deploy beta
+
+# CRM-024: the only trigger. No push/pull_request -- a deploy is always a
+# deliberate dispatch, never a side effect of a merge.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build and deploy
+        type: string
+        default: betty/factory
+      image_digest:
+        description: "Existing image digest to deploy instead of building (sha256:...). Set this for a rollback: it skips build/push entirely."
+        type: string
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-beta
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, deploy and migrate
+    runs-on: ubuntu-latest
+    environment: beta
+    steps:
+      - name: Checkout ${{ inputs.ref }}
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      # Never echoed: written straight from the secret to a gitignored file
+      # (deploy/aws/.gitignore already excludes terraform.tfvars).
+      - name: Write terraform.tfvars from the beta environment secret
+        working-directory: deploy/aws
+        env:
+          TFVARS: ${{ secrets.AWS_TFVARS }}
+        run: printf '%s' "$TFVARS" > terraform.tfvars
+
+      - name: Terraform init
+        working-directory: deploy/aws
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.AWS_TFSTATE_BUCKET }}" \
+            -backend-config="key=aos-crm/beta/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Read the currently deployed digest
+        id: previous
+        working-directory: deploy/aws
+        run: echo "digest=$(terraform output -raw image_digest 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the ECR repository URL
+        id: ecr
+        working-directory: deploy/aws
+        run: echo "url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Amazon ECR
+        if: ${{ inputs.image_digest == '' }}
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      # Same target as AWS_DEPLOYMENT_PLAN.md's manual procedure (CRM-013 R4
+      # step 5): `twenty` is the server plus the compiled frontend, the one
+      # image both the server and worker services run.
+      - name: Build the image
+        if: ${{ inputs.image_digest == '' }}
+        run: |
+          docker build --target twenty -f packages/twenty-docker/twenty/Dockerfile \
+            -t "${{ steps.ecr.outputs.url }}:${{ github.sha }}" .
+
+      - name: Push the image
+        if: ${{ inputs.image_digest == '' }}
+        run: docker push "${{ steps.ecr.outputs.url }}:${{ github.sha }}"
+
+      # The digest, never the tag: a tag can move, image_digest must not
+      # (deploy/aws/variables.tf's own validation on that variable).
+      - name: Resolve the pushed digest
+        if: ${{ inputs.image_digest == '' }}
+        id: pushed
+        run: |
+          digest=$(aws ecr describe-images \
+            --repository-name "aos-crm-beta" \
+            --image-ids imageTag=${{ github.sha }} \
+            --query 'imageDetails[0].imageDigest' --output text)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Choose the digest to deploy
+        id: deploy-digest
+        run: |
+          if [ -n "${{ inputs.image_digest }}" ]; then
+            echo "value=${{ inputs.image_digest }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ steps.pushed.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform plan
+        working-directory: deploy/aws
+        run: terraform plan -input=false -var="image_digest=${{ steps.deploy-digest.outputs.value }}" -out=tfplan
+
+      - name: Terraform apply
+        working-directory: deploy/aws
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # One-off task, never a service (AWS_DEPLOYMENT_PLAN.md CRM-013 R4 step
+      # 7): migrate before the redeployed server/worker can serve traffic
+      # with the new schema.
+      - name: Run the migrate task and wait for it
+        working-directory: deploy/aws
+        run: |
+          cluster=$(terraform output -raw ecs_cluster_name)
+          subnets=$(terraform output -json private_subnet_ids | tr -d '[]" ')
+          security_group=$(terraform output -raw ecs_tasks_security_group_id)
+
+          task_arn=$(aws ecs run-task \
+            --cluster "$cluster" \
+            --task-definition "$(terraform output -raw ecs_migrate_task_definition_arn)" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+
+          aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task_arn"
+
+          exit_code=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$exit_code" != "0" ]; then
+            echo "migrate task exited with $exit_code, see the migrate log group"
+            exit 1
+          fi
+
+      - name: Wait for server and worker to be stable
+        working-directory: deploy/aws
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$(terraform output -raw ecs_cluster_name)" \
+            --services "$(terraform output -raw ecs_server_service_name)" "$(terraform output -raw ecs_worker_service_name)"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy beta"
+            echo "- Ref: \`${{ inputs.ref }}\`"
+            echo "- Previous digest: \`${{ steps.previous.outputs.digest }}\`"
+            echo "- Deployed digest: \`${{ steps.deploy-digest.outputs.value }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

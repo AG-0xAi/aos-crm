@@ -1,0 +1,223 @@
+{
+  "_comment": "Static rendering of deploy/aws-bootstrap/github-deploy-role/policy.tf's data.aws_iam_policy_document.permissions, with example values substituted for every variable: aws_region=eu-west-1, aws_account_id=000000000000, app_environment=beta, state_bucket_name=example-state-bucket, state_key_prefix=aos-crm/beta, state_lock_table_name=aos-crm-tfstate-lock. No statement grants * actions on * resources: every statement whose Resource is \"*\" lists only Describe/Get/List/GetAuthorizationToken actions (see README.md for which AWS services have no resource-level permissions for those actions at all), and every write action (ecr push, ecs:RunTask/UpdateService/RegisterTaskDefinition, iam:PassRole, the Terraform state objects) is scoped to a specific ARN or ARN pattern.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrAuthToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrPushBetaRepository",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:DescribeRepositories",
+        "ecr:DescribeImages"
+      ],
+      "Resource": "arn:aws:ecr:eu-west-1:000000000000:repository/aos-crm-beta"
+    },
+    {
+      "Sid": "EcsRegisterTaskDefinition",
+      "Effect": "Allow",
+      "Action": "ecs:RegisterTaskDefinition",
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcsRunMigrateTask",
+      "Effect": "Allow",
+      "Action": "ecs:RunTask",
+      "Resource": "arn:aws:ecs:eu-west-1:000000000000:task-definition/aos-crm-beta-*",
+      "Condition": {
+        "ArnEquals": {
+          "ecs:cluster": "arn:aws:ecs:eu-west-1:000000000000:cluster/aos-crm-beta"
+        }
+      }
+    },
+    {
+      "Sid": "EcsUpdateBetaServices",
+      "Effect": "Allow",
+      "Action": "ecs:UpdateService",
+      "Resource": "arn:aws:ecs:eu-west-1:000000000000:service/aos-crm-beta/aos-crm-beta-*"
+    },
+    {
+      "Sid": "EcsDescribeForWaiters",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeTasks",
+        "ecs:DescribeServices"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassBetaTaskRolesToEcsOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::000000000000:role/aos-crm-beta-ecs-task-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ecs-tasks.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "IamReadBetaTaskRolesForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRoleTags",
+        "iam:ListInstanceProfilesForRole"
+      ],
+      "Resource": "arn:aws:iam::000000000000:role/aos-crm-beta-ecs-task-*"
+    },
+    {
+      "Sid": "IamReadBetaSesUserForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetUser",
+        "iam:GetUserPolicy",
+        "iam:ListUserPolicies",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListAccessKeys"
+      ],
+      "Resource": "arn:aws:iam::000000000000:user/aos-crm-beta-*"
+    },
+    {
+      "Sid": "RdsReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances",
+        "rds:DescribeDBSubnetGroups",
+        "rds:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:rds:eu-west-1:000000000000:db:aos-crm-beta",
+        "arn:aws:rds:eu-west-1:000000000000:subgrp:aos-crm-beta"
+      ]
+    },
+    {
+      "Sid": "ElastiCacheReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "elasticache:DescribeReplicationGroups",
+        "elasticache:DescribeCacheSubnetGroups",
+        "elasticache:DescribeCacheParameterGroups",
+        "elasticache:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:elasticache:eu-west-1:000000000000:replicationgroup:aos-crm-beta",
+        "arn:aws:elasticache:eu-west-1:000000000000:subnetgroup:aos-crm-beta",
+        "arn:aws:elasticache:eu-west-1:000000000000:parametergroup:aos-crm-beta"
+      ]
+    },
+    {
+      "Sid": "S3ReadFilesBucketForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketPolicy",
+        "s3:GetBucketVersioning",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketTagging",
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::aos-crm-beta-files-000000000000"
+    },
+    {
+      "Sid": "SecretsManagerReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetResourcePolicy",
+        "secretsmanager:ListSecretVersionIds"
+      ],
+      "Resource": "arn:aws:secretsmanager:eu-west-1:000000000000:secret:aos-crm/beta/*"
+    },
+    {
+      "Sid": "LogsReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:logs:eu-west-1:000000000000:log-group:/ecs/aos-crm-beta/*"
+    },
+    {
+      "Sid": "BudgetsReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": "budgets:ViewBudget",
+      "Resource": "arn:aws:budgets::000000000000:budget/aos-crm-beta-monthly"
+    },
+    {
+      "Sid": "NoResourceLevelPermissionReadForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeInternetGateways",
+        "ec2:DescribeNatGateways",
+        "ec2:DescribeAddresses",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSecurityGroupRules",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeTags",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeRules",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetHealth",
+        "elasticloadbalancing:DescribeTags",
+        "acm:DescribeCertificate",
+        "acm:ListTagsForCertificate",
+        "acm:GetCertificate",
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource",
+        "sesv2:GetEmailIdentity",
+        "sesv2:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformStateObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::example-state-bucket/aos-crm/beta/*"
+    },
+    {
+      "Sid": "TerraformStateBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::example-state-bucket",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": "aos-crm/beta/*"
+        }
+      }
+    },
+    {
+      "Sid": "TerraformStateLock",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:eu-west-1:000000000000:table/aos-crm-tfstate-lock"
+    }
+  ]
+}

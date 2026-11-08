@@ -515,7 +515,64 @@ Dos cosas que conviene saber antes de rellenarlo:
 Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
 en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
 
-## 10. Lo que este runbook no cubre
+## 11. Desplegar y volver atrás desde GitHub
+
+Orden del founder del 08/11/2026: hacer autónoma la fábrica quitando el PC del
+camino de despliegue. Hasta CRM-024 solo el PC del founder (con su sesión SSO)
+podía desplegar la beta; la VM de la fábrica nunca tuvo permiso de ECR/ECS, a
+propósito. `deploy-beta.yaml` automatiza exactamente los pasos 5 a 7 del
+procedimiento manual (`docs/aos/bootstrap/AWS_DEPLOYMENT_PLAN.md`, CRM-013 R4):
+construir la imagen, subirla por digest, aplicar Terraform y migrar. **Cada
+despliegue LIVE sigue necesitando el OK del founder**: el workflow quita el PC,
+no el OK — por eso el entorno `beta` de GitHub puede exigir su aprobación
+(§ "Configuración única", abajo).
+
+### Desplegar
+
+1. En GitHub, **Actions → Deploy beta → Run workflow**.
+2. `ref`: la rama o commit a desplegar (por defecto `betty/factory`).
+3. Deja `image_digest` vacío: el workflow construye la imagen desde ese `ref`,
+   la sube a ECR y despliega el digest resultante.
+4. Si el entorno `beta` exige revisor, alguien con permiso lo aprueba antes de
+   que el workflow asuma el rol de AWS.
+5. El resumen del job («Job summary») imprime el digest anterior y el nuevo.
+   El job falla si la tarea de migración termina con código distinto de 0, o
+   si el servicio de `server`/`worker` no llega a estable — en ambos casos no
+   hay que investigar a mano: el propio job ya dice qué paso falló.
+
+### Volver atrás
+
+Mismo workflow, con `image_digest` puesto al digest anterior (el que salió
+impreso como «Previous digest» en el despliegue que se quiere deshacer).
+Con `image_digest` relleno, el workflow **no construye ni sube nada**: aplica
+ese digest directamente. Terraform hace el *rolling* hacia atrás en ECS, igual
+que un `apply` manual. Las migraciones de Twenty no son reversibles por CLI
+(igual que en el procedimiento manual): si una migración ya corrió, la vía
+fiable sigue siendo restaurar por PITR, no un "down" de esquema.
+
+### Configuración única (la aplica la sesión de infraestructura, con el OK del founder)
+
+1. **Aplicar el rol.** Desde la sesión con credenciales SSO, aplicar
+   `deploy/aws-bootstrap/github-deploy-role/` (su propio `README.md` tiene el
+   procedimiento exacto) y anotar `terraform output -raw role_arn`.
+2. **Crear el entorno `beta`** en GitHub (Settings → Environments → New
+   environment → `beta`) y, dentro de él:
+   - Variables: `AWS_DEPLOY_ROLE_ARN` (el ARN del paso 1), `AWS_REGION`
+     (`eu-west-1`), `AWS_TFSTATE_BUCKET` (el bucket de estado de `deploy/aws`).
+   - Secreto: `AWS_TFVARS`, con el contenido completo de
+     `deploy/aws/terraform.tfvars`.
+3. **Opcional y recomendado:** marcar al founder como revisor obligatorio del
+   entorno `beta` (misma pantalla → "Required reviewers"). Así cada
+   despliegue espera su aprobación explícita antes de que el workflow pueda
+   asumir el rol — el control de "cada LIVE necesita el OK del founder" queda
+   en GitHub, no en la memoria de quien dispara el workflow.
+
+El procedimiento del PC (§0-§9 de este documento y
+`docs/aos/bootstrap/AWS_DEPLOYMENT_PLAN.md`) sigue existiendo como vía de
+respaldo: nada de esto lo reemplaza, solo quita la obligación de que sea
+siempre un humano en su propio PC quien lo dispare.
+
+## 12. Lo que este runbook no cubre
 
 - **El resto del panel de administración del servidor** (`/settings/admin-panel`): búsqueda de
   usuarios, impersonación y variables de configuración. De ese panel, CRM-016 solo ejercita la
