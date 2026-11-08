@@ -12740,6 +12740,10 @@ msgstr "Obtener clave de Organización"
 msgid "Get the most out of your workspace by inviting your team."
 msgstr "Aproveche al máximo su espacio de trabajo invitando a su equipo."
 
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "Get the most out of Betty by inviting your team. You can also do this later from Settings."
+msgstr "Aprovecha más a Betty invitando a tu equipo. También puedes hacerlo más tarde desde Configuración."
+
 #. js-lingui-id: 7SwUXR
 #: src/modules/object-record/record-sharing/utils/getRecordShareRoleAccessNote.ts
 msgid "Gets this record only: their role can't access {objectLabelPlural}"
@@ -14290,7 +14294,7 @@ msgstr "Invitar usuario"
 #: src/modules/onboarding/components/free-credits/OnboardingFreeCreditsPopoverContent.tsx
 #: src/pages/onboarding/InviteTeam.tsx
 msgid "Invite your team"
-msgstr "Invite a su equipo"
+msgstr "Invita a tu equipo"
 
 #. js-lingui-id: 2InwTp
 #: src/modules/settings/billing/components/SettingsBillingSubscriptionInfo.tsx
@@ -29432,6 +29436,10 @@ msgstr "No tiene permiso para crear registros en este objeto"
 #: src/pages/settings/developers/tabs/SettingsDevelopersAppsTab.tsx
 msgid "You can either create a private app or share it to others"
 msgstr "Puedes crear una aplicación privada o compartirla con otras personas"
+
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "You can invite up to {maxEmails} teammates at a time"
+msgstr "Puedes invitar hasta {maxEmails} compañeros de equipo a la vez"
 
 #. js-lingui-id: CNAoaw
 #: src/modules/workflow/workflow-steps/workflow-actions/logic-function-action/components/WorkflowEditActionLogicFunction.tsx

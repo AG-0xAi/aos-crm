@@ -1,3 +1,4 @@
+import { InviteYourTeamStepContent } from '@/onboarding/components/InviteYourTeamStepContent';
 import { OnboardingStepAnimatedItem } from '@/onboarding/components/OnboardingStepAnimatedItem';
 import { StyledOnboardingStepHeading } from '@/onboarding/components/StyledOnboardingStepHeading';
 import { StyledOnboardingStepPage } from '@/onboarding/components/StyledOnboardingStepPage';
@@ -8,6 +9,7 @@ import { useConnectAssistantStep } from '@/onboarding/hooks/useConnectAssistantS
 import { McpConnectAssistant } from '@/settings/mcp/components/McpConnectAssistant';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
+import { useState } from 'react';
 import { Button } from 'twenty-ui/primitives/input';
 import { themeCssVariables } from 'twenty-ui/theme';
 
@@ -29,9 +31,28 @@ const StyledFooter = styled.div`
 // The route and the file keep their upstream name: this is still the step the
 // server reaches through OnboardingStatus.INVITE_TEAM, and the onboarding
 // status machine is deliberately untouched. What the step ASKS changed.
+//
+// CRM-028: the status enum has no free slot after this one for an optional
+// "invite your team" step, so it lives as a sub-view of THIS step's
+// completion -- "Continue" moves from connect-assistant to invite-your-team,
+// and only sending or skipping there actually calls the server and advances
+// onboardingStatus.
 export const InviteTeam = () => {
   const { t } = useLingui();
-  const { goToCrm, isNavigating } = useConnectAssistantStep();
+  const [isShowingInviteYourTeam, setIsShowingInviteYourTeam] = useState(false);
+  const { completeStep, isNavigating } = useConnectAssistantStep();
+
+  if (isShowingInviteYourTeam) {
+    return (
+      <StyledOnboardingStepPage data-testid="onboarding-invite-your-team-step">
+        <InviteYourTeamStepContent
+          isSubmitting={isNavigating}
+          onSendInvitations={(emails) => void completeStep(emails)}
+          onSkip={() => void completeStep([])}
+        />
+      </StyledOnboardingStepPage>
+    );
+  }
 
   return (
     <StyledOnboardingStepPage data-testid="onboarding-connect-assistant-step">
@@ -58,10 +79,10 @@ export const InviteTeam = () => {
         <StyledFooter>
           <Button
             variant="outline"
-            onClick={() => void goToCrm()}
+            onClick={() => setIsShowingInviteYourTeam(true)}
             disabled={isNavigating}
           >
-            {t`Go to the CRM`}
+            {t`Continue`}
           </Button>
         </StyledFooter>
       </OnboardingStepAnimatedItem>
