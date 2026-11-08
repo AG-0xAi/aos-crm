@@ -222,9 +222,9 @@ describe('invitation emails branding', () => {
       locale,
     });
 
-  const buildSignUpInviteEmail = (locale: 'en' | 'es-ES') =>
+  const buildSignUpInviteEmail = (locale: 'en' | 'es-ES', expiresInDays = 7) =>
     SignUpInviteLinkEmail({
-      duration: '7 days',
+      expiresInDays,
       link: `${SERVER_URL}/welcome?signUpInvitationToken=123`,
       serverUrl: SERVER_URL,
       locale,
@@ -263,6 +263,55 @@ describe('invitation emails branding', () => {
       );
     },
   );
+});
+
+describe('sign-up invitation expiry wording', () => {
+  beforeAll(() => {
+    jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    jest.useFakeTimers();
+  });
+
+  const SERVER_URL = 'https://app.betty.management';
+
+  const buildSignUpInviteEmail = (
+    locale: 'en' | 'es-ES',
+    expiresInDays: number,
+  ) =>
+    SignUpInviteLinkEmail({
+      expiresInDays,
+      link: `${SERVER_URL}/welcome?signUpInvitationToken=123`,
+      serverUrl: SERVER_URL,
+      locale,
+    });
+
+  it('renders the plural duration in English for a 7-day invitation', async () => {
+    const html = await renderEmail(buildSignUpInviteEmail('en', 7));
+
+    expect(html).toContain('7 days');
+  });
+
+  it('renders the singular duration in English for a 1-day invitation', async () => {
+    const html = await renderEmail(buildSignUpInviteEmail('en', 1));
+
+    expect(html).toContain('1 day');
+  });
+
+  it('renders the plural duration in Spanish for a 7-day invitation, with no English "days"', async () => {
+    const html = await renderEmail(buildSignUpInviteEmail('es-ES', 7));
+
+    expect(html).toContain('7 días');
+    expect(html).not.toMatch(/\bdays\b/);
+  });
+
+  it('renders the singular duration in Spanish for a 1-day invitation', async () => {
+    const html = await renderEmail(buildSignUpInviteEmail('es-ES', 1));
+
+    expect(html).toContain('1 día');
+    expect(html).not.toMatch(/\bdays\b/);
+  });
 });
 
 describe('renderEmail guard', () => {

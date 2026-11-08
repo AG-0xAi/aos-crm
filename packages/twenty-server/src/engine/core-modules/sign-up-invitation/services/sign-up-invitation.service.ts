@@ -29,6 +29,7 @@ import { getSignUpInvitationStatus } from 'src/engine/core-modules/sign-up-invit
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
 const TOKEN_BYTES = 32;
+const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export const SIGN_UP_INVITATION_TOKEN_SEARCH_PARAM = 'signUpInvitationToken';
 
@@ -297,9 +298,9 @@ export class SignUpInvitationService {
     const resolvedLocale = locale ?? SOURCE_LOCALE;
     const emailTemplate = SignUpInviteLinkEmail({
       link: this.buildSignUpLink({ plainToken, email }).toString(),
-      duration: ms(differenceInMilliseconds(expiresAt, new Date()), {
-        long: true,
-      }),
+      expiresInDays: Math.round(
+        differenceInMilliseconds(expiresAt, new Date()) / MILLISECONDS_PER_DAY,
+      ),
       serverUrl: this.twentyConfigService.get('SERVER_URL'),
       locale: resolvedLocale,
     });

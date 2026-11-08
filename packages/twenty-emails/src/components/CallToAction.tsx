@@ -4,7 +4,7 @@ import { Button } from 'react-email';
 import { canvasTheme } from 'src/common-style';
 
 const callToActionStyle = {
-  display: 'inline-flex',
+  display: 'inline-block',
   padding: '14px 28px',
   borderRadius: canvasTheme.border.radius.md,
   background: canvasTheme.background.button,
