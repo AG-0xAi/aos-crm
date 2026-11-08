@@ -50,11 +50,9 @@ export const Emphasis: Story = {
     await expect(getComputedStyle(standard).color).toBe(
       getComputedStyle(reference).color,
     );
-    // Betty's 8-color palette repeats mutedText across font.secondary and
-    // font.tertiary (design-tokens/color/betty.ts), so standard and subtle
-    // resolve to the same color; assert the emphasis wiring instead.
-    await expect(standard).toHaveAttribute('data-emphasis', 'standard');
-    await expect(subtle).toHaveAttribute('data-emphasis', 'subtle');
+    await expect(getComputedStyle(subtle).color).not.toBe(
+      getComputedStyle(standard).color,
+    );
   },
 };
 
