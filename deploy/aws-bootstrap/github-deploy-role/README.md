@@ -62,7 +62,37 @@ Consider also requiring the founder as a reviewer of the `beta` environment
 (Settings → Environments → beta → "Required reviewers"): that makes every
 dispatch of `deploy-beta.yaml` wait for an explicit approval before the role
 is ever assumed, which is the "founder's OK each time" the spec asks for
-(`.aos-spec/despliegue-github/spec.md`'s Purpose).
+(`specs/despliegue-github/spec.md`'s Purpose).
+
+## Permissions, by service
+
+The full statements and their scoping live in `policy.tf`; this is the final
+action list per service, for anyone auditing the role without reading HCL.
+Writes are scoped to `aos-crm-<app_environment>*` resources (or the beta's
+state object/lock row); reads needed only so `terraform plan`/`apply` can
+refresh the rest of `deploy/aws` are scoped the same way wherever the service
+supports it, and to `*` only where the service's own IAM reference has no
+resource-level permission for that action (documented in `policy.tf`,
+statement by statement).
+
+| Service | Actions |
+| --- | --- |
+| ECR | `GetAuthorizationToken`, `BatchCheckLayerAvailability`, `InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`, `PutImage`, `BatchGetImage`, `GetDownloadUrlForLayer`, `DescribeRepositories`, `DescribeImages`, `ListTagsForResource`, `GetLifecyclePolicy`, `GetRepositoryPolicy` |
+| ECS | `RegisterTaskDefinition`, `RunTask`, `UpdateService`, `DescribeTasks`, `DescribeServices`, `DescribeTaskDefinition`, `DescribeClusters`, `ListTagsForResource`, `TagResource` |
+| IAM | `PassRole` (beta task roles only); `GetRole`, `GetRolePolicy`, `ListRolePolicies`, `ListAttachedRolePolicies`, `ListRoleTags`, `ListInstanceProfilesForRole` (beta task roles); `GetUser`, `GetUserPolicy`, `ListUserPolicies`, `ListAttachedUserPolicies`, `ListAccessKeys` (the SES SMTP user) |
+| RDS | `DescribeDBInstances`, `DescribeDBSubnetGroups`, `ListTagsForResource` |
+| ElastiCache | `DescribeReplicationGroups`, `DescribeCacheSubnetGroups`, `DescribeCacheParameterGroups`, `ListTagsForResource` |
+| S3 (files bucket) | `GetBucketAcl`, `GetBucketCORS`, `GetBucketPolicy`, `GetBucketVersioning`, `GetEncryptionConfiguration`, `GetBucketLogging`, `GetLifecycleConfiguration`, `GetBucketOwnershipControls`, `GetBucketPublicAccessBlock`, `GetBucketTagging`, `GetBucketWebsite`, `ListBucket` |
+| S3 (Terraform state) | `GetObject`, `PutObject`, `ListBucket` |
+| Secrets Manager | `DescribeSecret`, `GetResourcePolicy`, `ListSecretVersionIds`, `GetSecretValue` |
+| CloudWatch Logs | `DescribeLogGroups`, `ListTagsForResource` |
+| Budgets | `ViewBudget` |
+| EC2 | `DescribeVpcs`, `DescribeVpcAttribute`, `DescribeSubnets`, `DescribeInternetGateways`, `DescribeNatGateways`, `DescribeAddresses`, `DescribeNetworkInterfaces`, `DescribeRouteTables`, `DescribeSecurityGroups`, `DescribeSecurityGroupRules`, `DescribeAvailabilityZones`, `DescribeTags` |
+| ELBv2 | `DescribeLoadBalancers`, `DescribeLoadBalancerAttributes`, `DescribeListeners`, `DescribeRules`, `DescribeTargetGroups`, `DescribeTargetGroupAttributes`, `DescribeTargetHealth`, `DescribeTags` |
+| ACM | `DescribeCertificate`, `ListTagsForCertificate`, `GetCertificate` |
+| Route 53 | `GetHostedZone`, `ListHostedZonesByName`, `ListResourceRecordSets`, `ListTagsForResource` |
+| SES (sesv2) | `GetEmailIdentity`, `ListTagsForResource` |
+| DynamoDB (state lock) | `GetItem`, `PutItem`, `DeleteItem` |
 
 ## Re-applying after a permission change
 

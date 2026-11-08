@@ -24,7 +24,7 @@ CRM-024 (08/11/2026) added a way to run this stack's `plan`/`apply` from
 GitHub Actions instead of a human's PC: `.github/workflows/deploy-beta.yaml`,
 which assumes `deploy/aws-bootstrap/github-deploy-role`'s narrowly-trusted
 role through GitHub's OIDC provider. One-time setup and the deploy/rollback
-procedure are in `docs/aos/product/BETA_RUNBOOK.md` §11; every LIVE deploy
+procedure are in `docs/aos/product/BETA_RUNBOOK.md` §10; every LIVE deploy
 still needs the founder's explicit OK.
 
 ## Validate (no AWS credentials, no plan/apply)

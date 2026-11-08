@@ -515,7 +515,7 @@ Dos cosas que conviene saber antes de rellenarlo:
 Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
 en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
 
-## 11. Desplegar y volver atrás desde GitHub
+## 10. Desplegar y volver atrás desde GitHub
 
 Orden del founder del 08/11/2026: hacer autónoma la fábrica quitando el PC del
 camino de despliegue. Hasta CRM-024 solo el PC del founder (con su sesión SSO)
@@ -572,7 +572,7 @@ El procedimiento del PC (§0-§9 de este documento y
 respaldo: nada de esto lo reemplaza, solo quita la obligación de que sea
 siempre un humano en su propio PC quien lo dispare.
 
-## 12. Lo que este runbook no cubre
+## 11. Lo que este runbook no cubre
 
 - **El resto del panel de administración del servidor** (`/settings/admin-panel`): búsqueda de
   usuarios, impersonación y variables de configuración. De ese panel, CRM-016 solo ejercita la
