@@ -23,18 +23,9 @@ const ACCENT_GRAPHIC = token({
   light: BETTY_PALETTE.terracotta,
   dark: BETTY_PALETTE.terracotta,
 });
-export const ACCENT_INK = token({
+const ACCENT_INK = token({
   light: BETTY_PALETTE.terracottaInk,
   dark: BETTY_PALETTE.terracotta,
-});
-// Steps 9-12 read as text on top of steps 3/4 (ACCENT_LINE), e.g. the
-// pressed ReactionButton and the accent Badge. ACCENT_INK was only checked
-// against ivory (6.10:1 above) and falls to 2.82:1 on taupe and 1.10:1 on
-// mutedText, so it reuses the same charcoal/ivory flip font.color.primary
-// uses across themes: 5.20:1 on taupe, 5.56:1 on mutedText.
-const ACCENT_INK_ON_LINE = token({
-  light: BETTY_PALETTE.charcoal,
-  dark: BETTY_PALETTE.ivory,
 });
 
 export const ACCENT_TOKENS = {
@@ -52,8 +43,8 @@ export const ACCENT_TOKENS = {
   accent6: ACCENT_INK,
   accent7: ACCENT_GRAPHIC,
   accent8: ACCENT_GRAPHIC,
-  accent9: ACCENT_INK_ON_LINE,
-  accent10: ACCENT_INK_ON_LINE,
-  accent11: ACCENT_INK_ON_LINE,
-  accent12: ACCENT_INK_ON_LINE,
+  accent9: ACCENT_INK,
+  accent10: ACCENT_INK,
+  accent11: ACCENT_INK,
+  accent12: ACCENT_INK,
 };
