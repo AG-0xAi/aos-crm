@@ -29881,10 +29881,10 @@ msgstr "Cuenta creada"
 msgid "Sources authorized"
 msgstr "Fuentes autorizadas"
 
-#. js-lingui-id: 9Fp/Qd
+#. js-lingui-id: Os6zs4
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
-msgid "Welcome, {name}."
-msgstr "Te damos la bienvenida, {name}."
+msgid "Welcome, {firstName}."
+msgstr "Te damos la bienvenida, {firstName}."
 
 #. js-lingui-id: YbCUR5
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx

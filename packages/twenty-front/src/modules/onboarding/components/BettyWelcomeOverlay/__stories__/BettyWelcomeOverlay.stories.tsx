@@ -2,11 +2,16 @@ import { currentUserState } from '@/auth/states/currentUserState';
 import { BettyWelcomeOverlay } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay';
 import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
 import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
+import { i18n } from '@lingui/core';
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useEffect } from 'react';
+import { SOURCE_LOCALE } from 'twenty-shared/translations';
 import { RootDecorator } from '~/testing/decorators/RootDecorator';
+import { messages as esMessages } from '~/locales/generated/es-ES';
 import { mockedUserData } from '~/testing/mock-data/users';
 import { OnboardingStatus } from '~/generated-metadata/graphql';
+
+i18n.load({ 'es-ES': esMessages });
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -37,14 +42,17 @@ const mockReducedMotionPreference = (matches: boolean) => {
 
 type BettyWelcomeOverlayExampleProps = {
   prefersReducedMotion?: boolean;
+  lang?: 'en' | 'es';
 };
 
 const BettyWelcomeOverlayExample = ({
   prefersReducedMotion = false,
+  lang = 'en',
 }: BettyWelcomeOverlayExampleProps) => {
   useEffect(() => {
     const restoreMatchMedia = mockReducedMotionPreference(prefersReducedMotion);
 
+    i18n.activate(lang === 'es' ? 'es-ES' : SOURCE_LOCALE);
     jotaiStore.set(currentUserState.atom, {
       ...mockedUserData,
       firstName: 'Charles',
@@ -54,9 +62,10 @@ const BettyWelcomeOverlayExample = ({
 
     return () => {
       jotaiStore.set(isBettyWelcomeVisibleState.atom, false);
+      i18n.activate(SOURCE_LOCALE);
       restoreMatchMedia();
     };
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, lang]);
 
   return <BettyWelcomeOverlay />;
 };
@@ -72,9 +81,13 @@ export default meta;
 type Story = StoryObj<typeof BettyWelcomeOverlayExample>;
 
 export const Default: Story = {
-  args: { prefersReducedMotion: false },
+  args: { prefersReducedMotion: false, lang: 'en' },
+};
+
+export const DefaultEs: Story = {
+  args: { prefersReducedMotion: false, lang: 'es' },
 };
 
 export const ReducedMotion: Story = {
-  args: { prefersReducedMotion: true },
+  args: { prefersReducedMotion: true, lang: 'en' },
 };

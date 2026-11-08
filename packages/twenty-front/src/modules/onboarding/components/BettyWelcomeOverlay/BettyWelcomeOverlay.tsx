@@ -12,7 +12,7 @@ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomState
 import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Key } from 'ts-key-enum';
 import { BRAND_COLORS } from 'twenty-shared/constants';
@@ -60,7 +60,6 @@ const splitTitleForUnderline = (title: string) => {
 
 const StyledRoot = styled.div`
   align-items: center;
-  background: ${BRAND_COLORS.ivory};
   bottom: 0;
   display: flex;
   justify-content: center;
@@ -80,9 +79,16 @@ const StyledSkipButtonContainer = styled.div`
 `;
 
 const StyledScene = styled.div`
+  --betty-iris-radius: 0px;
+
   height: 100%;
   position: relative;
+  transition: --betty-iris-radius 0.8s ${EASE_IN_OUT};
   width: 100%;
+
+  &.is-open {
+    --betty-iris-radius: 3000px;
+  }
 `;
 
 const StyledCard = styled.div`
@@ -94,21 +100,19 @@ const StyledCard = styled.div`
   border-radius: 18px;
   box-shadow: ${themeCssVariables.boxShadow.strong};
   left: 50%;
-  margin-left: -230px;
-  margin-top: -170px;
   padding: 32px 40px;
   position: absolute;
   top: 50%;
-  width: 460px;
+  width: min(460px, 90vw);
 
   @keyframes bettyCardIn {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translate(-50%, calc(-50% + 12px));
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translate(-50%, -50%);
     }
   }
 
@@ -176,7 +180,7 @@ const StyledThread = styled.img`
   animation:
     bettyThreadIn ${BETTY_WELCOME_SCENE_DURATIONS_MS.thread}ms ${EASE_IN_OUT}
       ${THREAD_START_MS}ms forwards,
-    bettyFadeOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
+    bettyThreadOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
   bottom: 18%;
   left: 50%;
   opacity: 0;
@@ -195,13 +199,19 @@ const StyledThread = styled.img`
       transform: translateX(-50%) scaleX(1);
     }
   }
+
+  @keyframes bettyThreadOut {
+    to {
+      opacity: 0;
+    }
+  }
 `;
 
 const StyledThreadDot = styled.span`
   animation:
     bettyDotHop ${BETTY_WELCOME_SCENE_DURATIONS_MS.figure}ms ${EASE_OUT}
       ${FIGURE_START_MS}ms forwards,
-    bettyFadeOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
+    bettyDotOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
   background: ${BRAND_COLORS.terracotta};
   border-radius: 50%;
   bottom: calc(18% + 10px);
@@ -237,12 +247,18 @@ const StyledThreadDot = styled.span`
       transform: translate(40px, 0);
     }
   }
+
+  @keyframes bettyDotOut {
+    to {
+      opacity: 0;
+    }
+  }
 `;
 
 const StyledWordmark = styled.img`
   animation:
     bettyWordmarkIn 0.8s ${EASE_OUT} ${TRANSFORMATION_START_MS + 400}ms forwards,
-    bettyFadeOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
+    bettyWordmarkOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
   left: 50%;
   opacity: 0;
   position: absolute;
@@ -256,12 +272,18 @@ const StyledWordmark = styled.img`
       transform: translate(-50%, -50%) scale(1);
     }
   }
+
+  @keyframes bettyWordmarkOut {
+    to {
+      opacity: 0;
+    }
+  }
 `;
 
 const StyledGreeting = styled.p`
   animation:
     bettyGreetingIn 0.5s ${EASE_OUT} ${WELCOME_START_MS}ms forwards,
-    bettyFadeOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
+    bettyGreetingOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
   color: ${BRAND_COLORS.charcoal};
   font: 400 30px/1.2 ${SERIF};
   left: 50%;
@@ -279,72 +301,61 @@ const StyledGreeting = styled.p`
       transform: translate(-50%, 0);
     }
   }
+
+  @keyframes bettyGreetingOut {
+    to {
+      opacity: 0;
+    }
+  }
 `;
 
 const StyledSignature = styled.img`
   animation:
-    bettyFadeIn 0.6s ${EASE_OUT} ${WELCOME_START_MS + 400}ms forwards,
-    bettyFadeOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
+    bettySignatureIn 0.6s ${EASE_OUT} ${WELCOME_START_MS + 400}ms forwards,
+    bettySignatureOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
   left: 50%;
   opacity: 0;
   position: absolute;
   top: 68%;
   transform: translate(-50%, 0);
   width: 180px;
-`;
 
-const StyledDim = styled.div`
-  animation: bettyFadeIn ${BETTY_WELCOME_SCENE_DURATIONS_MS.dim}ms
-    ${EASE_IN_OUT} ${DIM_START_MS}ms forwards;
-  background: ${BRAND_COLORS.charcoal};
-  inset: 0;
-  opacity: 0;
-  position: absolute;
-
-  @keyframes bettyFadeIn {
+  @keyframes bettySignatureIn {
     to {
       opacity: 1;
     }
   }
+
+  @keyframes bettySignatureOut {
+    to {
+      opacity: 0;
+    }
+  }
 `;
 
-const StyledIrisMaskHost = styled.svg`
-  height: 0;
-  overflow: hidden;
+// The base layer for the whole layer (ivory, then charcoal once dimmed). Its
+// mask-image is a radial gradient whose transparent circle (the "hole") grows
+// via the --betty-iris-radius custom property declared on StyledScene (see
+// its @property registration below): registering it as a <length> is what
+// lets the browser interpolate it smoothly, which in turn drives a smooth
+// mask-image (and, for StyledIrisRing below, SVG r) recomputation each frame.
+const StyledBackdrop = styled.div`
+  animation: bettyDimIn ${BETTY_WELCOME_SCENE_DURATIONS_MS.dim}ms ${EASE_IN_OUT}
+    ${DIM_START_MS}ms forwards;
+  background: ${BRAND_COLORS.ivory};
+  inset: 0;
+  mask-image: radial-gradient(
+    circle at center,
+    transparent var(--betty-iris-radius),
+    black calc(var(--betty-iris-radius) + 1px)
+  );
   position: absolute;
-  width: 0;
-`;
 
-const StyledIrisHole = styled.circle`
-  fill: black;
-  r: 0;
-  transition: r 0.8s ${EASE_IN_OUT};
-
-  &.is-open {
-    r: 141.5vmax;
+  @keyframes bettyDimIn {
+    to {
+      background: ${BRAND_COLORS.charcoal};
+    }
   }
-`;
-
-const StyledIrisRing = styled.circle`
-  fill: none;
-  r: 0;
-  stroke: ${BRAND_COLORS.terracotta};
-  stroke-width: 7px;
-  transition:
-    r 0.8s ${EASE_IN_OUT},
-    stroke-width 0.8s ${EASE_IN_OUT};
-
-  &.is-open {
-    r: 141.5vmax;
-    stroke-width: 0;
-  }
-`;
-
-const StyledIrisMasked = styled.div`
-  background: ${BRAND_COLORS.charcoal};
-  height: 100%;
-  mask: url(#betty-iris-mask);
-  width: 100%;
 `;
 
 const StyledIrisRingLayer = styled.svg`
@@ -356,8 +367,42 @@ const StyledIrisRingLayer = styled.svg`
   width: 100%;
 `;
 
+const StyledIrisRing = styled.circle`
+  fill: none;
+  r: var(--betty-iris-radius);
+  stroke: ${BRAND_COLORS.terracotta};
+  stroke-width: calc(7px - var(--betty-iris-radius) * 7px / 3000px);
+`;
+
+// Always opaque, so the real page behind the layer never bleeds through
+// between the reduced-motion phases' fades (which only animate what's on
+// top of it).
+const StyledReducedBackdrop = styled.div`
+  animation: bettyReducedDimIn 0.3s linear ${REDUCED_DARK_START_MS}ms forwards;
+  background: ${BRAND_COLORS.ivory};
+  inset: 0;
+  position: absolute;
+
+  @keyframes bettyReducedDimIn {
+    to {
+      background: ${BRAND_COLORS.charcoal};
+    }
+  }
+`;
+
+// The per-instance fade-in/out delays are passed as CSS custom properties
+// (via inline style) rather than as an inline "animation" shorthand: linaria
+// only rewrites keyframe names it sees inside this template, so a keyframe
+// name written into a runtime style string would reference the wrong,
+// unscoped name and never match.
 const StyledReducedLayer = styled.div`
+  --reduced-fade-in-delay: 0ms;
+  --reduced-fade-out-delay: 999999ms;
+
   align-items: center;
+  animation:
+    bettyReducedFadeIn 0.2s linear var(--reduced-fade-in-delay) forwards,
+    bettyReducedFadeOut 0.2s linear var(--reduced-fade-out-delay) forwards;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -416,6 +461,7 @@ const BettyWelcomeContent = ({
       () => setIsIrisOpen(true),
       BETTY_WELCOME_IRIS_OPEN_AT_MS,
     );
+
     const dismissTimeoutId = setTimeout(onDismiss, BETTY_WELCOME_DURATION_MS);
 
     return () => {
@@ -495,6 +541,14 @@ const BettyWelcomeContent = ({
 
   return (
     <StyledRoot>
+      {/* Registers --betty-iris-radius as an animatable <length>, so the
+          transition declared on it in StyledScene also animates the
+          mask-image and SVG r values that reference it via var(). */}
+      <style>
+        {doNotTranslate(
+          "@property --betty-iris-radius { syntax: '<length>'; inherits: true; initial-value: 0px; }",
+        )}
+      </style>
       <StyledSkipButtonContainer>
         <Button variant="outline" onClick={onDismiss}>
           {t`Skip animation`}
@@ -505,21 +559,29 @@ const BettyWelcomeContent = ({
       </VisuallyHidden>
       {prefersReducedMotion ? (
         <StyledScene aria-hidden="true">
+          <StyledReducedBackdrop />
           <StyledReducedLayer
-            style={{
-              animation: doNotTranslate(
-                `bettyReducedFadeIn 0.2s linear forwards, bettyReducedFadeOut 0.2s linear ${REDUCED_CARD_HOLD_MS}ms forwards`,
-              ),
-            }}
+            style={
+              {
+                '--reduced-fade-out-delay': doNotTranslate(
+                  `${REDUCED_CARD_HOLD_MS}ms`,
+                ),
+              } as CSSProperties
+            }
           >
             <StyledReducedCard>{cardContent}</StyledReducedCard>
           </StyledReducedLayer>
           <StyledReducedLayer
-            style={{
-              animation: doNotTranslate(
-                `bettyReducedFadeIn 0.2s linear ${REDUCED_WELCOME_START_MS}ms forwards, bettyReducedFadeOut 0.2s linear ${REDUCED_WELCOME_HOLD_MS}ms forwards`,
-              ),
-            }}
+            style={
+              {
+                '--reduced-fade-in-delay': doNotTranslate(
+                  `${REDUCED_WELCOME_START_MS}ms`,
+                ),
+                '--reduced-fade-out-delay': doNotTranslate(
+                  `${REDUCED_WELCOME_HOLD_MS}ms`,
+                ),
+              } as CSSProperties
+            }
           >
             <img src={wordmarkSrc} alt={wordmarkAlt} width={180} />
             <StyledGreeting
@@ -534,17 +596,13 @@ const BettyWelcomeContent = ({
               {greeting}
             </StyledGreeting>
           </StyledReducedLayer>
-          <StyledReducedLayer
-            style={{
-              animation: doNotTranslate(
-                `bettyReducedFadeIn 0.3s linear ${REDUCED_DARK_START_MS}ms forwards`,
-              ),
-              background: BRAND_COLORS.charcoal,
-            }}
-          />
         </StyledScene>
       ) : (
-        <StyledScene aria-hidden="true">
+        <StyledScene
+          aria-hidden="true"
+          className={isIrisOpen ? 'is-open' : undefined}
+        >
+          <StyledBackdrop />
           <StyledCard>
             <StyledStamp src={stampSrc} alt="" aria-hidden="true" />
             {cardContent}
@@ -554,28 +612,9 @@ const BettyWelcomeContent = ({
           <StyledWordmark src={wordmarkSrc} alt={wordmarkAlt} />
           <StyledGreeting>{greeting}</StyledGreeting>
           <StyledSignature src={signatureSrc} alt="" aria-hidden="true" />
-          <StyledDim>
-            <StyledIrisMaskHost>
-              <defs>
-                <mask id="betty-iris-mask">
-                  <rect width="100%" height="100%" fill="white" />
-                  <StyledIrisHole
-                    className={isIrisOpen ? 'is-open' : undefined}
-                    cx="50%"
-                    cy="50%"
-                  />
-                </mask>
-              </defs>
-            </StyledIrisMaskHost>
-            <StyledIrisMasked />
-            <StyledIrisRingLayer>
-              <StyledIrisRing
-                className={isIrisOpen ? 'is-open' : undefined}
-                cx="50%"
-                cy="50%"
-              />
-            </StyledIrisRingLayer>
-          </StyledDim>
+          <StyledIrisRingLayer>
+            <StyledIrisRing cx="50%" cy="50%" />
+          </StyledIrisRingLayer>
         </StyledScene>
       )}
     </StyledRoot>
