@@ -158,6 +158,10 @@
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketTagging",
         "s3:GetBucketWebsite",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketRequestPayment",
+        "s3:GetReplicationConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
         "s3:ListBucket"
       ],
       "Resource": "arn:aws:s3:::aos-crm-beta-files-000000000000"
@@ -176,10 +180,7 @@
     {
       "Sid": "LogsReadForPlanRefresh",
       "Effect": "Allow",
-      "Action": [
-        "logs:DescribeLogGroups",
-        "logs:ListTagsForResource"
-      ],
+      "Action": "logs:ListTagsForResource",
       "Resource": "arn:aws:logs:eu-west-1:000000000000:log-group:/ecs/aos-crm-beta/*"
     },
     {
@@ -220,7 +221,9 @@
         "route53:ListResourceRecordSets",
         "route53:ListTagsForResource",
         "sesv2:GetEmailIdentity",
-        "sesv2:ListTagsForResource"
+        "sesv2:ListTagsForResource",
+        "logs:DescribeLogGroups",
+        "elasticache:DescribeCacheClusters"
       ],
       "Resource": "*"
     },

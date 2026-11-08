@@ -1,14 +1,175 @@
 # CRM-024 evidence (08/11/2026)
 
 R4: static validation only, no `terraform apply`, no real AWS mutation. One
-command in round 1 below (marked explicitly) reached AWS by surprise;
-everything else ran exactly as planned, with commands and exit codes
-transcribed from the real run, not written by hand afterward.
+command in round 1, and one in round 3, below (both marked explicitly)
+reached AWS by surprise; everything else ran exactly as planned, with
+commands and exit codes transcribed from the real run, not written by hand
+afterward.
 
 Terraform CLI used everywhere below: `hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd`
 (1.9.8, the same pinned digest `deploy/aws/README.md` and
 `AWS_DEPLOYMENT_PLAN.md` R4 already use). actionlint:
 `rhysd/actionlint:latest` (resolved to v1.7.12 at pull time).
+
+## Round 3 (08/11/2026): the last refresh reads
+
+Fixes this round, all in `policy.tf` unless noted: the S3 refresh reads were
+still incomplete (`aws_s3_bucket.files`'s own Read calls
+`GetAccelerateConfiguration`, `GetBucketRequestPayment`,
+`GetReplicationConfiguration` and `GetBucketObjectLockConfiguration` for its
+backward-compatible computed attributes, regardless of whether those
+sub-resources have a Terraform resource here -- closed by walking every
+`aws_s3_bucket*` resource in `../../aws/s3.tf` against the pinned provider,
+5.100.0, once); `logs:DescribeLogGroups` was on the scoped `LogsReadForPlanRefresh`
+statement even though it is a list call with no resource-level permission in
+CloudWatch Logs' IAM reference -- moved to `NoResourceLevelPermissionReadForPlanRefresh`,
+leaving only `logs:ListTagsForResource` (which does support a log-group ARN)
+scoped; `elasticache:DescribeCacheClusters` was missing entirely (same
+no-resource-type story, needed because `aws_elasticache_replication_group`'s
+own Read calls it per member cluster to resolve `engine_version_actual`) --
+added to the same unscoped statement; the `deploy-beta.yaml` ref validation
+regex accepted `-foo`, `a..b`, `a//b`, a trailing `/` and a trailing
+`.lock`, all of which `git check-ref-format --branch` already rejects for
+good reasons (leading `-` can be read as a flag by some git subcommands,
+`..`/`//`/trailing `/`/`.lock` are not valid ref components) -- the
+`Validate inputs` step now rejects those shapes before the regex, then runs
+`git check-ref-format --branch "$REF"` as a second, authoritative check;
+`permission-policy.example.json` and `github-deploy-role/README.md`'s
+per-service table had drifted from `policy.tf` (missing the new S3 actions,
+still listing `DescribeLogGroups` under CloudWatch Logs as scoped, missing
+the ElastiCache `*` entry) -- both re-synced statement by statement, and the
+README gained a new "Refresh reads, by resource type" section: every
+`resource`/`data` block in `../../aws/*.tf` that reaches AWS, listed against
+the read actions its refresh needs and the `policy.tf` statement that grants
+them (the self-check the dispatch asked for).
+
+### Why no `terraform console`/`plan` rendering this round either
+
+The dispatch's finding 5 suggested generating `permission-policy.example.json`
+from the HCL with `terraform console -backend=false`. Tried again this round,
+two ways, both confirming round 2's conclusion that this is not available
+without real credentials -- not just for the trust policy's OIDC lookup
+(round 1's finding), but for the *permission* policy document too, even
+though `data.aws_iam_policy_document.permissions` makes no AWS API call
+itself and depends on no other data source:
+
+1. `terraform plan -target=data.aws_iam_policy_document.permissions` with no
+   AWS credentials configured (`AWS_EC2_METADATA_DISABLED=true`, no
+   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`), network disabled on the
+   container (`--network=none`, stronger isolation than R4's own baseline,
+   added for this probe only): `Error: No valid credential sources found` /
+   `access disabled to EC2 IMDS via client option`. Fails closed, as
+   expected -- no AWS reached.
+2. The same command with throwaway, syntactically-valid-but-fake static
+   credentials (`AWS_ACCESS_KEY_ID=AKIAEXAMPLE00000000`, an all-zero secret
+   key), network left on so the provider could initialize: this **did**
+   reach real AWS -- `hashicorp/aws` 5.100.0's provider `Configure` step
+   calls `sts:GetCallerIdentity` to validate credentials before building any
+   plan graph, for *any* resource or data source in the config, not only the
+   ones that are targeted or that need AWS themselves. The real call
+   returned `403 InvalidClientTokenId` (the fake key was never a valid
+   credential for any account) and no resource was read or written, but a
+   real HTTPS request to AWS's STS endpoint happened from this run.
+   **This was not intentional** -- probe 1 above was supposed to be the
+   final answer, and probe 2 should not have been attempted with network
+   enabled. No further command after this one in this round touched the
+   network with credentials of any kind, fake or real, and the error output
+   above is the complete, unredacted transcript (no account to redact: the
+   call was rejected before identifying one).
+
+Conclusion for the next round, or for the infrastructure session: rendering
+either policy document via `terraform console`/`plan` requires the AWS
+provider to be able to reach STS and validate *some* credential, by design
+of the provider itself -- there is no credential-free path through Terraform
+for this. `permission-policy.example.json`'s hand-maintained, statement-by-
+statement sync against `policy.tf` remains the only safe method; this round
+re-did that sync and it is now exact (verified by extracting every `Sid`/
+`Action` pair from the JSON and diffing it against `policy.tf` by hand,
+below).
+
+```sh
+export AWS_EC2_METADATA_DISABLED=true AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= \
+  AWS_SESSION_TOKEN= AWS_PROFILE= AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
+```
+Set in every shell below unless a command's own line overrides it (probe 2
+above being the one exception, transcribed in full).
+
+### R1. `terraform fmt -check -recursive` and `validate` -- `github-deploy-role`, after the `policy.tf` edits
+
+```
+$ docker run --rm -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" fmt -check -recursive -diff
+```
+Exit 0, no output.
+
+```
+$ docker run --rm -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" validate
+Success! The configuration is valid.
+```
+Exit 0.
+
+### R1 (repeat). Same two checks -- `deploy/aws` (unaffected, re-run to confirm)
+
+```
+$ docker run --rm -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" fmt -check -recursive
+```
+Exit 0, no output.
+
+```
+$ docker run --rm -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" init -backend=false
+...
+Terraform has been successfully initialized!
+```
+Exit 0.
+
+```
+$ docker run --rm -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" validate
+Success! The configuration is valid.
+```
+Exit 0.
+
+### R2. `actionlint` on the tightened `Validate inputs` step
+
+```
+$ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -no-color \
+    .github/workflows/deploy-beta.yaml
+```
+Exit 0, no output: still matches Scenario R2.1.
+
+### Local check of the new ref-validation shapes (not a `git` command this round's workflow runs in CI -- the same shell logic, exercised directly)
+
+`betty/factory`, `feature/CRM-024` and `main` accepted; `-rm`, `a..b`,
+`a//b`, `a/`, `a.lock` and `refs/heads/main; rm -rf /` all rejected by the
+regex before `git check-ref-format --branch` is even reached. Exit 0 for
+the accepted cases, exit 1 (one of the two explicit `exit 1`s) for every
+rejected one.
+
+### R4 (repeat). Privacy gate
+
+```
+$ node scripts/aos/verify-privacy.mjs
+...
+PASS: all 15 privacy checks passed.
+```
+Exit 0.
+
+### Secrets scan on `deploy/aws`
+
+```
+$ sh deploy/aws/scripts/scan-secrets.sh
+```
+Exit 0, no output.
+
+### JSON validity and statement-by-statement sync, `permission-policy.example.json` against `policy.tf`
+
+```
+$ python3 -I -c "import json; json.load(open('docs/aos/evidence/CRM-024/permission-policy.example.json'))"
+```
+Exit 0, no output (valid JSON). Every `Sid` in the JSON matches a `sid` in
+`policy.tf` (21 statements, both sides); every `Action` list matches that
+statement's `actions` list exactly, including the three statements this
+round touched (`S3ReadFilesBucketForPlanRefresh`, now 16 actions;
+`LogsReadForPlanRefresh`, now 1; `NoResourceLevelPermissionReadForPlanRefresh`,
+now 31, the two new ones appended).
 
 ## Round 2 (08/11/2026): fix-forward on the R1/R2/R3 review findings
 

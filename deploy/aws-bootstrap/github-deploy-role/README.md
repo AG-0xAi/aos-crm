@@ -81,11 +81,11 @@ statement by statement).
 | ECS | `RegisterTaskDefinition`, `RunTask`, `UpdateService`, `DescribeTasks`, `DescribeServices`, `DescribeTaskDefinition`, `DescribeClusters`, `ListTagsForResource`, `TagResource` |
 | IAM | `PassRole` (beta task roles only); `GetRole`, `GetRolePolicy`, `ListRolePolicies`, `ListAttachedRolePolicies`, `ListRoleTags`, `ListInstanceProfilesForRole` (beta task roles); `GetUser`, `GetUserPolicy`, `ListUserPolicies`, `ListAttachedUserPolicies`, `ListAccessKeys` (the SES SMTP user) |
 | RDS | `DescribeDBInstances`, `DescribeDBSubnetGroups`, `ListTagsForResource` |
-| ElastiCache | `DescribeReplicationGroups`, `DescribeCacheSubnetGroups`, `DescribeCacheParameterGroups`, `ListTagsForResource` |
-| S3 (files bucket) | `GetBucketAcl`, `GetBucketCORS`, `GetBucketPolicy`, `GetBucketVersioning`, `GetEncryptionConfiguration`, `GetBucketLogging`, `GetLifecycleConfiguration`, `GetBucketOwnershipControls`, `GetBucketPublicAccessBlock`, `GetBucketTagging`, `GetBucketWebsite`, `ListBucket` |
+| ElastiCache | `DescribeReplicationGroups`, `DescribeCacheSubnetGroups`, `DescribeCacheParameterGroups`, `ListTagsForResource` (scoped); `DescribeCacheClusters` (no resource-level permission, `*`) |
+| S3 (files bucket) | `GetBucketAcl`, `GetBucketCORS`, `GetBucketPolicy`, `GetBucketVersioning`, `GetEncryptionConfiguration`, `GetBucketLogging`, `GetLifecycleConfiguration`, `GetBucketOwnershipControls`, `GetBucketPublicAccessBlock`, `GetBucketTagging`, `GetBucketWebsite`, `GetAccelerateConfiguration`, `GetBucketRequestPayment`, `GetReplicationConfiguration`, `GetBucketObjectLockConfiguration`, `ListBucket` |
 | S3 (Terraform state) | `GetObject`, `PutObject`, `ListBucket` |
 | Secrets Manager | `DescribeSecret`, `GetResourcePolicy`, `ListSecretVersionIds`, `GetSecretValue` |
-| CloudWatch Logs | `DescribeLogGroups`, `ListTagsForResource` |
+| CloudWatch Logs | `ListTagsForResource` (scoped to the log-group ARN pattern); `DescribeLogGroups` (no resource-level permission, `*`) |
 | Budgets | `ViewBudget` |
 | EC2 | `DescribeVpcs`, `DescribeVpcAttribute`, `DescribeSubnets`, `DescribeInternetGateways`, `DescribeNatGateways`, `DescribeAddresses`, `DescribeNetworkInterfaces`, `DescribeRouteTables`, `DescribeSecurityGroups`, `DescribeSecurityGroupRules`, `DescribeAvailabilityZones`, `DescribeTags` |
 | ELBv2 | `DescribeLoadBalancers`, `DescribeLoadBalancerAttributes`, `DescribeListeners`, `DescribeRules`, `DescribeTargetGroups`, `DescribeTargetGroupAttributes`, `DescribeTargetHealth`, `DescribeTags` |
@@ -93,6 +93,38 @@ statement by statement).
 | Route 53 | `GetHostedZone`, `ListHostedZonesByName`, `ListResourceRecordSets`, `ListTagsForResource` |
 | SES (sesv2) | `GetEmailIdentity`, `ListTagsForResource` |
 | DynamoDB (state lock) | `GetItem`, `PutItem`, `DeleteItem` |
+
+## Refresh reads, by resource type
+
+Self-check: every `resource`/`data` block in `../../aws/*.tf` that reaches
+AWS, the read actions its refresh calls, and the `policy.tf` statement that
+grants them. Resources with no AWS-facing read (`random_password`, and the
+`aws_iam_policy_document` data sources, which are rendered locally) are
+left out.
+
+| Resource type (`deploy/aws`) | Refresh reads | Granted by |
+| --- | --- | --- |
+| `aws_vpc`, `aws_subnet`, `aws_internet_gateway`, `aws_nat_gateway`, `aws_eip`, `aws_route_table`, `aws_route_table_association` (`network.tf`) | `ec2:DescribeVpcs`, `DescribeVpcAttribute`, `DescribeSubnets`, `DescribeInternetGateways`, `DescribeNatGateways`, `DescribeAddresses`, `DescribeRouteTables`, `DescribeTags` | `NoResourceLevelPermissionReadForPlanRefresh` (`*`: none of these support resource-level permissions) |
+| `data.aws_availability_zones.available` (`network.tf`) | `ec2:DescribeAvailabilityZones` | `NoResourceLevelPermissionReadForPlanRefresh` |
+| `aws_security_group`, `aws_security_group_rule` (`security-groups.tf`) | `ec2:DescribeSecurityGroups`, `DescribeSecurityGroupRules`, `DescribeNetworkInterfaces` (ENI attachment), `DescribeTags` | `NoResourceLevelPermissionReadForPlanRefresh` |
+| `aws_acm_certificate`, `aws_acm_certificate_validation` (`alb-acm.tf`) | `acm:DescribeCertificate`, `ListTagsForCertificate`, `GetCertificate` | `NoResourceLevelPermissionReadForPlanRefresh` (ACM has no resource-level permissions) |
+| `aws_lb`, `aws_lb_target_group`, `aws_lb_listener`, `aws_lb_listener_rule` (`alb-acm.tf`, `favicon-redirects.tf`) | `elasticloadbalancing:DescribeLoadBalancers`, `DescribeLoadBalancerAttributes`, `DescribeListeners`, `DescribeRules`, `DescribeTargetGroups`, `DescribeTargetGroupAttributes`, `DescribeTargetHealth`, `DescribeTags` | `NoResourceLevelPermissionReadForPlanRefresh` (ELBv2 has no resource-level permissions) |
+| `data.aws_route53_zone.this`, `aws_route53_record` (all) (`data.tf`, `alb-acm.tf`, `ses.tf`) | `route53:GetHostedZone`, `ListHostedZonesByName`, `ListResourceRecordSets`, `ListTagsForResource` | `NoResourceLevelPermissionReadForPlanRefresh` (Route 53 has no resource-level permissions) |
+| `aws_ecr_repository`, `aws_ecr_lifecycle_policy` (`ecr.tf`) | `ecr:DescribeRepositories`, `DescribeImages`, `GetLifecyclePolicy`, `GetRepositoryPolicy`, `ListTagsForResource` | `EcrPushBetaRepository` (scoped to the repository ARN) |
+| `aws_ecs_cluster` (`ecs.tf`) | `ecs:DescribeClusters`, `ListTagsForResource` | `EcsDescribeAndTagForPlanRefresh` (scoped) |
+| `aws_ecs_task_definition` (migrate/server/worker, `ecs.tf`) | `ecs:DescribeTaskDefinition` (`*`, no resource type), `ListTagsForResource` (scoped) | `EcsDescribeTaskDefinitionForPlanRefresh` + `EcsDescribeAndTagForPlanRefresh` |
+| `aws_ecs_service` (server/worker, `ecs.tf`) | `ecs:DescribeServices` (`*`, no resource type), `ListTagsForResource` (scoped) | `EcsDescribeForWaiters` + `EcsDescribeAndTagForPlanRefresh` |
+| `aws_iam_role` (execution/server/worker/migrate), `aws_iam_role_policy`, `aws_iam_role_policy_attachment` (`iam.tf`) | `iam:GetRole`, `GetRolePolicy`, `ListRolePolicies`, `ListAttachedRolePolicies`, `ListRoleTags`, `ListInstanceProfilesForRole` | `IamReadBetaTaskRolesForPlanRefresh` (scoped to the `*-ecs-task-*` role ARN pattern) |
+| `aws_cloudwatch_log_group` (server/worker/migrate, `logs.tf`) | `logs:ListTagsForResource` (scoped), `logs:DescribeLogGroups` (`*`, no resource type) | `LogsReadForPlanRefresh` + `NoResourceLevelPermissionReadForPlanRefresh` |
+| `aws_db_instance`, `aws_db_subnet_group` (`rds.tf`) | `rds:DescribeDBInstances`, `DescribeDBSubnetGroups`, `ListTagsForResource` | `RdsReadForPlanRefresh` (scoped) |
+| `aws_elasticache_subnet_group`, `aws_elasticache_parameter_group` (`redis.tf`) | `elasticache:DescribeCacheSubnetGroups`, `DescribeCacheParameterGroups`, `ListTagsForResource` | `ElastiCacheReadForPlanRefresh` (scoped) |
+| `aws_elasticache_replication_group` (`redis.tf`) | `elasticache:DescribeReplicationGroups`, `ListTagsForResource` (scoped); `DescribeCacheClusters` (`*`, no resource type -- reads the member cluster for `engine_version_actual`) | `ElastiCacheReadForPlanRefresh` + `NoResourceLevelPermissionReadForPlanRefresh` |
+| `aws_s3_bucket`, `aws_s3_bucket_public_access_block`, `aws_s3_bucket_versioning`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_policy` (`s3.tf`) | `s3:GetBucketAcl`, `GetBucketCORS`, `GetBucketPolicy`, `GetBucketVersioning`, `GetEncryptionConfiguration`, `GetBucketLogging`, `GetLifecycleConfiguration`, `GetBucketOwnershipControls`, `GetBucketPublicAccessBlock`, `GetBucketTagging`, `GetBucketWebsite`, `GetAccelerateConfiguration`, `GetBucketRequestPayment`, `GetReplicationConfiguration`, `GetBucketObjectLockConfiguration`, `ListBucket` | `S3ReadFilesBucketForPlanRefresh` (scoped to the files bucket ARN) |
+| `aws_secretsmanager_secret`, `aws_secretsmanager_secret_version` (`secrets.tf`, `ses.tf`, 5 secrets) | `secretsmanager:DescribeSecret`, `GetResourcePolicy`, `ListSecretVersionIds`, `GetSecretValue` | `SecretsManagerReadForPlanRefresh` (scoped to `aos-crm/<env>/*`) |
+| `aws_budgets_budget` (`budgets.tf`) | `budgets:ViewBudget` | `BudgetsReadForPlanRefresh` (scoped) |
+| `aws_sesv2_email_identity`, `aws_sesv2_email_identity_mail_from_attributes` (`ses.tf`) | `sesv2:GetEmailIdentity`, `ListTagsForResource` | `NoResourceLevelPermissionReadForPlanRefresh` (sesv2 has no resource-level permissions) |
+| `aws_iam_user`, `aws_iam_user_policy`, `aws_iam_access_key` (`ses_smtp`, `ses.tf`) | `iam:GetUser`, `GetUserPolicy`, `ListUserPolicies`, `ListAttachedUserPolicies`, `ListAccessKeys` | `IamReadBetaSesUserForPlanRefresh` (scoped to the `*-ses-smtp` user ARN pattern) |
+| `data.aws_caller_identity.current` (`data.tf`) | `sts:GetCallerIdentity` | none needed -- every authenticated principal can call it on itself, no IAM grant required |
 
 ## Re-applying after a permission change
 
