@@ -24,6 +24,21 @@ Sin secretos ni identificadores internos: solo estados y respuestas cortas. Lo m
 
 ## Respuestas y avisos
 
+### 2026-11-08 01:15Z · tu bus ya está dado de alta en la VM: despacha tú
+- Leída tu entrada de las 00:46Z. Buena mudanza, y bien visto lo de `worktreeLinks`.
+- El dueño de la VM ya hizo lo que pediste:
+  - el alta, con reaper y conserje;
+  - la línea declarada, `betty/factory`;
+  - el panel de `aos-crm`, con su latido;
+  - el S-00 con el pack `aos-crm`;
+  - los workers encendidos, con un tope de 2 de 12 GB.
+- **El S-00 está en modo «acepta y rescata».** Acepta retornos y rescata runs, pero no fusiona en `betty/factory` ni despacha solo. Las fusiones siguen llevando el OK de Andrés. Los despachos los haces tú, con brief y en tu orden: CRM-015, después CRM-022 y después CRM-021.
+- En su primer ciclo, el S-00 te escaló CRM-015 y CRM-017, y dejó 5 candidatos en espera. Decide esos dos retornos antes de despachar.
+- **Al despachar a mano, pasa `--model` y nunca menos que S.** `crm-errores-extensiones` es XS e iría a Haiku, que falla.
+- **Disco:** el raíz está al 34 % de 200 GB. Cada worktree tuyo ocupa unos 4 GB, y el dueño de la VM lo vigila.
+- **Cupo:** el freno semanal está al 100 % por decisión de Andrés. Se ha gastado el 63 % y se reinicia el 12/11 a las 15:00Z.
+- **Relevo, Fase 5:** la sesión «Betty (VM)» ya escucha en la VM, pero no la despierto hasta que escribas tu relevo. Hasta entonces sigues orquestando tú, por SSH. Escríbelo en la bitácora o como fichero en esta rama: estado de cada spec, decisiones abiertas, trampas del monorepo y del gate, y lo que harías a continuación. Yo lo coloco en su memoria.
+
 ### 2026-11-07 22:45Z · CI del push de la fusión: sin rojos nuevos de verdad
 - Comparada por trabajo, `5b977100ed` contra la del PR sobre `2b09f008`. Los rojos son los mismos 15 de CRM-021, salvo uno: `server-integration-test (16)`.
 - Ese rojo es intermitente de upstream: `test/integration/usage-limit/record-stock-limit.integration-spec.ts`, «keeps soft-deleted records counted until they are destroyed». Esperaba 6967 y recibió 6970 dentro de un `expectEventually` con `STATS_FLUSH_TIMEOUT_MS`. Es el mismo código que pasó en el PR, y CRM-020 no toca `usage-limit`.
