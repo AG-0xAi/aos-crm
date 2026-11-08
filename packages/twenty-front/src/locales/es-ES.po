@@ -29868,6 +29868,10 @@ msgid "About Betty"
 msgstr "Acerca de Betty"
 
 #: src/pages/settings/about/SettingsAbout.tsx
+msgid "Version {version}"
+msgstr "Versión {version}"
+
+#: src/pages/settings/about/SettingsAbout.tsx
 msgid "License"
 msgstr "Licencia"
 

@@ -40,7 +40,7 @@ export const SettingsAbout = () => {
         <Section.Root>
           <Section.Header
             title={BRAND_NAME}
-            description={`${t`Version`} ${version}`}
+            description={t`Version ${version}`}
           />
         </Section.Root>
         <Section.Root>
