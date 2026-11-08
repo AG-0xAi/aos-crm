@@ -118,11 +118,14 @@ describe('signUp with a pending personal invitation (integration)', () => {
   });
 
   describe('when email verification is not required', () => {
-    it('lists the invitation for an unverified email', async () => {
+    // CRM-016 (R3, closes CRM-014 §4.1): the invitation is still listed, but
+    // its token is withheld until the email is proven, regardless of
+    // IS_EMAIL_VERIFICATION_REQUIRED.
+    it('lists the invitation without its token for an unverified email', async () => {
       expect(signUpAvailableWorkspacesForSignUp).toEqual([
         expect.objectContaining({
           id: SEED_APPLE_WORKSPACE_ID,
-          personalInviteToken: inviteToken,
+          personalInviteToken: null,
         }),
       ]);
     });

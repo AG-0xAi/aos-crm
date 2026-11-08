@@ -100,6 +100,8 @@ const listMcpTools = async (
   return response.body.result.tools;
 };
 
+// CRM-007: search_help_center posts workspace text to a third party, so it is
+// excluded from MCP entirely (MCP_EXCLUDED_TOOL_NAMES), in both modes.
 const META_MODE_TOOL_NAMES = [
   'execute_tool',
   'get_tool_catalog',
@@ -107,7 +109,6 @@ const META_MODE_TOOL_NAMES = [
   'list_object_metadata_names',
   'list_skills',
   'load_skills',
-  'search_help_center',
 ];
 
 const DIRECT_MODE_PATH = '/mcp?mode=direct';
@@ -306,11 +307,7 @@ describe('MCP tool catalog (integration)', () => {
       ).map((tool) => tool.name);
 
       expect(toolNames).toEqual(
-        expect.arrayContaining([
-          'find_many_companies',
-          'search_help_center',
-          'load_skills',
-        ]),
+        expect.arrayContaining(['find_many_companies', 'load_skills']),
       );
 
       for (const hiddenToolName of [
@@ -318,6 +315,7 @@ describe('MCP tool catalog (integration)', () => {
         'learn_tools',
         'execute_tool',
         'http_request',
+        'search_help_center',
       ]) {
         expect(toolNames).not.toContain(hiddenToolName);
       }

@@ -31,7 +31,9 @@ const WORKSPACE_CUSTOM_APPLICATION_UNIVERSAL_IDENTIFIER =
   '20202020-aaaa-4aaa-8aaa-000000000001';
 
 describe('getRecordImageIdentifier', () => {
-  it('resolves a LINKS image identifier to a favicon url', async () => {
+  // CRM-019 (R2): no company-icon provider is configured, so LINKS image
+  // identifiers resolve to null even when twenty-icons requests are allowed.
+  it('returns null for a LINKS image identifier (no icon provider)', async () => {
     const domainNameField = getFlatFieldMetadataMock({
       universalIdentifier: 'domain-ui',
       objectMetadataId: 'company-id',
@@ -53,7 +55,7 @@ describe('getRecordImageIdentifier', () => {
       allowRequestsToTwentyIcons: true,
     });
 
-    expect(result).toBe('https://twenty-icons.com/twenty.com');
+    expect(result).toBe(null);
   });
 
   it('returns null for a LINKS image identifier when twenty-icons requests are disabled', async () => {
@@ -140,12 +142,12 @@ describe('getRecordImageIdentifier', () => {
       name: 'baseText',
       type: FieldMetadataType.TEXT,
     });
-    const domainNameField = getFlatFieldMetadataMock({
-      universalIdentifier: 'domain-ui',
+    const avatarFileField = getFlatFieldMetadataMock({
+      universalIdentifier: 'avatar-ui',
       objectMetadataId: 'custom-id',
-      id: 'domain-id',
-      name: 'domainName',
-      type: FieldMetadataType.LINKS,
+      id: 'avatar-id',
+      name: 'avatarFile',
+      type: FieldMetadataType.FILES,
     });
     const customObject = getFlatObjectMetadataMock({
       universalIdentifier: 'custom-ui',
@@ -154,7 +156,7 @@ describe('getRecordImageIdentifier', () => {
       imageIdentifierFieldMetadataId: 'text-id',
       overrides: {
         [WORKSPACE_CUSTOM_APPLICATION_UNIVERSAL_IDENTIFIER]: {
-          imageIdentifierFieldMetadataId: 'domain-id',
+          imageIdentifierFieldMetadataId: 'avatar-id',
         },
       },
     });
@@ -162,14 +164,15 @@ describe('getRecordImageIdentifier', () => {
     const result = await getRecordImageIdentifier({
       record: {
         baseText: 'ignored',
-        domainName: { primaryLinkUrl: 'acme.com' },
+        avatarFile: [{ fileId: 'file-1' }],
       },
       flatObjectMetadata: customObject,
-      flatFieldMetadataMaps: buildFieldMaps([baseTextField, domainNameField]),
+      flatFieldMetadataMaps: buildFieldMaps([baseTextField, avatarFileField]),
       allowRequestsToTwentyIcons: true,
+      signUrl,
     });
 
-    expect(result).toBe('https://twenty-icons.com/acme.com');
+    expect(result).toBe(`signed:${FileFolder.FilesField}:file-1`);
   });
 
   it('respects an explicit null override (cleared image identifier)', async () => {
