@@ -20,7 +20,10 @@
         "ecr:BatchGetImage",
         "ecr:GetDownloadUrlForLayer",
         "ecr:DescribeRepositories",
-        "ecr:DescribeImages"
+        "ecr:DescribeImages",
+        "ecr:ListTagsForResource",
+        "ecr:GetLifecyclePolicy",
+        "ecr:GetRepositoryPolicy"
       ],
       "Resource": "arn:aws:ecr:eu-west-1:000000000000:repository/aos-crm-beta"
     },
@@ -55,6 +58,26 @@
         "ecs:DescribeServices"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "EcsDescribeTaskDefinitionForPlanRefresh",
+      "Effect": "Allow",
+      "Action": "ecs:DescribeTaskDefinition",
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcsDescribeAndTagForPlanRefresh",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeClusters",
+        "ecs:ListTagsForResource",
+        "ecs:TagResource"
+      ],
+      "Resource": [
+        "arn:aws:ecs:eu-west-1:000000000000:cluster/aos-crm-beta",
+        "arn:aws:ecs:eu-west-1:000000000000:service/aos-crm-beta/aos-crm-beta-*",
+        "arn:aws:ecs:eu-west-1:000000000000:task-definition/aos-crm-beta-*"
+      ]
     },
     {
       "Sid": "PassBetaTaskRolesToEcsOnly",
@@ -124,11 +147,17 @@
       "Sid": "S3ReadFilesBucketForPlanRefresh",
       "Effect": "Allow",
       "Action": [
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
         "s3:GetBucketPolicy",
         "s3:GetBucketVersioning",
         "s3:GetEncryptionConfiguration",
+        "s3:GetBucketLogging",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetBucketOwnershipControls",
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketTagging",
+        "s3:GetBucketWebsite",
         "s3:ListBucket"
       ],
       "Resource": "arn:aws:s3:::aos-crm-beta-files-000000000000"
@@ -139,7 +168,8 @@
       "Action": [
         "secretsmanager:DescribeSecret",
         "secretsmanager:GetResourcePolicy",
-        "secretsmanager:ListSecretVersionIds"
+        "secretsmanager:ListSecretVersionIds",
+        "secretsmanager:GetSecretValue"
       ],
       "Resource": "arn:aws:secretsmanager:eu-west-1:000000000000:secret:aos-crm/beta/*"
     },
@@ -163,25 +193,30 @@
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeVpcs",
+        "ec2:DescribeVpcAttribute",
         "ec2:DescribeSubnets",
         "ec2:DescribeInternetGateways",
         "ec2:DescribeNatGateways",
         "ec2:DescribeAddresses",
+        "ec2:DescribeNetworkInterfaces",
         "ec2:DescribeRouteTables",
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeSecurityGroupRules",
         "ec2:DescribeAvailabilityZones",
         "ec2:DescribeTags",
         "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
         "elasticloadbalancing:DescribeListeners",
         "elasticloadbalancing:DescribeRules",
         "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetGroupAttributes",
         "elasticloadbalancing:DescribeTargetHealth",
         "elasticloadbalancing:DescribeTags",
         "acm:DescribeCertificate",
         "acm:ListTagsForCertificate",
         "acm:GetCertificate",
         "route53:GetHostedZone",
+        "route53:ListHostedZonesByName",
         "route53:ListResourceRecordSets",
         "route53:ListTagsForResource",
         "sesv2:GetEmailIdentity",

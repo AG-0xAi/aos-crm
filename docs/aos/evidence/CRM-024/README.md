@@ -1,14 +1,129 @@
 # CRM-024 evidence (08/11/2026)
 
 R4: static validation only, no `terraform apply`, no real AWS mutation. One
-command below (marked explicitly) reached AWS by surprise; everything else
-ran exactly as planned, with commands and exit codes transcribed from the
-real run, not written by hand afterward.
+command in round 1 below (marked explicitly) reached AWS by surprise;
+everything else ran exactly as planned, with commands and exit codes
+transcribed from the real run, not written by hand afterward.
 
 Terraform CLI used everywhere below: `hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd`
 (1.9.8, the same pinned digest `deploy/aws/README.md` and
 `AWS_DEPLOYMENT_PLAN.md` R4 already use). actionlint:
 `rhysd/actionlint:latest` (resolved to v1.7.12 at pull time).
+
+## Round 2 (08/11/2026): fix-forward on the R1/R2/R3 review findings
+
+Fixes this round: missing refresh reads in `policy.tf` (ECS, ECR, ELBv2, EC2,
+S3, Secrets Manager, Route 53), the workflow's image tag (checked-out commit,
+not `github.sha`), `inputs.ref`/`inputs.image_digest` passed through `env:`
+with format validation before any use, the SES user name in `policy.tf`'s
+comment, and the two documentation issues (the spec path and the runbook's
+missing §10). Every command below ran with the AWS environment variables the
+dispatch's hard rule requires, set in the same shell and passed with `-e` to
+every `docker run`, so none of them could reach the VM's ambient instance
+role the way round 1's command 10 did:
+
+```sh
+export AWS_EC2_METADATA_DISABLED=true AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= \
+  AWS_SESSION_TOKEN= AWS_PROFILE= AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
+```
+
+No `terraform plan` ran this round, against either stack, for any reason.
+
+### R1. `terraform fmt -check -recursive`, `init -backend=false`, `validate` -- `github-deploy-role`
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] \
+    -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" fmt -check -recursive
+```
+Exit 0, no output.
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] \
+    -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" init -backend=false
+...
+Terraform has been successfully initialized!
+```
+Exit 0.
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] \
+    -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" validate
+Success! The configuration is valid.
+```
+Exit 0.
+
+### R1. Same three checks -- `deploy/aws` (unaffected by this round's policy.tf-only change, re-run to confirm)
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" fmt -check -recursive
+```
+Exit 0, no output.
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" init -backend=false
+...
+Terraform has been successfully initialized!
+```
+Exit 0.
+
+```
+$ docker run --rm -e AWS_EC2_METADATA_DISABLED [...] -v "$PWD/deploy/aws:/w" -w /w "$TF_IMG" validate
+Success! The configuration is valid.
+```
+Exit 0.
+
+### R2. `actionlint` on the rewritten workflow
+
+```
+$ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -no-color \
+    .github/workflows/deploy-beta.yaml
+```
+Exit 0, no output: still matches Scenario R2.1 after the `env:`/commit-sha
+rewrite.
+
+### R1. Static rendering of the updated permission policy
+
+`terraform console -backend=false` was tried first
+(`echo 'data.aws_iam_policy_document.permissions.json' | docker run --rm -i
+[...] console -var=...`); it printed `(known after apply)` for that
+expression with no state present (confirmed harmless with a control
+expression, `local.ecr_repository_arn`, which *did* resolve to a concrete
+ARN in the same session) -- `terraform console` does not refresh data
+sources without a prior plan/apply, so it cannot render this data source any
+more than round 1's blocked `plan` could. `permission-policy.example.json`
+was hand-updated instead, statement by statement against this round's
+`policy.tf`, the same method round 1 used for the version it replaces; the
+new/changed statements are `EcrPushBetaRepository` (3 new actions),
+`EcsDescribeTaskDefinitionForPlanRefresh` and `EcsDescribeAndTagForPlanRefresh`
+(new), `S3ReadFilesBucketForPlanRefresh` (6 new actions),
+`SecretsManagerReadForPlanRefresh` (1 new action) and
+`NoResourceLevelPermissionReadForPlanRefresh` (3 new actions). Validated as
+well-formed JSON:
+
+```
+$ python3 -I -c "import json; json.load(open('docs/aos/evidence/CRM-024/permission-policy.example.json'))"
+```
+Exit 0, no output (valid JSON). `trust-policy.example.json` is unchanged
+this round: no edit touched `role.tf` or `data.tf`.
+
+### R4 (repeat). Privacy gate
+
+```
+$ node scripts/aos/verify-privacy.mjs
+...
+PASS: all 15 privacy checks passed.
+```
+Exit 0.
+
+### Secrets scan on `deploy/aws`
+
+```
+$ sh deploy/aws/scripts/scan-secrets.sh
+```
+Exit 0, no output (no account id, access key id, or hardcoded secret literal
+found).
+
+## Round 1 (08/11/2026)
 
 ## Important finding, read before the rest: this sandbox is NOT credential-free
 
