@@ -4,6 +4,7 @@ import { BRAND_NAME } from 'twenty-shared/constants';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath, isDefined } from 'twenty-shared/utils';
 import { Section } from 'twenty-ui/components/layout';
+import { Text } from 'twenty-ui/primitives/typography';
 import { themeCssVariables } from 'twenty-ui/theme';
 
 import { appVersionState } from '@/client-config/states/appVersionState';
@@ -45,8 +46,8 @@ export const SettingsAbout = () => {
         </Section.Root>
         <Section.Root>
           <Section.Header
-            title={t`License`}
-            description={t`Betty is free software under the GNU AGPL-3.0.`}
+            title={t`License and source code`}
+            description={t`Betty is a product of AOS Holding. Its CRM is built on Twenty, an open-source project licensed under the GNU AGPL-3.0. The changes we make to that CRM are published under the same license.`}
           />
           <StyledLink
             href={AGPL_LICENSE_URL}
@@ -75,10 +76,7 @@ export const SettingsAbout = () => {
           />
         </Section.Root>
         <Section.Root>
-          <Section.Header
-            title={t`Credits`}
-            description={t`Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license.`}
-          />
+          <Text>{t`Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding.`}</Text>
         </Section.Root>
       </SettingsPageContainer>
     </SettingsPageLayout>

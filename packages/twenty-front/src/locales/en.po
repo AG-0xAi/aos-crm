@@ -29872,13 +29872,15 @@ msgstr "Could not revoke the invitation. Please try again later."
 msgid "About Betty"
 msgstr "About Betty"
 
+#. js-lingui-id: sgezpy
 #: src/pages/settings/about/SettingsAbout.tsx
-msgid "License"
-msgstr "License"
+msgid "License and source code"
+msgstr "License and source code"
 
+#. js-lingui-id: M4Y0Jr
 #: src/pages/settings/about/SettingsAbout.tsx
-msgid "Betty is free software under the GNU AGPL-3.0."
-msgstr "Betty is free software under the GNU AGPL-3.0."
+msgid "Betty is a product of AOS Holding. Its CRM is built on Twenty, an open-source project licensed under the GNU AGPL-3.0. The changes we make to that CRM are published under the same license."
+msgstr "Betty is a product of AOS Holding. Its CRM is built on Twenty, an open-source project licensed under the GNU AGPL-3.0. The changes we make to that CRM are published under the same license."
 
 #: src/pages/settings/about/SettingsAbout.tsx
 msgid "Read the license"
@@ -29888,9 +29890,10 @@ msgstr "Read the license"
 msgid "Source code"
 msgstr "Source code"
 
+#. js-lingui-id: 8ERqKa
 #: src/pages/settings/about/SettingsAbout.tsx
-msgid "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
-msgstr "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
+msgid "Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding."
+msgstr "Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding."
 
 #. js-lingui-id: 5UJjwl
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
@@ -29926,3 +29929,4 @@ msgstr "Welcome."
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
 msgid "Skip animation"
 msgstr "Skip animation"
+
