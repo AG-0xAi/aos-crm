@@ -39,6 +39,23 @@ const skipInvitationMock = {
   },
 };
 
+const rejectAllInvitationsMock = {
+  request: {
+    query: SendInvitationsDocument,
+    variables: { emails: ['already-invited@example.com'] },
+  },
+  maxUsageCount: Number.POSITIVE_INFINITY,
+  result: {
+    data: {
+      sendInvitations: {
+        success: false,
+        errors: ['already-invited@example.com is already invited'],
+        result: [],
+      },
+    },
+  },
+};
+
 const sendOneInvitationMock = {
   request: {
     query: SendInvitationsDocument,
@@ -82,7 +99,13 @@ const renderConnectAssistantStepHook = () => {
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
       MockedProvider,
-      { mocks: [skipInvitationMock, sendOneInvitationMock] as never },
+      {
+        mocks: [
+          skipInvitationMock,
+          sendOneInvitationMock,
+          rejectAllInvitationsMock,
+        ] as never,
+      },
       createElement(
         JotaiProvider,
         { store: jotaiStore },
@@ -134,5 +157,23 @@ describe('useConnectAssistantStep', () => {
         onboardingFreeCreditsFamilyState.atomFamily(mockCurrentWorkspace.id),
       ).inviteTeam,
     ).toBe(0.5);
+  });
+
+  it('keeps the user on the step instead of advancing when every submitted email is rejected', async () => {
+    const { result } = renderConnectAssistantStepHook();
+
+    await act(async () => {
+      await result.current.completeStep(['already-invited@example.com']);
+    });
+
+    expect(jotaiStore.get(currentUserState.atom)?.onboardingStatus).toBe(
+      OnboardingStatus.INVITE_TEAM,
+    );
+    expect(result.current.isNavigating).toBe(false);
+    expect(
+      jotaiStore.get(
+        onboardingFreeCreditsFamilyState.atomFamily(mockCurrentWorkspace.id),
+      ).inviteTeam,
+    ).toBe(0);
   });
 });

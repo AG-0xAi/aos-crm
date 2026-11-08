@@ -46,6 +46,21 @@ export const useConnectAssistantStep = () => {
           result.data?.sendInvitations.result.length ?? 0;
         const invitationErrors = result.data?.sendInvitations.errors ?? [];
 
+        const allInvitationsRejected =
+          invitedTeammatesCount === 0 &&
+          isNonEmptyArray(emails) &&
+          isNonEmptyArray(invitationErrors);
+
+        if (allInvitationsRejected) {
+          enqueueToast({
+            status: 'error',
+            children: invitationErrors.join(', '),
+            duration: 5000,
+          });
+          setIsNavigating(false);
+          return;
+        }
+
         setOnboardingStepFreeCredits(
           'inviteTeam',
           getInviteTeamCreditsReward({
@@ -53,18 +68,6 @@ export const useConnectAssistantStep = () => {
             onboardingConfig: store.get(onboardingConfigState.atom),
           }),
         );
-
-        if (
-          invitedTeammatesCount === 0 &&
-          isNonEmptyArray(emails) &&
-          isNonEmptyArray(invitationErrors)
-        ) {
-          enqueueToast({
-            status: 'error',
-            children: invitationErrors.join(', '),
-            duration: 5000,
-          });
-        }
 
         if (invitedTeammatesCount > 0) {
           enqueueToast({
