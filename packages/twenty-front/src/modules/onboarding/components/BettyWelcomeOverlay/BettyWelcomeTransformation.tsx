@@ -1,3 +1,4 @@
+import { BETTY_WELCOME_TRANSFORMATION_START_MS } from '@/onboarding/components/BettyWelcomeOverlay/bettyWelcomeTimeline';
 import {
   BETTY_WORDMARK_DOT,
   BETTY_WORDMARK_GLYPHS,
@@ -31,7 +32,8 @@ const strandPath = (start: readonly [number, number]) => {
 // previous one and takes ~280ms to reach the glyph (betty-bienvenida.jsx's
 // `s0 = X + 0.5 + 0.05*i`, `ar = s0 + 0.28`), relative to this scene's start.
 const glyphTimingMs = (index: number) => {
-  const strandStartMs = 500 + 50 * index;
+  const strandStartMs =
+    BETTY_WELCOME_TRANSFORMATION_START_MS + 500 + 50 * index;
   const outlineStartMs = strandStartMs + 280;
 
   return { strandStartMs, outlineStartMs };
@@ -46,7 +48,8 @@ const StyledContainer = styled.div`
 
   // The crouch + jump that hands off from BettyWelcomeFigure (same transform
   // shape as its own jump keyframe), then holds while the strands draw.
-  animation: bettyTransformSettle 0.3s ${EASE_OUT} both;
+  animation: bettyTransformSettle 0.3s ${EASE_OUT}
+    ${BETTY_WELCOME_TRANSFORMATION_START_MS}ms both;
 
   @keyframes bettyTransformSettle {
     from {
@@ -131,10 +134,13 @@ const StyledGlyphFill = styled.path`
   }
 `;
 
+const DOT_LAND_DELAY_MS = BETTY_WELCOME_TRANSFORMATION_START_MS + 700;
+const DOT_LAND_FADE_OUT_DELAY_MS = BETTY_WELCOME_TRANSFORMATION_START_MS + 1450;
+
 const StyledLandingDot = styled.circle`
   animation:
-    bettyDotLand 450ms ${EASE_OUT} 700ms both,
-    bettyDotLandFadeOut 150ms linear 1450ms forwards;
+    bettyDotLand 450ms ${EASE_OUT} ${DOT_LAND_DELAY_MS}ms both,
+    bettyDotLandFadeOut 150ms linear ${DOT_LAND_FADE_OUT_DELAY_MS}ms forwards;
   fill: ${BRAND_COLORS.terracotta};
   opacity: 0;
   transform-origin: ${ORIGIN[0]}px ${ORIGIN[1]}px;

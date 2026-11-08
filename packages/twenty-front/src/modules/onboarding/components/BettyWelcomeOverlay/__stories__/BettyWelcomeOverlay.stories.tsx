@@ -1,6 +1,7 @@
 import { currentUserState } from '@/auth/states/currentUserState';
 import { BettyWelcomeOverlay } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay';
 import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
+import { isMinimalMetadataReadyState } from '@/metadata-store/states/isMinimalMetadataReadyState';
 import { jotaiStore } from '@/ui/utilities/state/jotai/jotaiStore';
 import { i18n } from '@lingui/core';
 import { type Meta, type StoryObj } from '@storybook/react-vite';
@@ -58,10 +59,15 @@ const BettyWelcomeOverlayExample = ({
       firstName: 'Charles',
       onboardingStatus: OnboardingStatus.COMPLETED,
     });
+    // The dashboard behind the layer is ready by the time the story mounts:
+    // the happy path, so the iris opens on schedule instead of pulsing for
+    // up to BETTY_WELCOME_IRIS_PULSE_CAP_MS.
+    jotaiStore.set(isMinimalMetadataReadyState.atom, true);
     jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
 
     return () => {
       jotaiStore.set(isBettyWelcomeVisibleState.atom, false);
+      jotaiStore.set(isMinimalMetadataReadyState.atom, false);
       i18n.activate(SOURCE_LOCALE);
       restoreMatchMedia();
     };
