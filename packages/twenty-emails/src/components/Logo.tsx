@@ -1,5 +1,9 @@
-import { Text } from 'react-email';
-import { BRAND_COLORS, BRAND_WORDMARK } from 'twenty-shared/constants';
+import { Img, Text } from 'react-email';
+import {
+  BRAND_COLORS,
+  BRAND_NAME,
+  BRAND_WORDMARK,
+} from 'twenty-shared/constants';
 import { doNotTranslate } from 'twenty-shared/i18n';
 
 const wordmarkStyle = {
@@ -16,18 +20,35 @@ const dotStyle = {
   color: BRAND_COLORS.terracotta,
 };
 
-// The wordmark is set in type rather than loaded as an image on purpose: the
-// base e-mail has no absolute URL to build an <img src> from (only two of the
-// fourteen templates receive serverUrl), and a remote image in an e-mail is
-// both a request the recipient never asked for and a read receipt. Georgia is
-// the brand manual's own e-mail serif, and the terracotta dot is the
-// distinguishing mark. Being text, it needs no alt text.
+const logoImageStyle = {
+  margin: doNotTranslate('0 0 32px 0'),
+};
+
+type LogoProps = {
+  serverUrl?: string;
+};
+
+// The approved asset, betty-wordmark-email-2x.png, needs an absolute URL --
+// only templates that receive serverUrl can build one. The typeset fallback
+// below stays for the rest: Georgia is the brand manual's own e-mail serif,
+// and the terracotta dot is the distinguishing mark. Being text, it needs no
+// alt text.
 //
-// LEAN-DEBT: the ceiling is typographic fidelity -- the approved asset is
-// betty-wordmark-email-2x.png shown at 120px. Upgrade path: thread serverUrl
-// through BaseEmail into all fourteen templates and use
-// `${serverUrl}/brand/logo/betty-wordmark-email-2x.png`.
-export const Logo = () => {
+// LEAN-DEBT: the ceiling is every template on the real asset. Upgrade path:
+// thread serverUrl through BaseEmail into the remaining twelve templates.
+export const Logo = ({ serverUrl }: LogoProps) => {
+  if (serverUrl !== undefined) {
+    return (
+      <Img
+        src={`${serverUrl}/brand/logo/betty-wordmark-email-2x.png`}
+        width={120}
+        height={59}
+        alt={BRAND_NAME}
+        style={logoImageStyle}
+      />
+    );
+  }
+
   return (
     <Text style={wordmarkStyle}>
       {BRAND_WORDMARK.replace(/\.$/, '')}

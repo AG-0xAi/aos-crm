@@ -300,6 +300,7 @@ export class SignUpInvitationService {
       duration: ms(differenceInMilliseconds(expiresAt, new Date()), {
         long: true,
       }),
+      serverUrl: this.twentyConfigService.get('SERVER_URL'),
       locale: resolvedLocale,
     });
 

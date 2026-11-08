@@ -8,6 +8,7 @@ import { HighlightedContainer } from 'src/components/HighlightedContainer';
 import { HighlightedText } from 'src/components/HighlightedText';
 import { Link } from 'src/components/Link';
 import { MainText } from 'src/components/MainText';
+import { ShadowText } from 'src/components/ShadowText';
 import { Title } from 'src/components/Title';
 import { WhatIsTwenty } from 'src/components/WhatIsTwenty';
 import { capitalize } from 'src/utils/capitalize';
@@ -44,7 +45,14 @@ export const SendInviteLinkEmail = ({
   const workspaceName = workspace.name;
 
   return (
-    <BaseEmail width={333} locale={locale}>
+    <BaseEmail
+      width={333}
+      locale={locale}
+      serverUrl={serverUrl}
+      footerNote={i18n._(
+        "You're receiving this email because you were invited to join a workspace on Betty.",
+      )}
+    >
       <Title value={i18n._('Join your team on Betty')} />
       <MainText>
         <Trans
@@ -55,7 +63,7 @@ export const SendInviteLinkEmail = ({
               <Link
                 href={`mailto:${senderEmail}`}
                 value={senderEmail}
-                color={canvasTheme.font.colors.blue}
+                color={canvasTheme.font.colors.link}
               />
             ),
             1: <b />,
@@ -77,6 +85,14 @@ export const SendInviteLinkEmail = ({
         {workspace.name ? <HighlightedText value={workspace.name} /> : <></>}
         <CallToAction href={link} value={i18n._('Accept invite')} />
       </HighlightedContainer>
+      <ShadowText>
+        <Link href={link} value={link} />
+      </ShadowText>
+      <ShadowText>
+        {i18n._(
+          'This invite is personal to you and will expire soon, for your security.',
+        )}
+      </ShadowText>
       <WhatIsTwenty i18n={i18n} />
     </BaseEmail>
   );

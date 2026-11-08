@@ -8,7 +8,7 @@ type TitleProps = {
 };
 
 const titleStyle = {
-  fontFamily: canvasTheme.font.family,
+  fontFamily: canvasTheme.font.family.serif,
   fontSize: canvasTheme.font.size.xl,
   fontWeight: canvasTheme.font.weight.bold,
   color: canvasTheme.font.colors.highlighted,

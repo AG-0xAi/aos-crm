@@ -8,7 +8,7 @@ type MainTextProps = {
 };
 
 const mainTextStyle = {
-  fontFamily: canvasTheme.font.family,
+  fontFamily: canvasTheme.font.family.sans,
   fontSize: canvasTheme.font.size.md,
   fontWeight: canvasTheme.font.weight.regular,
   color: canvasTheme.font.colors.primary,

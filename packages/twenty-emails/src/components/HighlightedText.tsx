@@ -7,6 +7,7 @@ const highlightedStyle = {
   borderRadius: canvasTheme.border.radius.sm,
   background: canvasTheme.background.colors.highlight,
   padding: '4px 8px',
+  fontFamily: canvasTheme.font.family.sans,
   fontSize: canvasTheme.font.size.lg,
   fontWeight: canvasTheme.font.weight.bold,
   color: canvasTheme.font.colors.highlighted,
