@@ -21,14 +21,9 @@ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomState
 import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
+import { useStableCallback } from '@base-ui/utils/useStableCallback';
 import { useStore } from 'jotai';
-import {
-  type CSSProperties,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Key } from 'ts-key-enum';
 import { BRAND_COLORS } from 'twenty-shared/constants';
@@ -451,17 +446,14 @@ const BettyWelcomeContent = ({
 
   // onDismiss is a new function on every render of the mount site (and every
   // parent re-render, e.g. currentUserState updating, re-renders this
-  // component too). Reading it through a ref instead of a dependency keeps
-  // the timer effect below from depending on it.
-  const onDismissRef = useRef(onDismiss);
-  useEffect(() => {
-    onDismissRef.current = onDismiss;
-  }, [onDismiss]);
+  // component too). useStableCallback keeps it callable without making the
+  // timer effect below depend on it.
+  const stableOnDismiss = useStableCallback(onDismiss);
 
   // Anchors every delay below to the moment this component mounted, so that
   // if this effect ever re-runs mid-animation (it normally only runs once
   // per mount), the remaining delays shrink instead of restarting from zero.
-  const mountTimeRef = useRef(Date.now());
+  const [mountTime] = useState(() => Date.now());
 
   // Driven imperatively off the jotai store (store.get/store.sub), not off a
   // reactive isMinimalMetadataReadyState hook value: cascading this through
@@ -469,11 +461,11 @@ const BettyWelcomeContent = ({
   // dismiss timeout in tests.
   useEffect(() => {
     const remainingMsSince = (totalMs: number) =>
-      Math.max(totalMs - (Date.now() - mountTimeRef.current), 0);
+      Math.max(totalMs - (Date.now() - mountTime), 0);
 
     if (prefersReducedMotion) {
       const timeoutId = setTimeout(
-        () => onDismissRef.current(),
+        () => stableOnDismiss(),
         remainingMsSince(BETTY_WELCOME_REDUCED_MOTION_DURATION_MS),
       );
       return () => clearTimeout(timeoutId);
@@ -492,7 +484,7 @@ const BettyWelcomeContent = ({
       setIsPulsingForDashboard(false);
       setIsIrisOpen(true);
       dismissTimeoutId = setTimeout(
-        () => onDismissRef.current(),
+        () => stableOnDismiss(),
         remainingMsSince(
           BETTY_WELCOME_IRIS_OPEN_AT_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.iris,
         ),
@@ -535,7 +527,7 @@ const BettyWelcomeContent = ({
       clearTimeout(dismissTimeoutId);
       unsubscribeFromDashboardReady?.();
     };
-  }, [prefersReducedMotion, store]);
+  }, [prefersReducedMotion, store, stableOnDismiss, mountTime]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
