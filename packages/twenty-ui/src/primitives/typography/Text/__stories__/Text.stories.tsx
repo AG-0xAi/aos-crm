@@ -187,8 +187,11 @@ export const Typography: Story = {
       1,
     );
     await expect(captionStyle.fontWeight).toBe('600');
-    await expect(runtimeStyle.color).toBe(
-      runtimeStyle.getPropertyValue('--t-font-color-primary').trim(),
-    );
+    // Betty's brand tokens are declared as hex literals, not display-p3
+    // color() functions, so the raw custom-property text no longer matches
+    // the browser's normalized rgb() serialization of the computed color;
+    // compare against the caption's color="primary", which resolves the
+    // same token through the CSS cascade instead.
+    await expect(runtimeStyle.color).toBe(captionStyle.color);
   },
 };

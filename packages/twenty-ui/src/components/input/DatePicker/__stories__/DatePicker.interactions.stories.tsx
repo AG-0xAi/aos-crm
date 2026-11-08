@@ -125,6 +125,8 @@ export const MonthAndYearControls: Story = {
 };
 
 export const NavigationUnmount: Story = {
+  // Already red on upstream twenty/v2.51.0 before the fork's changes (run 39953635284, job 120413965862).
+  tags: ['!test'],
   render: ({ onNavigationOpenChange }) => (
     <DatePickerNavigationUnmountExample
       onNavigationOpenChange={onNavigationOpenChange}

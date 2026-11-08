@@ -48,6 +48,20 @@ export const Display: Story = {
 };
 
 export const Default: Story = {
+  render: (args) => (
+    <>
+      <Skeleton {...args} data-testid="placeholder" />
+      {/* Betty's background-tertiary token is a hex literal, so its raw
+          custom-property text no longer matches the browser's normalized
+          rgb() serialization of the computed background-color; this
+          reference element resolves the same token through the CSS
+          cascade instead. */}
+      <div
+        data-testid="background-tertiary-reference"
+        style={{ backgroundColor: 'var(--t-background-tertiary)' }}
+      />
+    </>
+  ),
   play: async ({ canvas }) => {
     const placeholder = canvas.getByTestId('placeholder');
 
@@ -66,7 +80,8 @@ export const Default: Story = {
       .trim();
 
     await expect(shapeStyle.backgroundColor).toBe(
-      shapeStyle.getPropertyValue('--t-background-tertiary').trim(),
+      getComputedStyle(canvas.getByTestId('background-tertiary-reference'))
+        .backgroundColor,
     );
     await expect(highlightColor).toBe(
       shapeStyle.getPropertyValue('--t-background-transparent-lighter').trim(),
@@ -182,6 +197,7 @@ export const StaticBehavior: Story = {
 };
 
 export const Dark: Story = {
+  render: Default.render,
   play: Default.play,
   decorators: [
     (Story) => (

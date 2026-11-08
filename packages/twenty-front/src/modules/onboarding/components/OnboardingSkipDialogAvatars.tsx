@@ -70,7 +70,7 @@ export const OnboardingSkipDialogAvatars = ({
             key={`empty-seat-${emptySeatIndex}`}
             index={visibleAvatars.length + emptySeatIndex}
           >
-            <StyledEmptySeat>
+            <StyledEmptySeat role="presentation">
               <IconPlus size={theme.icon.size.sm} />
             </StyledEmptySeat>
           </OnboardingSkipDialogAvatarItem>
