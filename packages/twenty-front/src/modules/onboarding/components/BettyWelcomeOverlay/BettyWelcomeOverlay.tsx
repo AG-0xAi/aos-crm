@@ -1,17 +1,26 @@
 import { currentUserState } from '@/auth/states/currentUserState';
+import { BettyWelcomeFigure } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeFigure';
+import { BettyWelcomeTransformation } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeTransformation';
 import { focusFirstInteractiveDashboardElement } from '@/onboarding/components/BettyWelcomeOverlay/focusFirstInteractiveDashboardElement';
 import {
-  BETTY_WELCOME_DURATION_MS,
+  BETTY_WELCOME_DIM_START_MS,
+  BETTY_WELCOME_FIGURE_START_MS,
   BETTY_WELCOME_IRIS_OPEN_AT_MS,
+  BETTY_WELCOME_IRIS_PULSE_CAP_MS,
   BETTY_WELCOME_REDUCED_MOTION_DURATION_MS,
   BETTY_WELCOME_SCENE_DURATIONS_MS,
+  BETTY_WELCOME_THREAD_START_MS,
+  BETTY_WELCOME_TRANSFORMATION_START_MS,
+  BETTY_WELCOME_WELCOME_START_MS,
 } from '@/onboarding/components/BettyWelcomeOverlay/bettyWelcomeTimeline';
 import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
+import { isMinimalMetadataReadyState } from '@/metadata-store/states/isMinimalMetadataReadyState';
 import { RootStackingContextZIndices } from '@/ui/layout/constants/RootStackingContextZIndices';
 import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from 'jotai';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Key } from 'ts-key-enum';
@@ -28,17 +37,14 @@ const SANS = doNotTranslate('"Source Sans 3", system-ui, Arial, sans-serif');
 const EASE_OUT = doNotTranslate('cubic-bezier(.2,.7,.2,1)');
 const EASE_IN_OUT = doNotTranslate('cubic-bezier(.65,0,.35,1)');
 
-// Cumulative scene starts (ms), from BETTY_WELCOME_SCENE_DURATIONS_MS.
-const READY_START_MS = 0;
-const THREAD_START_MS = READY_START_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.ready;
-const FIGURE_START_MS =
-  THREAD_START_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.thread;
-const TRANSFORMATION_START_MS =
-  FIGURE_START_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.figure;
-const WELCOME_START_MS =
-  TRANSFORMATION_START_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.transformation;
-const DIM_START_MS =
-  WELCOME_START_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.welcome;
+const THREAD_START_MS = BETTY_WELCOME_THREAD_START_MS;
+const FIGURE_START_MS = BETTY_WELCOME_FIGURE_START_MS;
+const TRANSFORMATION_START_MS = BETTY_WELCOME_TRANSFORMATION_START_MS;
+const WELCOME_START_MS = BETTY_WELCOME_WELCOME_START_MS;
+const DIM_START_MS = BETTY_WELCOME_DIM_START_MS;
+// The real wordmark <img> takes over from BettyWelcomeTransformation's glyph
+// trace right as its last glyph finishes filling.
+const WORDMARK_TAKEOVER_MS = TRANSFORMATION_START_MS + 1450;
 
 const REDUCED_CARD_HOLD_MS = BETTY_WELCOME_REDUCED_MOTION_DURATION_MS * 0.24;
 const REDUCED_WELCOME_START_MS =
@@ -180,7 +186,7 @@ const StyledThread = styled.img`
   animation:
     bettyThreadIn ${BETTY_WELCOME_SCENE_DURATIONS_MS.thread}ms ${EASE_IN_OUT}
       ${THREAD_START_MS}ms forwards,
-    bettyThreadOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
+    bettyThreadLift 0.3s ${EASE_OUT} ${FIGURE_START_MS}ms forwards;
   bottom: 18%;
   left: 50%;
   opacity: 0;
@@ -200,64 +206,18 @@ const StyledThread = styled.img`
     }
   }
 
-  @keyframes bettyThreadOut {
+  /* The thread lifts into BettyWelcomeFigure's rise, rather than just vanishing. */
+  @keyframes bettyThreadLift {
     to {
       opacity: 0;
-    }
-  }
-`;
-
-const StyledThreadDot = styled.span`
-  animation:
-    bettyDotHop ${BETTY_WELCOME_SCENE_DURATIONS_MS.figure}ms ${EASE_OUT}
-      ${FIGURE_START_MS}ms forwards,
-    bettyDotOut 0.3s ${EASE_OUT} ${TRANSFORMATION_START_MS}ms forwards;
-  background: ${BRAND_COLORS.terracotta};
-  border-radius: 50%;
-  bottom: calc(18% + 10px);
-  height: 16px;
-  left: 50%;
-  opacity: 0;
-  position: absolute;
-  width: 16px;
-
-  @keyframes bettyDotHop {
-    0% {
-      opacity: 0;
-      transform: translate(-50%, 0);
-    }
-    8% {
-      opacity: 1;
-    }
-    25% {
-      transform: translate(-80px, -22px);
-    }
-    50% {
-      transform: translate(-40px, 0);
-    }
-    75% {
-      transform: translate(0, -22px);
-    }
-    92% {
-      opacity: 1;
-      transform: translate(40px, 0);
-    }
-    100% {
-      opacity: 1;
-      transform: translate(40px, 0);
-    }
-  }
-
-  @keyframes bettyDotOut {
-    to {
-      opacity: 0;
+      transform: translateX(-50%) scaleX(1) translateY(-16px) rotate(-6deg);
     }
   }
 `;
 
 const StyledWordmark = styled.img`
   animation:
-    bettyWordmarkIn 0.8s ${EASE_OUT} ${TRANSFORMATION_START_MS + 400}ms forwards,
+    bettyWordmarkIn 0.8s ${EASE_OUT} ${WORDMARK_TAKEOVER_MS}ms forwards,
     bettyWordmarkOut 0.4s ${EASE_OUT} ${DIM_START_MS}ms forwards;
   left: 50%;
   opacity: 0;
@@ -374,6 +334,31 @@ const StyledIrisRing = styled.circle`
   stroke-width: calc(7px - var(--betty-iris-radius) * 7px / 3000px);
 `;
 
+// Montage step 4 (assets/motion/betty-bienvenida-spec.md): if the dashboard
+// isn't ready when the dimming ends, the dot pulses in place (scale 1 ↔
+// 0.92, 1.2s) instead of the iris opening, for at most
+// BETTY_WELCOME_IRIS_PULSE_CAP_MS.
+const StyledPulseDot = styled.circle`
+  fill: ${BRAND_COLORS.terracotta};
+  opacity: 0;
+  transform-origin: center;
+
+  &.is-pulsing {
+    animation: bettyPulse 1.2s ${EASE_IN_OUT} infinite;
+    opacity: 1;
+  }
+
+  @keyframes bettyPulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(0.92);
+    }
+  }
+`;
+
 // Always opaque, so the real page behind the layer never bleeds through
 // between the reduced-motion phases' fades (which only animate what's on
 // top of it).
@@ -447,7 +432,16 @@ const BettyWelcomeContent = ({
 }: BettyWelcomeContentProps) => {
   const { t } = useLingui();
   const [isIrisOpen, setIsIrisOpen] = useState(false);
+  // Set once the dimming has finished and the dashboard isn't ready yet: the
+  // dot pulses (montage step 4) until the dashboard store subscription below
+  // opens the iris, or the cap timer forces it open.
+  const [isPulsingForDashboard, setIsPulsingForDashboard] = useState(false);
+  const store = useStore();
 
+  // Driven imperatively off the jotai store (store.get/store.sub), not off a
+  // reactive isMinimalMetadataReadyState hook value: cascading this through
+  // React state + dependent effects raced against the fake-timer-driven
+  // dismiss timeout in tests.
   useEffect(() => {
     if (prefersReducedMotion) {
       const timeoutId = setTimeout(
@@ -457,18 +451,47 @@ const BettyWelcomeContent = ({
       return () => clearTimeout(timeoutId);
     }
 
-    const irisTimeoutId = setTimeout(
-      () => setIsIrisOpen(true),
-      BETTY_WELCOME_IRIS_OPEN_AT_MS,
+    let hasOpened = false;
+    let unsubscribeFromDashboardReady: (() => void) | undefined;
+
+    const openIris = () => {
+      if (hasOpened) {
+        return;
+      }
+      hasOpened = true;
+      unsubscribeFromDashboardReady?.();
+      setIsPulsingForDashboard(false);
+      setIsIrisOpen(true);
+      setTimeout(onDismiss, BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+    };
+
+    const dimmingDoneTimeoutId = setTimeout(() => {
+      if (store.get(isMinimalMetadataReadyState.atom)) {
+        openIris();
+        return;
+      }
+      setIsPulsingForDashboard(true);
+      unsubscribeFromDashboardReady = store.sub(
+        isMinimalMetadataReadyState.atom,
+        () => {
+          if (store.get(isMinimalMetadataReadyState.atom)) {
+            openIris();
+          }
+        },
+      );
+    }, BETTY_WELCOME_IRIS_OPEN_AT_MS);
+
+    const pulseCapTimeoutId = setTimeout(
+      openIris,
+      BETTY_WELCOME_IRIS_OPEN_AT_MS + BETTY_WELCOME_IRIS_PULSE_CAP_MS,
     );
 
-    const dismissTimeoutId = setTimeout(onDismiss, BETTY_WELCOME_DURATION_MS);
-
     return () => {
-      clearTimeout(irisTimeoutId);
-      clearTimeout(dismissTimeoutId);
+      clearTimeout(dimmingDoneTimeoutId);
+      clearTimeout(pulseCapTimeoutId);
+      unsubscribeFromDashboardReady?.();
     };
-  }, [prefersReducedMotion, onDismiss]);
+  }, [prefersReducedMotion, onDismiss, store]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -600,6 +623,7 @@ const BettyWelcomeContent = ({
       ) : (
         <StyledScene
           aria-hidden="true"
+          data-testid={doNotTranslate('betty-welcome-scene')}
           className={isIrisOpen ? 'is-open' : undefined}
         >
           <StyledBackdrop />
@@ -608,12 +632,19 @@ const BettyWelcomeContent = ({
             {cardContent}
           </StyledCard>
           <StyledThread src={threadSrc} alt="" aria-hidden="true" />
-          <StyledThreadDot />
+          <BettyWelcomeFigure />
+          <BettyWelcomeTransformation />
           <StyledWordmark src={wordmarkSrc} alt={wordmarkAlt} />
           <StyledGreeting>{greeting}</StyledGreeting>
           <StyledSignature src={signatureSrc} alt="" aria-hidden="true" />
           <StyledIrisRingLayer>
             <StyledIrisRing cx="50%" cy="50%" />
+            <StyledPulseDot
+              cx="50%"
+              cy="50%"
+              r={28}
+              className={isPulsingForDashboard ? 'is-pulsing' : undefined}
+            />
           </StyledIrisRingLayer>
         </StyledScene>
       )}
