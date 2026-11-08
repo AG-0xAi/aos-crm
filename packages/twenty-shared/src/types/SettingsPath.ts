@@ -110,4 +110,6 @@ export enum SettingsPath {
   Legal = 'legal',
   LegalDpa = 'legal/dpa',
   LegalDpaNew = 'legal/dpa/new',
+
+  About = 'about',
 }

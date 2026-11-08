@@ -1,7 +1,6 @@
 import { styled } from '@linaria/react';
 import { Trans } from '@lingui/react/macro';
 
-import { LicenseNotice } from '@/auth/sign-in-up/components/LicenseNotice';
 import { useWorkspaceBypass } from '@/auth/sign-in-up/hooks/useWorkspaceBypass';
 import { useIsCurrentLocationOnAWorkspace } from '@/domain-manager/hooks/useIsCurrentLocationOnAWorkspace';
 import { ONBOARDING_CONTENT_BLOCK_WIDTH } from '@/onboarding/constants/OnboardingContentBlockWidth';
@@ -86,7 +85,6 @@ export const FooterNote = () => {
           </a>
           .
         </StyledCopyContainer>
-        <LicenseNotice />
       </StyledFooter>
     );
   }
@@ -110,7 +108,6 @@ export const FooterNote = () => {
           <Trans>Terms of Service</Trans>
         </a>
       </StyledLinksContainer>
-      <LicenseNotice />
     </StyledFooter>
   );
 };

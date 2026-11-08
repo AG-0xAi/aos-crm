@@ -5,15 +5,21 @@
 // What it measures, in a real headless Chromium with its sandbox ON:
 //  - public   : the unauthenticated sign-in/sign-up page. The document title,
 //               the favicon and the default logo this deployment paints, the
-//               legal links pointing at betty.management, the AGPL notice, and
-//               no "Twenty" in any text a visitor can read or any image the
-//               page paints. The brand is NOT asserted as body text: on a
-//               workspace host this screen greets with the workspace name,
-//               which is upstream's design and correct.
-//  - settings : Settings > AI > MCP. The "Connect your assistant" card at the
-//               top, Claude's prefilled link (or its stated absence), the
+//               legal links pointing at betty.management, and no "Twenty" in
+//               any text a visitor can read or any image the page paints. The
+//               brand is NOT asserted as body text: on a workspace host this
+//               screen greets with the workspace name, which is upstream's
+//               design and correct. The AGPL notice is no longer here: CRM-026
+//               moved it to Settings > About Betty, asserted in the settings
+//               phase below, because it must stay reachable by every signed-in
+//               user (AGPL section 13), not only a visitor who has not signed
+//               in yet.
+//  - settings : Settings > AI > MCP (the "Connect your assistant" card at the
+//               top, Claude's prefilled link or its stated absence, the
 //               ChatGPT steps, the workspace's own MCP URL, and the absence of
-//               the card for Twenty's hosted ChatGPT app.
+//               the card for Twenty's hosted ChatGPT app) and Settings > About
+//               Betty (the AGPL notice, with the source of the deployed
+//               version or a stated absence).
 //  - navigation: the settings navigation. Community gone, Documentation hidden
 //               while HELP_CENTER_URL is unset, and no "Twenty" in the drawer.
 //  - authorize : the OAuth consent screen a connector sends the user to. The
@@ -211,13 +217,6 @@ async function runPublicPhase(page) {
     hrefs.join(' | ').slice(0, 300),
   );
   record(
-    'the AGPL notice is shown, with the source of the deployed version or a stated absence',
-    /AGPL-3\.0/.test(text) &&
-      (/Source code \(/.test(text) ||
-        /source code link not configured/.test(text)),
-    text.slice(-300),
-  );
-  record(
     'no link leaves for a Twenty-owned host',
     !hrefs.some((href) => /\btwenty(hq|-[a-z]+)?\b[a-z0-9.-]*\.[a-z]{2,}/i.test(href ?? '')),
     hrefs.filter((href) => /twenty/i.test(href ?? '')).join(' | '),
@@ -290,6 +289,22 @@ async function runSettingsPhase(page) {
       text.slice(0, 400),
     );
   }
+
+  // CRM-026: the AGPL notice moved off the public sign-in page to here, so
+  // every signed-in user (not just a visitor) can reach the source offer.
+  await page.goto(`${BASE_URL}/settings/about`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const aboutText = await visibleText(page);
+
+  record(
+    'the AGPL notice is shown on Settings > About Betty, with the source of the deployed version or a stated absence',
+    /AGPL-3\.0/.test(aboutText) &&
+      (/Source code \(/.test(aboutText) ||
+        /source code link not configured/.test(aboutText)),
+    aboutText.slice(0, 600),
+  );
 }
 
 async function runNavigationPhase(page) {
