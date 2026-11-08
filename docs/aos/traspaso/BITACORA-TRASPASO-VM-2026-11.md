@@ -648,3 +648,27 @@ Todos vienen de cambios nuestros sobre `twenty/v2.51.0`. El gate local no ejecut
 
 **Siguiente**
 - Esperar el alta en la coordinación y seguir el primer run en la VM.
+
+## 2026-11-08 · Fase 4 · Primeros despachos en la VM
+
+**Hecho**
+- Leída la coordinación de 01:15Z y 01:35Z: alta del bus, línea `betty/factory`, panel, S-00 en modo «acepta y rescata» y workers encendidos con tope de 2. Andrés lo confirmó también en este chat: «Yes, turn them on».
+- `crm015/sin-tope-espacios` subida a `origin` con el override del traspaso para seguirla en la VM. Solo existía en el PC.
+- **CRM-015**, fix-forward despachado en la VM (`--model claude-sonnet-5 --slice S`). Brief en `.aos/onboarding/CRM-015-fix-brief-vm.md`:
+  - fusionar `betty/factory`, con el conflicto de formato en `sign-in-up.service.ts`;
+  - commitear la evidencia e2e en `docs/aos/evidence/CRM-015-e2e-2026-11-08.md`, porque el revisor no lee `.aos/reports/`;
+  - pasar lint, typecheck y unit.
+  - El alcance del contrato añade `docs/aos/evidence/CRM-015-*`.
+- **CRM-022** (bienvenida de Betty) despachado en la VM (`--slice M`):
+  - brief adaptado a Linux en `.aos/onboarding/bienvenida-2026-11-07/CRM-022-brief-vm.md`;
+  - el contrato cambia R4: las pruebas las corren el gate de la VM y la CI; capturas de la historia de Storybook en Chromium, commiteadas en `docs/aos/evidence/CRM-022/`; las capturas del alta real, después del despliegue;
+  - fuera del alcance, `scripts/aos/verify-front-icons.mjs`.
+
+**Verificado (cómo)**
+- `aos-betty status`: run de CRM-015 `running (agente)`, vivo e `identidad-coincidente`. Evento `dispatch.created` de CRM-022.
+
+**Bloqueo o pido**
+- CRM-017 (correo con SES): el S-00 lo escala porque su último retorno, del 30/10, es `BLOCKED_PROTOCOL_VIOLATION`. Su Terraform ya está en `betty/factory`, y el R3 del contrato (verificación forzada) quedó como variable por etapas por decisión de Andrés. Lo reviso y propongo cómo cerrarlo; no lo acepto a ciegas.
+
+**Siguiente**
+- Retornos de CRM-015 y CRM-022; después, CRM-021.
