@@ -216,7 +216,8 @@ export class SignUpInvitationService {
       .update(AppTokenEntity)
       .set({
         revokedAt: now,
-        context: () => `coalesce("context", '{}'::jsonb) || :consumption::jsonb`,
+        context: () =>
+          `coalesce("context", '{}'::jsonb) || :consumption::jsonb`,
       })
       .where('id = :invitationId', { invitationId })
       .andWhere('type = :type', { type: AppTokenType.SignUpInvitationToken })

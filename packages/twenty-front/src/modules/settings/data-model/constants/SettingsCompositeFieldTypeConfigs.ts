@@ -1,4 +1,3 @@
-import { BRAND_DOMAIN, BRAND_NAME } from 'twenty-shared/constants';
 import { type MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { COMPOSITE_FIELD_SUB_FIELD_LABEL_MESSAGES } from '@/settings/data-model/constants/CompositeFieldSubFieldLabelMessages';
@@ -15,6 +14,8 @@ import {
 import { type SettingsFieldTypeConfig } from '@/settings/data-model/constants/SettingsNonCompositeFieldTypeConfigs';
 import { type CompositeFieldType } from '@/settings/data-model/types/CompositeFieldType';
 import {
+  BRAND_DOMAIN,
+  BRAND_NAME,
   COMPOSITE_FIELD_TYPE_SUB_FIELDS_NAMES,
   CurrencyCode,
 } from 'twenty-shared/constants';

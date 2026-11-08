@@ -1,14 +1,15 @@
 import { Text } from 'react-email';
 import { BRAND_COLORS, BRAND_WORDMARK } from 'twenty-shared/constants';
+import { doNotTranslate } from 'twenty-shared/i18n';
 
 const wordmarkStyle = {
   color: BRAND_COLORS.charcoal,
-  fontFamily: 'Georgia, "Times New Roman", serif',
+  fontFamily: doNotTranslate('Georgia, "Times New Roman", serif'),
   fontSize: '28px',
   fontWeight: 400,
   letterSpacing: '-0.02em',
   lineHeight: '32px',
-  margin: '0 0 40px 0',
+  margin: doNotTranslate('0 0 40px 0'),
 };
 
 const dotStyle = {

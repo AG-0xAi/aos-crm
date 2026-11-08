@@ -76,7 +76,9 @@ const buildService = ({
 
       store.set(id, saved);
 
-      return entity.id === undefined ? { ...saved, createdAt: undefined } : { id };
+      return entity.id === undefined
+        ? { ...saved, createdAt: undefined }
+        : { id };
     }),
     update: jest.fn(async (id: string, patch: Partial<AppTokenEntity>) => {
       const existing = store.get(id);
@@ -170,8 +172,10 @@ describe('SignUpInvitationService', () => {
         }),
       ).resolves.toBeDefined();
 
-      const where = appTokenRepository.findOne.mock.calls[0][0]
-        .where as Record<string, unknown>;
+      const where = appTokenRepository.findOne.mock.calls[0][0].where as Record<
+        string,
+        unknown
+      >;
 
       expect(where.value).toBe(hashSignUpInvitationToken(PLAIN_TOKEN));
       expect(where.value).not.toBe(PLAIN_TOKEN);
@@ -316,9 +320,9 @@ describe('SignUpInvitationService', () => {
       });
       const { service, emailService } = buildService({ rows: [redeemed] });
 
-      await expect(
-        service.resend({ id: INVITATION_ID }),
-      ).rejects.toMatchObject({ code: AuthExceptionCode.INVALID_INPUT });
+      await expect(service.resend({ id: INVITATION_ID })).rejects.toMatchObject(
+        { code: AuthExceptionCode.INVALID_INPUT },
+      );
       expect(emailService.send).not.toHaveBeenCalled();
     });
 
@@ -327,14 +331,16 @@ describe('SignUpInvitationService', () => {
         rows: [liveInvitation({ revokedAt: new Date() })],
       });
 
-      await expect(
-        service.resend({ id: INVITATION_ID }),
-      ).rejects.toMatchObject({ code: AuthExceptionCode.INVALID_INPUT });
+      await expect(service.resend({ id: INVITATION_ID })).rejects.toMatchObject(
+        { code: AuthExceptionCode.INVALID_INPUT },
+      );
       expect(emailService.send).not.toHaveBeenCalled();
     });
 
     it('rotates the token in place when it resends an expired invitation', async () => {
-      const expired = liveInvitation({ expiresAt: new Date(Date.now() - 1000) });
+      const expired = liveInvitation({
+        expiresAt: new Date(Date.now() - 1000),
+      });
       const { service, emailService, store } = buildService({
         rows: [expired],
       });

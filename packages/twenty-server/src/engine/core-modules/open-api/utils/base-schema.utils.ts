@@ -131,8 +131,7 @@ curl -H 'Authorization: Bearer <token>' \\
   ${serverUrl}/${ApiPath.Rest}/open-api/${schemaName} > betty-${schemaName}.json
 \`\`\`
 `,
-      termsOfService:
-        BRAND_SOURCE_CODE_URL,
+      termsOfService: BRAND_SOURCE_CODE_URL,
       contact: {
         email: `hola@${BRAND_DOMAIN}`,
       },

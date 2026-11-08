@@ -1267,6 +1267,7 @@ type ClientConfig {
   defaultSubdomain: String
   enterpriseInstanceType: String!
   frontDomain: String!
+  helpCenterUrl: String
   isAttachmentPreviewEnabled: Boolean!
   isBookCallOnboardingStepEnabled: Boolean!
   isClickHouseConfigured: Boolean!
@@ -1290,6 +1291,7 @@ type ClientConfig {
   sentry: Sentry!
   serverUrl: String!
   signInPrefilled: Boolean!
+  sourceCodeUrl: String
   support: Support!
 }
 
@@ -3334,7 +3336,7 @@ type Mutation {
   setResourceCreditSubscriptionPrice(priceId: String!): BillingUpdate!
   signIn(captchaToken: String, email: String!, locale: String, password: String!, verifyEmailRedirectPath: String): AvailableWorkspacesAndAccessTokens!
   signOut(refreshToken: String): Boolean!
-  signUp(captchaToken: String, email: String!, locale: String, password: String!, verifyEmailRedirectPath: String): AvailableWorkspacesAndAccessTokens!
+  signUp(captchaToken: String, email: String!, locale: String, password: String!, signUpInvitationToken: String, verifyEmailRedirectPath: String): AvailableWorkspacesAndAccessTokens!
   signUpInNewWorkspace(input: SignUpInNewWorkspaceInput): SignUp!
   signUpInWorkspace(captchaToken: String, email: String!, locale: String, password: String!, verifyEmailRedirectPath: String, workspaceId: UUID, workspaceInviteHash: String, workspacePersonalInviteToken: String): SignUp!
   skipSyncEmailOnboardingStep(isAutoSkipped: Boolean! = false): OnboardingStepSuccess!
@@ -4571,6 +4573,7 @@ type SignUp {
 input SignUpInNewWorkspaceInput {
   displayName: String
   partner: String
+  signUpInvitationToken: String
   subdomain: String
 }
 
