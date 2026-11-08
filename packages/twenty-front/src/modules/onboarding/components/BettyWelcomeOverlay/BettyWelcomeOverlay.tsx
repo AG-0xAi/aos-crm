@@ -3,10 +3,12 @@ import { currentUserState } from '@/auth/states/currentUserState';
 import { BettyWelcomeFigure } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeFigure';
 import { BettyWelcomeTransformation } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeTransformation';
 import { focusFirstInteractiveDashboardElement } from '@/onboarding/components/BettyWelcomeOverlay/focusFirstInteractiveDashboardElement';
+import { useStableCallback } from '@/onboarding/components/BettyWelcomeOverlay/useStableCallback';
 import {
   BETTY_WELCOME_DIM_START_MS,
   BETTY_WELCOME_FIGURE_START_MS,
   BETTY_WELCOME_IRIS_OPEN_AT_MS,
+  BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS,
   BETTY_WELCOME_IRIS_PULSE_CAP_MS,
   BETTY_WELCOME_REDUCED_MOTION_DURATION_MS,
   BETTY_WELCOME_SCENE_DURATIONS_MS,
@@ -21,7 +23,6 @@ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomState
 import { useSetAtomState } from '@/ui/utilities/state/jotai/hooks/useSetAtomState';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
-import { useStableCallback } from '@base-ui/utils/useStableCallback';
 import { useStore } from 'jotai';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -91,7 +92,8 @@ const StyledScene = styled.div`
 
   height: 100%;
   position: relative;
-  transition: --betty-iris-radius 0.8s ${EASE_IN_OUT};
+  transition: --betty-iris-radius ${BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS}ms
+    ${EASE_IN_OUT};
   width: 100%;
 
   &.is-open {
@@ -483,11 +485,12 @@ const BettyWelcomeContent = ({
       unsubscribeFromDashboardReady?.();
       setIsPulsingForDashboard(false);
       setIsIrisOpen(true);
+      // Fixed delay from now, not anchored to mount: the iris can open late
+      // (dashboard-ready pulse or the pulse cap), and the dismiss always
+      // waits for the CSS transition to actually finish from that moment.
       dismissTimeoutId = setTimeout(
         () => stableOnDismiss(),
-        remainingMsSince(
-          BETTY_WELCOME_IRIS_OPEN_AT_MS + BETTY_WELCOME_SCENE_DURATIONS_MS.iris,
-        ),
+        BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS,
       );
     };
 

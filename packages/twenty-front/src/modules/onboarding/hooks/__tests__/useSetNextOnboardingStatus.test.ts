@@ -383,15 +383,67 @@ describe('useSetNextOnboardingStatus', () => {
     // beforeEach's resetJotaiStore() already gives this test a fresh store
     // and cleared storage, standing in for a page reload: currentUserState
     // is hydrated the same way it would be from a fresh server fetch after
-    // reload, still at PROFILE_CREATION, and onboarding is then completed
-    // normally from there.
-    const { nextOnboardingStatus, isBettyWelcomeVisible } = renderHooks(
-      OnboardingStatus.PROFILE_CREATION,
-      { withOneWorkspaceMember: false },
+    // reload, still at PROFILE_CREATION. isBettyWelcomeVisibleState is a
+    // session-only atom, so it must come back false right after that
+    // hydration, before onboarding is completed normally from there.
+    const { result } = renderHook(
+      () => {
+        const setCurrentUser = useSetAtomState(currentUserState);
+        const setCurrentUserWorkspace = useSetAtomState(
+          currentUserWorkspaceState,
+        );
+        const setCurrentWorkspace = useSetAtomState(currentWorkspaceState);
+        const setBilling = useSetAtomState(billingState);
+        const setNextOnboardingStatus = useSetNextOnboardingStatus();
+        const currentUser = useAtomStateValue(currentUserState);
+        const isBettyWelcomeVisible = useAtomStateValue(
+          isBettyWelcomeVisibleState,
+        );
+        return {
+          currentUser,
+          setCurrentUser,
+          setCurrentWorkspace,
+          setCurrentUserWorkspace,
+          setBilling,
+          setNextOnboardingStatus,
+          isBettyWelcomeVisible,
+        };
+      },
+      { wrapper: Wrapper },
     );
 
-    expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
-    expect(isBettyWelcomeVisible).toBe(true);
+    act(() => {
+      result.current.setCurrentUser({
+        ...mockedUserData,
+        onboardingStatus: OnboardingStatus.PROFILE_CREATION,
+      });
+      result.current.setCurrentUserWorkspace(
+        mockedUserData.currentUserWorkspace,
+      );
+      result.current.setCurrentWorkspace({
+        ...mockCurrentWorkspace,
+        billingSubscriptions: [],
+        workspaceMembersCount: 2,
+      });
+      result.current.setBilling({
+        __typename: 'Billing',
+        isBillingEnabled: false,
+        trialPeriods: [],
+      });
+    });
+
+    expect(result.current.isBettyWelcomeVisible).toBe(false);
+
+    act(() => {
+      result.current.setNextOnboardingStatus({
+        stepHistoryEffect: 'leaveUnchanged',
+      });
+    });
+
+    expect(result.current.currentUser?.onboardingStatus).toEqual(
+      OnboardingStatus.COMPLETED,
+    );
+    expect(result.current.isBettyWelcomeVisible).toBe(true);
   });
 
   it("should never trigger Twenty's own welcome animation, only Betty's, when onboarding completes", () => {

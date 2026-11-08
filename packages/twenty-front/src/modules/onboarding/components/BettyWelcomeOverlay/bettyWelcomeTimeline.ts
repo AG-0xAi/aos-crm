@@ -43,5 +43,11 @@ export const BETTY_WELCOME_IRIS_OPEN_AT_MS =
 // montage step 4: "como máximo 4 s y luego abrir igualmente").
 export const BETTY_WELCOME_IRIS_PULSE_CAP_MS = 4000;
 
+// How long the --betty-iris-radius CSS transition (StyledScene) takes to
+// reveal the dashboard once the iris starts opening. The dismiss timeout is
+// counted from the moment the iris actually opens, not from mount, since the
+// iris can open late (dashboard-ready pulse or pulse cap).
+export const BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS = 800;
+
 // prefers-reduced-motion: same sequence, fades only, ~2.5s (assets/motion/betty-bienvenida-spec.md «Accesibilidad»).
 export const BETTY_WELCOME_REDUCED_MOTION_DURATION_MS = 2500;

@@ -12,8 +12,8 @@ import { BettyWelcomeOverlay } from '@/onboarding/components/BettyWelcomeOverlay
 import {
   BETTY_WELCOME_DURATION_MS,
   BETTY_WELCOME_IRIS_OPEN_AT_MS,
+  BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS,
   BETTY_WELCOME_IRIS_PULSE_CAP_MS,
-  BETTY_WELCOME_SCENE_DURATIONS_MS,
 } from '@/onboarding/components/BettyWelcomeOverlay/bettyWelcomeTimeline';
 import { isBettyWelcomeVisibleState } from '@/onboarding/states/isBettyWelcomeVisibleState';
 import { isMinimalMetadataReadyState } from '@/metadata-store/states/isMinimalMetadataReadyState';
@@ -253,7 +253,69 @@ describe('BettyWelcomeOverlay', () => {
     );
   });
 
-  it('should open the iris at the cap when the dashboard never becomes ready', () => {
+  it('should open the iris on time and dismiss the layer 0.8s after opening when the dashboard is already ready', () => {
+    jest.useFakeTimers();
+    jotaiStore.set(isMinimalMetadataReadyState.atom, true);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_AT_MS);
+    });
+
+    expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS - 1);
+    });
+
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+
+    expect(queryTitleHeading()).not.toBeInTheDocument();
+  });
+
+  it('should open the iris when the dashboard becomes ready mid-pulse and dismiss the layer 0.8s after that', () => {
+    jest.useFakeTimers();
+    jotaiStore.set(isMinimalMetadataReadyState.atom, false);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_AT_MS + 2000);
+    });
+
+    expect(screen.getByTestId('betty-welcome-scene')).not.toHaveClass(
+      'is-open',
+    );
+
+    act(() => {
+      jotaiStore.set(isMinimalMetadataReadyState.atom, true);
+    });
+
+    expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS - 1);
+    });
+
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+
+    expect(queryTitleHeading()).not.toBeInTheDocument();
+  });
+
+  it('should open the iris at the cap and dismiss the layer 0.8s after that when the dashboard never becomes ready', () => {
     jest.useFakeTimers();
     jotaiStore.set(isMinimalMetadataReadyState.atom, false);
     jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
@@ -270,24 +332,16 @@ describe('BettyWelcomeOverlay', () => {
     expect(queryTitleHeading()).toBeInTheDocument();
 
     act(() => {
-      jest.advanceTimersByTime(BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS - 1);
+    });
+
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
     });
 
     expect(queryTitleHeading()).not.toBeInTheDocument();
-  });
-
-  it('should open the iris right away when the dashboard is already ready before the dimming ends', () => {
-    jest.useFakeTimers();
-    jotaiStore.set(isMinimalMetadataReadyState.atom, true);
-    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
-
-    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
-
-    act(() => {
-      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_AT_MS);
-    });
-
-    expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
   });
 
   it('keeps the iris and dismiss timers anchored to mount when a parent re-render recreates onDismiss mid-animation', () => {
@@ -327,7 +381,7 @@ describe('BettyWelcomeOverlay', () => {
     expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
 
     act(() => {
-      jest.advanceTimersByTime(BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS);
     });
 
     expect(queryTitleHeading()).not.toBeInTheDocument();
@@ -362,7 +416,7 @@ describe('BettyWelcomeOverlay', () => {
     expect(queryTitleHeading()).toBeInTheDocument();
 
     act(() => {
-      jest.advanceTimersByTime(BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_TRANSITION_MS);
     });
 
     expect(queryTitleHeading()).toBeInTheDocument();
