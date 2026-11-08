@@ -50,6 +50,11 @@ data "aws_iam_policy_document" "permissions" {
       "ecr:GetDownloadUrlForLayer",
       "ecr:DescribeRepositories",
       "ecr:DescribeImages",
+      # Reads terraform plan/apply needs to refresh aws_ecr_repository and
+      # aws_ecr_lifecycle_policy (ecr.tf), scoped to the same repository.
+      "ecr:ListTagsForResource",
+      "ecr:GetLifecyclePolicy",
+      "ecr:GetRepositoryPolicy",
     ]
     resources = [local.ecr_repository_arn]
   }
@@ -118,6 +123,37 @@ data "aws_iam_policy_document" "permissions" {
   # --- READ: only so terraform plan/apply can refresh the rest of
   #     deploy/aws's state. Describe/Get/List only, never a write verb. ------
 
+  # ecs:DescribeTaskDefinition has no resource type in ECS's IAM reference
+  # (same story as ecs:RegisterTaskDefinition above): every task definition
+  # refresh -- migrate, server and worker -- needs this on "*". Read-only,
+  # no write verb rides on it.
+  statement {
+    sid       = "EcsDescribeTaskDefinitionForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["ecs:DescribeTaskDefinition"]
+    resources = ["*"]
+  }
+
+  # ecs:DescribeClusters and ecs:ListTagsForResource support resource-level
+  # permissions (cluster/service/task-definition ARNs), so they are scoped by
+  # name prefix like every other beta-only grant. ecs:TagResource rides along
+  # scoped to the same resources: apply would need it the moment any of these
+  # resources gets a `tags` block, and it is a write, so it never goes on "*".
+  statement {
+    sid    = "EcsDescribeAndTagForPlanRefresh"
+    effect = "Allow"
+    actions = [
+      "ecs:DescribeClusters",
+      "ecs:ListTagsForResource",
+      "ecs:TagResource",
+    ]
+    resources = [
+      local.ecs_cluster_arn,
+      local.ecs_service_arn_pattern,
+      local.ecs_task_definition_arn_pattern,
+    ]
+  }
+
   statement {
     sid    = "IamReadBetaTaskRolesForPlanRefresh"
     effect = "Allow"
@@ -132,7 +168,7 @@ data "aws_iam_policy_document" "permissions" {
     resources = [local.ecs_task_role_arn_pattern]
   }
 
-  # ses.tf also creates an IAM user (aos_crm_${app_environment}-ses-smtp) and
+  # ses.tf also creates an IAM user (aos-crm-${app_environment}-ses-smtp) and
   # its access key. Reading them for plan refresh is fine; creating either
   # is not (R1's own exclusion) and no Create*/Delete* action appears here.
   statement {
@@ -178,15 +214,25 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
+  # aws_s3_bucket's own Read (s3.tf) still calls every one of these Get*
+  # actions regardless of which sub-resources are actually declared
+  # (ACL/CORS/lifecycle/logging/ownership-controls/website have no Terraform
+  # resource here, but the provider reads them on every refresh anyway).
   statement {
     sid    = "S3ReadFilesBucketForPlanRefresh"
     effect = "Allow"
     actions = [
+      "s3:GetBucketAcl",
+      "s3:GetBucketCORS",
       "s3:GetBucketPolicy",
       "s3:GetBucketVersioning",
       "s3:GetEncryptionConfiguration",
+      "s3:GetBucketLogging",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetBucketOwnershipControls",
       "s3:GetBucketPublicAccessBlock",
       "s3:GetBucketTagging",
+      "s3:GetBucketWebsite",
       "s3:ListBucket",
     ]
     resources = ["arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"]
@@ -199,6 +245,10 @@ data "aws_iam_policy_document" "permissions" {
       "secretsmanager:DescribeSecret",
       "secretsmanager:GetResourcePolicy",
       "secretsmanager:ListSecretVersionIds",
+      # aws_secretsmanager_secret_version's own Read (secrets.tf, ses.tf) calls
+      # GetSecretValue to detect drift on secret_string -- needed on refresh,
+      # not just on apply.
+      "secretsmanager:GetSecretValue",
     ]
     resources = ["arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:aos-crm/${var.app_environment}/*"]
   }
@@ -239,25 +289,33 @@ data "aws_iam_policy_document" "permissions" {
     effect = "Allow"
     actions = [
       "ec2:DescribeVpcs",
+      "ec2:DescribeVpcAttribute",
       "ec2:DescribeSubnets",
       "ec2:DescribeInternetGateways",
       "ec2:DescribeNatGateways",
       "ec2:DescribeAddresses",
+      "ec2:DescribeNetworkInterfaces",
       "ec2:DescribeRouteTables",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSecurityGroupRules",
       "ec2:DescribeAvailabilityZones",
       "ec2:DescribeTags",
       "elasticloadbalancing:DescribeLoadBalancers",
+      "elasticloadbalancing:DescribeLoadBalancerAttributes",
       "elasticloadbalancing:DescribeListeners",
       "elasticloadbalancing:DescribeRules",
       "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:DescribeTargetGroupAttributes",
       "elasticloadbalancing:DescribeTargetHealth",
       "elasticloadbalancing:DescribeTags",
       "acm:DescribeCertificate",
       "acm:ListTagsForCertificate",
       "acm:GetCertificate",
       "route53:GetHostedZone",
+      # data.aws_route53_zone (data.tf) looks the zone up by domain name when
+      # var.route53_zone_id is null -- that lookup is this action, before any
+      # zone id (and therefore any GetHostedZone resource scope) is known.
+      "route53:ListHostedZonesByName",
       "route53:ListResourceRecordSets",
       "route53:ListTagsForResource",
       "sesv2:GetEmailIdentity",
