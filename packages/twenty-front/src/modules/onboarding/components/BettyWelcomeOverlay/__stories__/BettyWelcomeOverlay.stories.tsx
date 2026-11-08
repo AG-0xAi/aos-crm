@@ -57,6 +57,7 @@ const BettyWelcomeOverlayExample = ({
     jotaiStore.set(currentUserState.atom, {
       ...mockedUserData,
       firstName: 'Charles',
+      isWorkspaceCreator: true,
       onboardingStatus: OnboardingStatus.COMPLETED,
     });
     // The dashboard behind the layer is ready by the time the story mounts:

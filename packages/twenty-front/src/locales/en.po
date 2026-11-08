@@ -29882,10 +29882,10 @@ msgstr "Source code"
 msgid "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
 msgstr "Betty is based on Twenty (twentyhq/twenty), licensed under the GNU AGPL-3.0, with some files under a commercial license."
 
-#. js-lingui-id: 3xCOEd
+#. js-lingui-id: 5UJjwl
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
-msgid "Initial setup · 3 of 3"
-msgstr "Initial setup · 3 of 3"
+msgid "Initial setup · {stepCount} of {stepCount}"
+msgstr "Initial setup · {stepCount} of {stepCount}"
 
 #. js-lingui-id: Gq+sma
 #: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx

@@ -1,3 +1,4 @@
+import { myConnectedAccountsState } from '@/accounts/states/myConnectedAccountsState';
 import { currentUserState } from '@/auth/states/currentUserState';
 import { BettyWelcomeFigure } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeFigure';
 import { BettyWelcomeTransformation } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeTransformation';
@@ -425,6 +426,8 @@ const StyledReducedCard = styled.div`
 
 type BettyWelcomeContentProps = {
   firstName: string | null | undefined;
+  isWorkspaceCreator: boolean;
+  hasConnectedAccount: boolean;
   lang: 'es' | 'en';
   prefersReducedMotion: boolean;
   onDismiss: () => void;
@@ -432,6 +435,8 @@ type BettyWelcomeContentProps = {
 
 const BettyWelcomeContent = ({
   firstName,
+  isWorkspaceCreator,
+  hasConnectedAccount,
   lang,
   prefersReducedMotion,
   onDismiss,
@@ -549,14 +554,21 @@ const BettyWelcomeContent = ({
     };
   }, []);
 
-  const eyebrow = t`Initial setup · 3 of 3`;
   const titleText = t`Your space is ready.`;
   const { prefix, underlined, suffix } = splitTitleForUnderline(titleText);
+  // The rows mirror the steps actually completed in this session: a
+  // workspace creator goes through account creation and (email sync being
+  // auto-skipped in the beta, so never "Sources authorized" unless the user
+  // actually connected an account) connecting the assistant; someone joining
+  // an existing workspace by invite only goes through account creation and
+  // never sees "Connect your assistant" (getNextOnboardingStatus.ts).
   const rows = [
     t`Account created`,
-    t`Sources authorized`,
-    t`Connect your assistant`,
+    ...(hasConnectedAccount ? [t`Sources authorized`] : []),
+    ...(isWorkspaceCreator ? [t`Connect your assistant`] : []),
   ];
+  const stepCount = rows.length;
+  const eyebrow = t`Initial setup · ${stepCount} of ${stepCount}`;
   const greeting =
     isDefined(firstName) && firstName.length > 0
       ? t`Welcome, ${firstName}.`
@@ -696,6 +708,7 @@ export const BettyWelcomeOverlay = () => {
   const isBettyWelcomeVisible = useAtomStateValue(isBettyWelcomeVisibleState);
   const setIsBettyWelcomeVisible = useSetAtomState(isBettyWelcomeVisibleState);
   const currentUser = useAtomStateValue(currentUserState);
+  const myConnectedAccounts = useAtomStateValue(myConnectedAccountsState);
   const prefersReducedMotion = useMediaQuery(
     doNotTranslate('(prefers-reduced-motion: reduce)'),
   );
@@ -712,6 +725,8 @@ export const BettyWelcomeOverlay = () => {
   return createPortal(
     <BettyWelcomeContent
       firstName={currentUser?.firstName}
+      isWorkspaceCreator={currentUser?.isWorkspaceCreator === true}
+      hasConnectedAccount={(myConnectedAccounts?.length ?? 0) > 0}
       lang={lang}
       prefersReducedMotion={prefersReducedMotion}
       onDismiss={handleDismiss}

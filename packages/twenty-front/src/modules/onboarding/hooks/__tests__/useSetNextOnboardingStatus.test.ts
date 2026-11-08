@@ -379,6 +379,21 @@ describe('useSetNextOnboardingStatus', () => {
     expect(shouldOpenAiChatAfterOnboarding).toBe(false);
   });
 
+  it('should still show the welcome layer when onboarding completes after a reload during the profile step', () => {
+    // beforeEach's resetJotaiStore() already gives this test a fresh store
+    // and cleared storage, standing in for a page reload: currentUserState
+    // is hydrated the same way it would be from a fresh server fetch after
+    // reload, still at PROFILE_CREATION, and onboarding is then completed
+    // normally from there.
+    const { nextOnboardingStatus, isBettyWelcomeVisible } = renderHooks(
+      OnboardingStatus.PROFILE_CREATION,
+      { withOneWorkspaceMember: false },
+    );
+
+    expect(nextOnboardingStatus).toEqual(OnboardingStatus.COMPLETED);
+    expect(isBettyWelcomeVisible).toBe(true);
+  });
+
   it('should never trigger Twenty\'s own welcome animation, only Betty\'s, when onboarding completes', () => {
     const { isBettyWelcomeVisible } = renderHooks(OnboardingStatus.INVITE_TEAM);
 

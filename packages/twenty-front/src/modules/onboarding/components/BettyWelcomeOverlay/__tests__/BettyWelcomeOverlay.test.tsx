@@ -6,6 +6,7 @@ import { Provider as JotaiProvider } from 'jotai';
 import { createElement, type ReactNode } from 'react';
 import { SOURCE_LOCALE } from 'twenty-shared/translations';
 
+import { myConnectedAccountsState } from '@/accounts/states/myConnectedAccountsState';
 import { currentUserState } from '@/auth/states/currentUserState';
 import { BettyWelcomeOverlay } from '@/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay';
 import {
@@ -100,6 +101,59 @@ describe('BettyWelcomeOverlay', () => {
     expect(
       screen.getByRole('button', { name: 'Skip animation' }),
     ).toBeInTheDocument();
+  });
+
+  it('should show the creator path rows (account created, connect your assistant) and drop sources authorized when email sync was auto-skipped', () => {
+    jotaiStore.set(currentUserState.atom, {
+      ...mockedUserData,
+      isWorkspaceCreator: true,
+      onboardingStatus: OnboardingStatus.COMPLETED,
+    });
+    jotaiStore.set(myConnectedAccountsState.atom, null);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Initial setup · 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Account created')).toBeInTheDocument();
+    expect(screen.getByText('Connect your assistant')).toBeInTheDocument();
+    expect(screen.queryByText('Sources authorized')).not.toBeInTheDocument();
+  });
+
+  it('should show sources authorized for a creator who actually connected an account', () => {
+    jotaiStore.set(currentUserState.atom, {
+      ...mockedUserData,
+      isWorkspaceCreator: true,
+      onboardingStatus: OnboardingStatus.COMPLETED,
+    });
+    jotaiStore.set(myConnectedAccountsState.atom, [
+      { id: 'connected-account-1' },
+    ] as never);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Initial setup · 3 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Account created')).toBeInTheDocument();
+    expect(screen.getByText('Sources authorized')).toBeInTheDocument();
+    expect(screen.getByText('Connect your assistant')).toBeInTheDocument();
+  });
+
+  it('should show only the joiner path row (account created) and never connect your assistant', () => {
+    jotaiStore.set(currentUserState.atom, {
+      ...mockedUserData,
+      isWorkspaceCreator: false,
+      onboardingStatus: OnboardingStatus.COMPLETED,
+    });
+    jotaiStore.set(myConnectedAccountsState.atom, null);
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Initial setup · 1 of 1')).toBeInTheDocument();
+    expect(screen.getByText('Account created')).toBeInTheDocument();
+    expect(screen.queryByText('Sources authorized')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connect your assistant')).not.toBeInTheDocument();
   });
 
   it('should fall back to the nameless greeting when the profile has no first name', () => {
