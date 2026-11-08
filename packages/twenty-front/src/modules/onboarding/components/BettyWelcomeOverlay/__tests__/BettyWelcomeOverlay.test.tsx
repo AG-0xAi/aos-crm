@@ -233,4 +233,36 @@ describe('BettyWelcomeOverlay', () => {
 
     expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
   });
+
+  it('clears the iris-open dismiss timer on Escape, so it cannot dismiss a later welcome overlay', () => {
+    jest.useFakeTimers();
+    jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+
+    render(<BettyWelcomeOverlay />, { wrapper: Wrapper });
+
+    // Let the iris open: this schedules the once-only onDismiss timeout that
+    // Escape must clear below.
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_IRIS_OPEN_AT_MS);
+    });
+    expect(screen.getByTestId('betty-welcome-scene')).toHaveClass('is-open');
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(queryTitleHeading()).not.toBeInTheDocument();
+
+    // Re-open a fresh overlay before the stale timer from the first mount
+    // would have fired, then advance by exactly that remaining delay.
+    act(() => {
+      jotaiStore.set(isBettyWelcomeVisibleState.atom, true);
+    });
+    expect(queryTitleHeading()).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+    });
+
+    expect(queryTitleHeading()).toBeInTheDocument();
+  });
 });

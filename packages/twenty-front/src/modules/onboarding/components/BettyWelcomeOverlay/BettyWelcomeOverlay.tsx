@@ -331,7 +331,7 @@ const StyledIrisRing = styled.circle`
   fill: none;
   r: var(--betty-iris-radius);
   stroke: ${BRAND_COLORS.terracotta};
-  stroke-width: calc(7px - var(--betty-iris-radius) * 7px / 3000px);
+  stroke-width: calc(7px - var(--betty-iris-radius) * 7 / 3000);
 `;
 
 // Montage step 4 (assets/motion/betty-bienvenida-spec.md): if the dashboard
@@ -453,6 +453,7 @@ const BettyWelcomeContent = ({
 
     let hasOpened = false;
     let unsubscribeFromDashboardReady: (() => void) | undefined;
+    let dismissTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const openIris = () => {
       if (hasOpened) {
@@ -462,9 +463,19 @@ const BettyWelcomeContent = ({
       unsubscribeFromDashboardReady?.();
       setIsPulsingForDashboard(false);
       setIsIrisOpen(true);
-      setTimeout(onDismiss, BETTY_WELCOME_SCENE_DURATIONS_MS.iris);
+      dismissTimeoutId = setTimeout(
+        onDismiss,
+        BETTY_WELCOME_SCENE_DURATIONS_MS.iris,
+      );
     };
 
+    // isMinimalMetadataReadyState tracks whether the object/field metadata,
+    // views and view fields the dashboard shell renders from have finished
+    // loading (see IsMinimalMetadataReadyEffect) — the closest existing
+    // front-end signal to "the dashboard behind the overlay is ready to show".
+    // It is usually already true by the time onboarding completes, since the
+    // user has been navigating the app for several steps already, so this
+    // pulse mostly guards the rare case where metadata is still in flight.
     const dimmingDoneTimeoutId = setTimeout(() => {
       if (store.get(isMinimalMetadataReadyState.atom)) {
         openIris();
@@ -489,6 +500,7 @@ const BettyWelcomeContent = ({
     return () => {
       clearTimeout(dimmingDoneTimeoutId);
       clearTimeout(pulseCapTimeoutId);
+      clearTimeout(dismissTimeoutId);
       unsubscribeFromDashboardReady?.();
     };
   }, [prefersReducedMotion, onDismiss, store]);
