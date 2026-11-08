@@ -5,6 +5,7 @@ import { canvasTheme } from 'src/common-style';
 
 const linkStyle = {
   textDecoration: 'underline',
+  fontFamily: canvasTheme.font.family.sans,
 };
 
 type LinkProps = {
@@ -19,7 +20,7 @@ export const Link = ({ value, href, color }: LinkProps) => {
       href={href}
       style={{
         ...linkStyle,
-        color: color ?? canvasTheme.font.colors.tertiary,
+        color: color ?? canvasTheme.font.colors.link,
       }}
     >
       {value}

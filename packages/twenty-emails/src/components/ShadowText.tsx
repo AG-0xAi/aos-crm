@@ -8,6 +8,7 @@ type ShadowTextProps = {
 };
 
 const shadowTextStyle = {
+  fontFamily: canvasTheme.font.family.sans,
   fontSize: canvasTheme.font.size.sm,
   fontWeight: canvasTheme.font.weight.regular,
   color: canvasTheme.font.colors.tertiary,

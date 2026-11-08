@@ -66,7 +66,7 @@ msgstr "Después de ese plazo, el espacio de trabajo y todos sus datos se elimin
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "An assistant for your business relationships: it keeps your contacts and conversations in one place and helps you prepare what comes next."
-msgstr ""
+msgstr "Un asistente para tus relaciones comerciales: mantiene tus contactos y conversaciones en un solo lugar y te ayuda a preparar lo que sigue."
 
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
@@ -327,7 +327,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "¿Qué es Betty?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -384,3 +384,23 @@ msgstr "Tu espacio de trabajo ha sido eliminado"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Tu espacio de trabajo está en pausa"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "¡Bienvenido a Betty!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "This invite is personal to you and will expire soon, for your security."
+msgstr "Esta invitación es personal y caducará pronto, por tu seguridad."
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Recibes este correo porque te invitaron a unirte a un espacio de trabajo en Betty."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Recibes este correo porque alguien te invitó a crear tu propio espacio de trabajo en Betty."

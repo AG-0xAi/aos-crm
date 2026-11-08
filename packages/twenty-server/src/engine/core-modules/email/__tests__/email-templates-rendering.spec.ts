@@ -11,6 +11,7 @@ import {
   SendEmailVerificationLinkEmail,
   SendInviteLinkEmail,
   ServerAdminAccessChangedEmail,
+  SignUpInviteLinkEmail,
   WarnSuspendedWorkspaceEmail,
   EmailRenderError,
   renderEmail,
@@ -196,7 +197,7 @@ describe('email templates rendering', () => {
   });
 });
 
-describe('SendInviteLinkEmail branding', () => {
+describe('invitation emails branding', () => {
   beforeAll(() => {
     jest.useRealTimers();
   });
@@ -205,26 +206,61 @@ describe('SendInviteLinkEmail branding', () => {
     jest.useFakeTimers();
   });
 
+  const SERVER_URL = 'https://app.betty.management';
+  const LOGO_SRC = `${SERVER_URL}/brand/logo/betty-wordmark-email-2x.png`;
+
   const buildInviteEmail = (locale: 'en' | 'es-ES') =>
     SendInviteLinkEmail({
-      link: 'https://app.betty.management/invite/token',
+      link: `${SERVER_URL}/invite/token`,
       workspace: { name: 'Acme Inc', logo: undefined },
       sender: {
         email: 'tim@example.com',
         firstName: 'Tim',
         lastName: 'Apple',
       },
-      serverUrl: 'https://app.betty.management',
+      serverUrl: SERVER_URL,
+      locale,
+    });
+
+  const buildSignUpInviteEmail = (locale: 'en' | 'es-ES') =>
+    SignUpInviteLinkEmail({
+      duration: '7 days',
+      link: `${SERVER_URL}/welcome?signUpInvitationToken=123`,
+      serverUrl: SERVER_URL,
       locale,
     });
 
   it.each(['en', 'es-ES'] as const)(
-    'should render Betty branding with no visible Twenty for locale %s',
+    'SendInviteLinkEmail renders Betty branding, the real logo image and a working button link, with no visible Twenty for locale %s',
     async (locale) => {
       const html = await renderEmail(buildInviteEmail(locale));
 
       expect(html).toContain('Betty');
       expect(html).not.toMatch(/twenty/i);
+      expect(html).toMatch(/<img\b[^>]*>/);
+      expect(html).toContain(`src="${LOGO_SRC}"`);
+      expect(html).toContain('alt="Betty"');
+      expect(html).toMatch(
+        new RegExp(`<a\\s+href="${SERVER_URL}/invite/token"`),
+      );
+    },
+  );
+
+  it.each(['en', 'es-ES'] as const)(
+    'SignUpInviteLinkEmail renders Betty branding, the real logo image and a working button link, with no visible Twenty for locale %s',
+    async (locale) => {
+      const html = await renderEmail(buildSignUpInviteEmail(locale));
+
+      expect(html).toContain('Betty');
+      expect(html).not.toMatch(/twenty/i);
+      expect(html).toMatch(/<img\b[^>]*>/);
+      expect(html).toContain(`src="${LOGO_SRC}"`);
+      expect(html).toContain('alt="Betty"');
+      expect(html).toMatch(
+        new RegExp(
+          `<a\\s+href="${SERVER_URL}/welcome\\?signUpInvitationToken=123"`,
+        ),
+      );
     },
   );
 });

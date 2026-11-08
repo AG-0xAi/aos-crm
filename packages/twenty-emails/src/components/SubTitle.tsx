@@ -8,7 +8,7 @@ type SubTitleProps = {
 };
 
 const subTitleStyle = {
-  fontFamily: canvasTheme.font.family,
+  fontFamily: canvasTheme.font.family.serif,
   fontSize: canvasTheme.font.size.lg,
   fontWeight: canvasTheme.font.weight.bold,
   color: canvasTheme.font.colors.highlighted,

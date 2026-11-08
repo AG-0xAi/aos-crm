@@ -56,7 +56,7 @@ export const SendApprovedAccessDomainValidation = ({
               <Link
                 href={`mailto:${senderEmail}`}
                 value={senderEmail}
-                color={canvasTheme.font.colors.blue}
+                color={canvasTheme.font.colors.link}
               />
             ),
             1: <b />,

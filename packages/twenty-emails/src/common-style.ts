@@ -1,44 +1,25 @@
-/* oxlint-disable twenty/no-hardcoded-colors */
+import { BRAND_COLORS } from 'twenty-shared/constants';
+import { doNotTranslate } from 'twenty-shared/i18n';
 
-const grayScale = {
-  gray100: '#000000',
-  gray90: '#141414',
-  gray85: '#171717',
-  gray80: '#1b1b1b',
-  gray75: '#1d1d1d',
-  gray70: '#222222',
-  gray65: '#292929',
-  gray60: '#333333',
-  gray55: '#4c4c4c',
-  gray50: '#666666',
-  gray45: '#818181',
-  gray40: '#999999',
-  gray35: '#b3b3b3',
-  gray30: '#cccccc',
-  gray25: '#d6d6d6',
-  gray20: '#ebebeb',
-  gray15: '#f1f1f1',
-  gray10: '#fcfcfc',
-  gray0: '#ffffff',
-};
-
-const colors = {
-  blue40: '#5e90f2',
-};
-
+// Betty's email palette and type, brand manual 3.2: Georgia (serif) for
+// headings, a web-safe sans for body copy -- email clients cannot load the
+// brand's own webfonts.
 export const canvasTheme = {
   font: {
     colors: {
-      highlighted: grayScale.gray60,
-      primary: grayScale.gray50,
-      tertiary: grayScale.gray35,
-      inverted: grayScale.gray0,
-      blue: colors.blue40,
+      highlighted: BRAND_COLORS.charcoal,
+      primary: BRAND_COLORS.mutedText,
+      tertiary: BRAND_COLORS.mutedText,
+      inverted: BRAND_COLORS.paperWhite,
+      link: BRAND_COLORS.terracottaInk,
     },
-    family: 'Trebuchet MS', // Google Inter not working, we need to use a web safe font, see https://templates.mailchimp.com/design/typography/
+    family: {
+      serif: doNotTranslate('Georgia, "Times New Roman", serif'),
+      sans: doNotTranslate('Arial, Helvetica, sans-serif'),
+    },
     weight: {
       regular: 400,
-      bold: 600,
+      bold: 700,
     },
     size: {
       sm: '12px',
@@ -50,14 +31,15 @@ export const canvasTheme = {
   },
   border: {
     radius: { sm: '4px', md: '8px' },
-    color: { highlighted: grayScale.gray20 },
+    // The card's own hairline is beige; a box highlighted *inside* the card
+    // needs a darker line of its own, or it would share its border with its
+    // own background.
+    color: { card: BRAND_COLORS.beige, highlighted: BRAND_COLORS.taupe },
   },
   background: {
-    colors: { highlight: grayScale.gray15 },
-    button: grayScale.gray60,
-    transparent: {
-      medium: 'rgba(0, 0, 0, 0.08)',
-      light: 'rgba(0, 0, 0, 0.04)',
-    },
+    page: BRAND_COLORS.ivory,
+    card: BRAND_COLORS.paperWhite,
+    colors: { highlight: BRAND_COLORS.beige },
+    button: BRAND_COLORS.charcoal,
   },
 };
