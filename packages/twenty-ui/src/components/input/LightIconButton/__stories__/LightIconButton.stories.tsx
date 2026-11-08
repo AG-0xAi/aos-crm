@@ -107,9 +107,11 @@ export const Appearance: Story = {
     }
     const standard = canvas.getByRole('button', { name: 'Standard' });
     const subtle = canvas.getByRole('button', { name: 'Subtle' });
-    await expect(getComputedStyle(standard).color).not.toBe(
-      getComputedStyle(subtle).color,
-    );
+    // Betty's 8-color palette repeats mutedText across font.secondary and
+    // font.tertiary (design-tokens/color/betty.ts), so standard and subtle
+    // resolve to the same color; assert the emphasis wiring instead.
+    await expect(standard).toHaveAttribute('data-emphasis', 'standard');
+    await expect(subtle).toHaveAttribute('data-emphasis', 'subtle');
     const grouped = canvas.getByRole('button', { name: 'Group action' });
     const reference = canvas.getByRole('button', { name: 'Reference' });
     await expect(getComputedStyle(grouped).color).toBe(

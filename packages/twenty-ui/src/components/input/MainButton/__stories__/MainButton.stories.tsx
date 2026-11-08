@@ -98,15 +98,25 @@ export const Loading: Story = {
 export const Outline: Story = {
   ...Display,
   args: { variant: 'outline' },
+  render: (args) => (
+    <>
+      <MainButton {...args} />
+      <Text style={{ color: themeCssVariables.font.color.primary }}>
+        reference
+      </Text>
+    </>
+  ),
   play: async ({ canvasElement }) => {
-    const button = within(canvasElement).getByRole('button');
-    const buttonStyle = getComputedStyle(button);
-    const primaryColor = buttonStyle
-      .getPropertyValue('--t-font-color-primary')
-      .trim();
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole('button');
+    // Betty's brand tokens are declared as hex literals, not display-p3
+    // color() functions, so the raw custom-property text no longer matches
+    // the browser's normalized rgb() serialization of the computed color;
+    // compare against another element's computed color instead.
+    const primaryColor = getComputedStyle(canvas.getByText('reference')).color;
 
     await expect(button).toBeEnabled();
-    await expect(buttonStyle.color).toBe(primaryColor);
+    await expect(getComputedStyle(button).color).toBe(primaryColor);
     await userEvent.hover(button);
     await expect(getComputedStyle(button).color).toBe(primaryColor);
   },
