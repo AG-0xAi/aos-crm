@@ -29855,3 +29855,38 @@ msgstr "Invitation revoked"
 #: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
 msgid "Could not revoke the invitation. Please try again later."
 msgstr "Could not revoke the invitation. Please try again later."
+
+#. js-lingui-id: 3xCOEd
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Initial setup · 3 of 3"
+msgstr "Initial setup · 3 of 3"
+
+#. js-lingui-id: Gq+sma
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Your space is ready."
+msgstr "Your space is ready."
+
+#. js-lingui-id: Lf1geV
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Account created"
+msgstr "Account created"
+
+#. js-lingui-id: iNP53j
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Sources authorized"
+msgstr "Sources authorized"
+
+#. js-lingui-id: Os6zs4
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Welcome, {firstName}."
+msgstr "Welcome, {firstName}."
+
+#. js-lingui-id: YbCUR5
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Welcome."
+msgstr "Welcome."
+
+#. js-lingui-id: R64qbc
+#: src/modules/onboarding/components/BettyWelcomeOverlay/BettyWelcomeOverlay.tsx
+msgid "Skip animation"
+msgstr "Skip animation"

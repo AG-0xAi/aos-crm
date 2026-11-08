@@ -108,4 +108,26 @@ describe('OnboardingStepLayout', () => {
 
     expect(screen.queryByText('Earn 2')).not.toBeInTheDocument();
   });
+
+  it('should never mount a construction site canvas, on any step', () => {
+    jotaiStore.set(onboardingConfigState.atom, onboardingConfig);
+    setOnboardingStatus(OnboardingStatus.SYNC_EMAIL);
+
+    const { container } = render(<OnboardingStepLayout />, {
+      wrapper: Wrapper,
+    });
+
+    expect(container.querySelector('canvas')).not.toBeInTheDocument();
+  });
+
+  it('should never mount a construction site canvas on the last onboarding step', () => {
+    jotaiStore.set(onboardingConfigState.atom, onboardingConfig);
+    setOnboardingStatus(OnboardingStatus.PLAN_REQUIRED);
+
+    const { container } = render(<OnboardingStepLayout />, {
+      wrapper: Wrapper,
+    });
+
+    expect(container.querySelector('canvas')).not.toBeInTheDocument();
+  });
 });
