@@ -29960,3 +29960,12 @@ msgstr "Te damos la bienvenida."
 msgid "Skip animation"
 msgstr "Saltar animación"
 
+#. js-lingui-id: iZcj2X
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Based on"
+msgstr "Basado en"
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Versión de Betty"

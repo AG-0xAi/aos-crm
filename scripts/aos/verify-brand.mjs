@@ -308,6 +308,12 @@ export const ALLOWLIST = [
     reason:
       'CRM-026: the AGPL open-source credit, naming the upstream project this fork is built from. The founder asked for this attribution explicitly, on a page only a signed-in user reaches.',
   },
+  {
+    file: 'packages/twenty-front/src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx',
+    match: 'Twenty v',
+    reason:
+      'CRM-032: the upstream version this fork is based on, shown as plain text with no link in the server-admin-only Admin Panel (Based on Twenty v2.51.0).',
+  },
 ];
 
 export function isScannedPath(relativePath) {

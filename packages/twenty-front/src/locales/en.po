@@ -29951,3 +29951,12 @@ msgstr "Welcome."
 msgid "Skip animation"
 msgstr "Skip animation"
 
+#. js-lingui-id: iZcj2X
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Based on"
+msgstr "Based on"
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Betty version"
