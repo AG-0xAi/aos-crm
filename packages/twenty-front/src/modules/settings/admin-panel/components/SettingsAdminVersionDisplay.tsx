@@ -8,13 +8,6 @@ type SettingsAdminVersionDisplayProps = {
   noVersionMessage: string;
 };
 
-const StyledActionLink = styled.a`
-  color: ${themeCssVariables.font.color.primary};
-  font-size: ${themeCssVariables.font.size.sm};
-  font-weight: ${themeCssVariables.font.weight.regular};
-  text-decoration: none;
-`;
-
 const StyledSpan = styled.span`
   color: ${themeCssVariables.font.color.primary};
   font-size: ${themeCssVariables.font.size.sm};
@@ -34,13 +27,5 @@ export const SettingsAdminVersionDisplay = ({
     return <StyledSpan>{noVersionMessage}</StyledSpan>;
   }
 
-  return (
-    <StyledActionLink
-      href={`https://hub.docker.com/r/twentycrm/twenty/tags?name=${version}`}
-      target="_blank"
-      rel="noreferrer"
-    >
-      {version}
-    </StyledActionLink>
-  );
+  return <StyledSpan>{version}</StyledSpan>;
 };

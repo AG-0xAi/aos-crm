@@ -26648,6 +26648,11 @@ msgstr "Turns true into false and false into true."
 msgid "Turquoise"
 msgstr "Turquoise"
 
+#. js-lingui-id: iZcj2X
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Based on"
+msgstr "Based on"
+
 #. js-lingui-id: 8pmRvi
 #: src/pages/onboarding/SyncEmails.tsx
 msgid "Betty adds the people you email and meet, and keeps them up to date without manual data entry."
@@ -26662,6 +26667,11 @@ msgstr "Betty fields"
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
 msgid "Betty fills each level with the best model that meets your requirements"
 msgstr "Betty fills each level with the best model that meets your requirements"
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Betty version"
 
 #. js-lingui-id: qUadjH
 #: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
