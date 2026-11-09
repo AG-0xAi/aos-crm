@@ -29,4 +29,24 @@ describe('buildLambdaResourceName', () => {
       }),
     ).toBe('deps-def456');
   });
+
+  it('prepends the namePrefix when it is set', () => {
+    expect(
+      buildLambdaResourceName({
+        namePrefix: 'aos-crm-prod-lf-',
+        resourceNamePrefix: 'twenty-builder',
+        namespace: 'abc123',
+        checksum: 'def456',
+      }),
+    ).toBe('aos-crm-prod-lf-twenty-builder-abc123-def456');
+  });
+
+  it('omits the namePrefix when it is undefined', () => {
+    expect(
+      buildLambdaResourceName({
+        resourceNamePrefix: 'deps',
+        checksum: 'def456',
+      }),
+    ).toBe('deps-def456');
+  });
 });

@@ -895,6 +895,18 @@ export class ConfigVariables {
   LOGIC_FUNCTION_LAMBDA_ENDPOINT?: string;
 
   @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.LOGIC_FUNCTION_CONFIG,
+    description:
+      'Prefix applied to every Lambda function, layer and tag name the driver creates, so an IAM policy can scope access to function:<prefix>* and layer:<prefix>* instead of function:*. Empty keeps unprefixed (upstream) names.',
+    type: ConfigVariableType.STRING,
+  })
+  @ValidateIf(
+    (env) => env.LOGIC_FUNCTION_TYPE === LogicFunctionDriverType.LAMBDA,
+  )
+  @IsOptional()
+  LOGIC_FUNCTION_LAMBDA_NAME_PREFIX?: string;
+
+  @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.CODE_INTERPRETER_CONFIG,
     description:
       'Code interpreter driver type - LOCAL for development (unsafe), E2B for sandboxed execution',

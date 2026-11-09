@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 
 import { isNonEmptyString } from '@sniptt/guards';
 
-const RESOURCE_NAMESPACE_LENGTH = 10;
+export const RESOURCE_NAMESPACE_LENGTH = 10;
 const NO_ROLE_SENTINEL = 'no-role';
 
 export const getLambdaResourceNamespace = ({

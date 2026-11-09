@@ -91,6 +91,9 @@ export class LogicFunctionDriverFactory extends DriverFactoryBase<LogicFunctionD
         const resourceNamespace = getLambdaResourceNamespace({
           lambdaRoleArn: lambdaRole,
         });
+        const namePrefix = this.twentyConfigService.get(
+          'LOGIC_FUNCTION_LAMBDA_NAME_PREFIX',
+        );
 
         return new LambdaDriver({
           logicFunctionResourceService: this.logicFunctionResourceService,
@@ -109,6 +112,7 @@ export class LogicFunctionDriverFactory extends DriverFactoryBase<LogicFunctionD
           layerBucket,
           layerBucketRegion,
           resourceNamespace,
+          namePrefix,
           sdkClientArchiveService: this.sdkClientArchiveService,
         });
       }
