@@ -113,4 +113,5 @@ export enum SettingsPath {
 
   About = 'about',
   ConnectAssistant = 'connect-assistant',
+  InviteToBetty = 'invite-to-betty',
 }

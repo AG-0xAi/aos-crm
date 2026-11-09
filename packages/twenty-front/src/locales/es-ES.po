@@ -14286,6 +14286,17 @@ msgstr "Invitar por enlace"
 msgid "Invite link sent to email addresses"
 msgstr "Enlace de invitación enviado a las direcciones de correo electrónico"
 
+#. js-lingui-id: l+/rog
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/pages/settings/invite-to-betty/SettingsInviteToBetty.tsx
+msgid "Invite someone to Betty"
+msgstr "Invitar a alguien a Betty"
+
+#. js-lingui-id: 8y71FF
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "Invite someone to your workspace"
+msgstr "Invitar a alguien a tu espacio"
+
 #. js-lingui-id: x1m5RZ
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
 msgid "Invite user"
@@ -25502,6 +25513,16 @@ msgstr "No hay actividad asociada con este registro."
 msgid "There was an error while updating password."
 msgstr "Hubo un error al actualizar la contraseña."
 
+#. js-lingui-id: NaZquI
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They create their own Betty account and workspace"
+msgstr "Crea su propia cuenta y espacio en Betty"
+
+#. js-lingui-id: NG7YDf
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They join this workspace"
+msgstr "Se une a este espacio"
+
 #. js-lingui-id: 5Ml5Nr
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "Thickness"
@@ -29815,48 +29836,6 @@ msgstr "enlace al código fuente sin configurar en este servidor ({version})"
 msgid "version not reported"
 msgstr "versión no informada"
 
-#. js-lingui-id: OJp5A8
-#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
-#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "Connect ChatGPT or Claude"
-msgstr "Conectar ChatGPT o Claude"
-
-#. js-lingui-id: DjrDw1
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "You connect with your own account, so this is personal to you, not a workspace setting."
-msgstr "Te conectas con tu propia cuenta, así que esto es personal para ti, no un ajuste del espacio de trabajo."
-
-#. js-lingui-id: qlwLcm
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "Troubleshooting"
-msgstr "Solución de problemas"
-
-#. js-lingui-id: t6FENf
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "If the connector stops showing up inside Claude or ChatGPT, check these first."
-msgstr "Si el conector deja de aparecer en Claude o ChatGPT, revisa esto primero."
-
-#. js-lingui-id: om8roM
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
-msgstr "En Claude, abre Settings › Connectors: si «Betty» aparece con «Connect», pulsa ahí; si no aparece, pulsa «Abrir Claude» arriba de nuevo."
-
-#. js-lingui-id: esKwv8
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "Inside a chat, turn Betty on from the tools menu."
-msgstr "Dentro de un chat, activa Betty desde el menú de herramientas."
-
-#. js-lingui-id: YrG04M
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "Custom connectors are added on claude.ai on the web or in the desktop app, not in the phone app."
-msgstr "Los conectores personalizados se añaden en claude.ai desde el navegador o en la app de escritorio, no en la app del móvil."
-
-#. js-lingui-id: TAcIr5
-#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
-msgid "The URL must be your workspace's address ending in \"/mcp\"."
-msgstr "La URL debe ser la dirección de tu espacio de trabajo terminada en «/mcp»."
-
 #: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
 msgid "This invitation is for this address only."
 msgstr "Esta invitación es solo para esta dirección."
@@ -29981,3 +29960,44 @@ msgstr "Te damos la bienvenida."
 msgid "Skip animation"
 msgstr "Saltar animación"
 
+#. js-lingui-id: OJp5A8
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Connect ChatGPT or Claude"
+msgstr "Conectar ChatGPT o Claude"
+
+#. js-lingui-id: DjrDw1
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "You connect with your own account, so this is personal to you, not a workspace setting."
+msgstr "Te conectas con tu propia cuenta, así que esto es personal para ti, no un ajuste del espacio de trabajo."
+
+#. js-lingui-id: qlwLcm
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Troubleshooting"
+msgstr "Solución de problemas"
+
+#. js-lingui-id: t6FENf
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "If the connector stops showing up inside Claude or ChatGPT, check these first."
+msgstr "Si el conector deja de aparecer en Claude o ChatGPT, revisa esto primero."
+
+#. js-lingui-id: om8roM
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
+msgstr "En Claude, abre Settings › Connectors: si «Betty» aparece con «Connect», pulsa ahí; si no aparece, pulsa «Abrir Claude» arriba de nuevo."
+
+#. js-lingui-id: esKwv8
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Inside a chat, turn Betty on from the tools menu."
+msgstr "Dentro de un chat, activa Betty desde el menú de herramientas."
+
+#. js-lingui-id: YrG04M
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Custom connectors are added on claude.ai on the web or in the desktop app, not in the phone app."
+msgstr "Los conectores personalizados se añaden en claude.ai desde el navegador o en la app de escritorio, no en la app del móvil."
+
+#. js-lingui-id: TAcIr5
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "The URL must be your workspace's address ending in \"/mcp\"."
+msgstr "La URL debe ser la dirección de tu espacio de trabajo terminada en «/mcp»."
