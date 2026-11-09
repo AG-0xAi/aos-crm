@@ -2,12 +2,13 @@ import { SettingsTableCard } from '@/settings/components/SettingsTableCard';
 import { useApolloAdminClient } from '@/settings/admin-panel/apollo/hooks/useApolloAdminClient';
 import { SettingsAdminVersionDisplay } from '@/settings/admin-panel/components/SettingsAdminVersionDisplay';
 import { t } from '@lingui/core/macro';
+import { doNotTranslate } from 'twenty-shared/i18n';
 import { IconCircleDot, IconVersions } from 'twenty-ui/icon';
 import { useQuery } from '@apollo/client/react';
 import { GetVersionInfoDocument } from '~/generated-admin/graphql';
 
 // Bump this when the fork re-syncs its base with a newer Twenty upstream tag.
-const UPSTREAM_TWENTY_VERSION = 'Twenty v2.51.0';
+const UPSTREAM_TWENTY_VERSION = doNotTranslate('Twenty v2.51.0');
 
 export const SettingsAdminVersionContainer = () => {
   const apolloAdminClient = useApolloAdminClient();
