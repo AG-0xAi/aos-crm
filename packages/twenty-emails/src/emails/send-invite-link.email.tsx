@@ -46,7 +46,6 @@ export const SendInviteLinkEmail = ({
 
   return (
     <BaseEmail
-      width={333}
       locale={locale}
       serverUrl={serverUrl}
       footerNote={i18n._(

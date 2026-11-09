@@ -15,6 +15,15 @@ const bodyStyle = {
   fontFamily: canvasTheme.font.family.sans,
 };
 
+// react-email's Container already caps at the 37.5em (600px) email standard
+// and is 100% fluid below that; a numeric `width` instead sets it as a literal
+// HTML width attribute, which clients (Outlook especially) honor over that
+// cap. Side padding on the row keeps the card off the viewport edge once it
+// goes full-width on small screens.
+const fluidContainerStyle = {
+  padding: '0 16px',
+};
+
 const cardStyle = {
   backgroundColor: canvasTheme.background.card,
   border: `1px solid ${canvasTheme.border.color.card}`,
@@ -44,7 +53,10 @@ export const BaseEmail = ({
       <Html lang={locale}>
         <BaseHead i18n={i18nInstance} />
         <Body style={bodyStyle}>
-          <Container width={width || 290}>
+          <Container
+            width={width ?? '100%'}
+            style={width === undefined ? fluidContainerStyle : undefined}
+          >
             <Container style={cardStyle}>
               <Logo serverUrl={serverUrl} />
               {children}
