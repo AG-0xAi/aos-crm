@@ -219,6 +219,24 @@ describe('useSettingsNavigationItems', () => {
     ]);
   });
 
+  it('should show Connect ChatGPT or Claude under User regardless of AI_SETTINGS', () => {
+    setPermissionFlags([]);
+
+    const { result } = renderHook(() => useSettingsNavigationItems(), {
+      wrapper: Wrapper,
+    });
+
+    const userSection = result.current.find(
+      (section) => section.label === 'User',
+    );
+    const connectAssistantItem = userSection?.items.find(
+      (item) => item.path === SettingsPath.ConnectAssistant,
+    );
+
+    expect(connectAssistantItem).toBeDefined();
+    expect(connectAssistantItem?.isHidden).toBeFalsy();
+  });
+
   it('should show About Betty to a non-admin member', () => {
     setPermissionFlags([]);
 

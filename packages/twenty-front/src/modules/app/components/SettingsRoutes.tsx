@@ -452,6 +452,14 @@ const SettingsAbout = lazy(() =>
   })),
 );
 
+const SettingsConnectAssistant = lazy(() =>
+  import('~/pages/settings/mcp-connect/SettingsConnectAssistant').then(
+    (module) => ({
+      default: module.SettingsConnectAssistant,
+    }),
+  ),
+);
+
 const SettingsAccounts = lazy(() =>
   import('~/pages/settings/accounts/SettingsAccounts').then((module) => ({
     default: module.SettingsAccounts,
@@ -816,6 +824,10 @@ const createSettingsRouteElements = ({
     />
     <Route path={SettingsPath.Experience} element={<SettingsExperience />} />
     <Route path={SettingsPath.About} element={<SettingsAbout />} />
+    <Route
+      path={SettingsPath.ConnectAssistant}
+      element={<SettingsConnectAssistant />}
+    />
     <Route
       element={
         <SettingsProtectedRouteWrapper
