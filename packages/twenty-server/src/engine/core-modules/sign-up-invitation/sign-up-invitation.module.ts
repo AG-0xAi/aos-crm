@@ -4,9 +4,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppTokenEntity } from 'src/engine/core-modules/app-token/app-token.entity';
 import { WorkspaceDomainsModule } from 'src/engine/core-modules/domain/workspace-domains/workspace-domains.module';
 import { SignUpInvitationService } from 'src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service';
+import { SignupWebhookModule } from 'src/engine/core-modules/signup-webhook/signup-webhook.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AppTokenEntity]), WorkspaceDomainsModule],
+  imports: [
+    TypeOrmModule.forFeature([AppTokenEntity]),
+    WorkspaceDomainsModule,
+    SignupWebhookModule,
+  ],
   providers: [SignUpInvitationService],
   exports: [SignUpInvitationService],
 })

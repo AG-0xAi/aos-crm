@@ -40,6 +40,12 @@ permissions_boundary_arn = "arn:aws:iam::REPLACE_ME:policy/aos-limite-roles"
 # outbound_email_enabled      = true
 # email_verification_required = true
 
+# Webhook the server and worker POST a JSON event to on every invitation and
+# sign-up, for the operator's own lead funnel (CRM-034). Empty (default, so
+# this line can stay commented) disables it entirely. A real URL is not
+# shipped here: it is a secret the operator's own Betty workflow issues.
+# signup_webhook_url = "https://REPLACE_ME/webhooks/signup"
+
 # External mailbox at the apex (a provider like the one the founder uses, not
 # SES: SES only sends). The MX and SPF values come from the provider's own
 # setup page; the CNAME map carries its DKIM keys and, if it publishes them,

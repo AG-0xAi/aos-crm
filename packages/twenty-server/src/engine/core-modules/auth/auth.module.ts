@@ -46,6 +46,7 @@ import { MetricsModule } from 'src/engine/core-modules/metrics/metrics.module';
 import { OnboardingModule } from 'src/engine/core-modules/onboarding/onboarding.module';
 import { SecureHttpClientModule } from 'src/engine/core-modules/secure-http-client/secure-http-client.module';
 import { SignUpInvitationModule } from 'src/engine/core-modules/sign-up-invitation/sign-up-invitation.module';
+import { SignupWebhookModule } from 'src/engine/core-modules/signup-webhook/signup-webhook.module';
 import { WorkspaceSsoModule } from 'src/engine/core-modules/sso/sso.module';
 import { WorkspaceSsoIdentityProviderEntity } from 'src/engine/core-modules/sso/workspace-sso-identity-provider.entity';
 import { ThrottlerModule } from 'src/engine/core-modules/throttler/throttler.module';
@@ -124,6 +125,7 @@ import { AuthService } from './services/auth.service';
     EmailAliasManagerModule,
     UserSessionModule,
     SignUpInvitationModule,
+    SignupWebhookModule,
   ],
   controllers: [
     GoogleAuthController,

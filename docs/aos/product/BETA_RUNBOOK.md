@@ -525,7 +525,53 @@ Dos cosas que conviene saber antes de rellenarlo:
 Nada de esto afecta al envío ni al CRM: los MX y el SPF del buzón viven en la raíz, los de SES viven
 en `mail.<dominio>`, y los CNAME del buzón son nombres propios suyos.
 
-## 10. Lo que este runbook no cubre
+## 10. Avisar al funnel del founder: el webhook de altas
+
+El founder lleva su funnel de leads en su propio espacio de Betty (betty.betty.management). Este
+servidor puede avisarle de cada invitación y cada alta con un POST a un webhook de ese espacio: un
+workflow con disparador **Webhook** (`WorkflowTriggerType.WEBHOOK` en Twenty) que crea o actualiza
+la Persona, fija la etapa del funnel y encadena la serie de bienvenida (CRM-034, founder
+09/11/2026).
+
+### Conseguir la URL del webhook
+
+1. En el espacio del founder, crear (o abrir) un workflow con disparador **Webhook**.
+2. Publicarlo. Twenty muestra la URL del webhook en el propio disparador una vez publicado.
+3. Esa URL es secreta: cualquiera que la tenga puede disparar el workflow. No va en el repo, ni en
+   un ticket, ni en un chat -- solo en `terraform.tfvars` (gitignored, ver §9) o en el gestor de
+   secretos que el founder use para pasarla al operador.
+
+### Encenderlo
+
+Una línea en `terraform.tfvars` y un apply, igual que las etapas de correo (§9):
+
+```
+signup_webhook_url = "<la URL que dio el workflow>"
+```
+
+Por defecto está vacía, y vacía significa apagado: ni el servidor ni el worker encolan nada. Puesta
+la URL, cada invitación y cada alta dispara un POST en segundo plano, con reintentos sobre 5xx y
+sobre fallos de red; un fallo del webhook nunca bloquea ni rompe la invitación o el alta que lo
+dispara.
+
+### Qué llega en cada evento
+
+Todo evento lleva primero `event`, `occurredAt` (ISO), `app: "betty"` y `appVersion`, y después los
+campos propios:
+
+| Evento | Cuándo | Campos propios |
+| --- | --- | --- |
+| `signup_invitation.created` | el operador invita a alguien (§1) | `email`, `locale`, `expiresAt` |
+| `user.signed_up` | alguien abre su propio espacio | `email`, `firstName`, `lastName`, `locale`, `workspace: { subdomain, displayName }`, `via: "signup_invitation" \| "other"` |
+| `user.signed_up` | alguien entra a un espacio existente por invitación | igual, con `via: "workspace_invitation"` |
+
+Nunca lleva contraseñas, tokens ni enlaces de invitación.
+
+### Volver atrás
+
+Quitar la línea de `terraform.tfvars` y aplicar. No hay que tocar código ni reconstruir la imagen.
+
+## 11. Lo que este runbook no cubre
 
 - **El resto del panel de administración del servidor** (`/settings/admin-panel`): búsqueda de
   usuarios, impersonación y variables de configuración. De ese panel, CRM-016 solo ejercita la
