@@ -31,6 +31,7 @@ Resource ARNs use `<prefix>` for `LOGIC_FUNCTION_LAMBDA_NAME_PREFIX`
 | `waitUntilFunctionUpdatedV2` (polls `GetFunction`) | `drivers/lambda/services/lambda-aws-client.service.ts:115` | `lambda:GetFunction` | `function:<prefix>*` |
 | `ListLayerVersionsCommand` (`getExistingLayerArn`) | `drivers/lambda/services/lambda-aws-client.service.ts:175` | `lambda:ListLayerVersions` | `layer:<prefix>*` |
 | `PutObjectCommand` (presigned upload, deps layer zip) | `drivers/lambda/services/lambda-aws-client.service.ts:92` | `s3:PutObject` | `arn:aws:s3:::<layer-bucket>/*` |
+| *(implied by `PublishLayerVersionCommand`'s `Content.S3Bucket`/`S3Key`, deps layer)* | `drivers/lambda/services/lambda-layer-manager.service.ts:286-291` | `s3:GetObject` | `arn:aws:s3:::<layer-bucket>/*` |
 | *(implied by `CreateFunctionCommand`/`UpdateFunctionConfigurationCommand`'s `Layers: [...]`)* | `lambda-executor-manager.service.ts:429,463` | `lambda:GetLayerVersion` | `layer:<prefix>*` |
 | *(implied by `CreateFunctionCommand`'s `Role: ...`)* | `lambda-tool-functions.service.ts:249,290`, `lambda-executor-manager.service.ts:465` | `iam:PassRole`, condition `iam:PassedToService = lambda.amazonaws.com` | the execution role ARN only |
 

@@ -42,6 +42,12 @@
       "Effect": "Allow",
       "Action": "s3:PutObject",
       "Resource": "arn:aws:s3:::__LAYER_BUCKET__/*"
+    },
+    {
+      "Sid": "ReadLayerArchives",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::__LAYER_BUCKET__/*"
     }
   ]
 }
