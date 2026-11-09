@@ -8,7 +8,9 @@ jest.mock('@aws-sdk/client-lambda', () => {
     ...actual,
     Lambda: jest.fn().mockImplementation(() => ({
       send: (...args: unknown[]) => mockLambdaSend(...args),
-      middlewareStack: { add: (...args: unknown[]) => mockMiddlewareStackAdd(...args) },
+      middlewareStack: {
+        add: (...args: unknown[]) => mockMiddlewareStackAdd(...args),
+      },
     })),
   };
 });

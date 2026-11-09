@@ -80,7 +80,11 @@ const buildHarness = ({ namePrefix }: { namePrefix?: string }) => {
   } as unknown as LambdaToolFunctionsService;
 
   const layerManager = new LambdaLayerManagerService(
-    { layerBucket: LAYER_BUCKET, resourceNamespace: RESOURCE_NAMESPACE, namePrefix },
+    {
+      layerBucket: LAYER_BUCKET,
+      resourceNamespace: RESOURCE_NAMESPACE,
+      namePrefix,
+    },
     awsClient,
     toolFunctions,
     buildFakeLogicFunctionResourceService() as any,
@@ -113,7 +117,10 @@ describe('LambdaLayerManagerService', () => {
       applicationUniversalIdentifier: 'app-universal-id',
     });
 
-    const publishes = callsNamed(fakeLambda.calls, 'PublishLayerVersionCommand');
+    const publishes = callsNamed(
+      fakeLambda.calls,
+      'PublishLayerVersionCommand',
+    );
 
     expect(publishes).toHaveLength(1);
     expect(publishes[0].input.LayerName).toBe(expectedLayerName);
@@ -139,7 +146,10 @@ describe('LambdaLayerManagerService', () => {
       applicationUniversalIdentifier: 'app-universal-id',
     });
 
-    const publishes = callsNamed(fakeLambda.calls, 'PublishLayerVersionCommand');
+    const publishes = callsNamed(
+      fakeLambda.calls,
+      'PublishLayerVersionCommand',
+    );
 
     expect(publishes[0].input.LayerName).toBe(expectedLayerName);
     expect(expectedLayerName.startsWith(NAME_PREFIX)).toBe(false);
@@ -160,7 +170,10 @@ describe('LambdaLayerManagerService', () => {
       applicationUniversalIdentifier: 'app-universal-id',
     });
 
-    const publishes = callsNamed(fakeLambda.calls, 'PublishLayerVersionCommand');
+    const publishes = callsNamed(
+      fakeLambda.calls,
+      'PublishLayerVersionCommand',
+    );
 
     expect(publishes).toHaveLength(1);
     expect(publishes[0].input.LayerName).toBe(expectedLayerName);
@@ -189,9 +202,10 @@ describe('LambdaLayerManagerService', () => {
       applicationUniversalIdentifier: 'app-universal-id',
     });
 
-    const lists = callsNamed(fakeLambda.calls, 'ListLayerVersionsCommand').filter(
-      (call) => call.input.LayerName === expectedLayerName,
-    );
+    const lists = callsNamed(
+      fakeLambda.calls,
+      'ListLayerVersionsCommand',
+    ).filter((call) => call.input.LayerName === expectedLayerName);
     const deletes = callsNamed(fakeLambda.calls, 'DeleteLayerVersionCommand');
 
     expect(lists.length).toBeGreaterThan(0);

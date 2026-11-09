@@ -63,9 +63,8 @@ let LambdaToolFunctionsService: typeof LambdaToolFunctionsServiceType;
 
 beforeAll(async () => {
   jest.useRealTimers();
-  ({ LambdaToolFunctionsService } = await import(
-    'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-tool-functions.service'
-  ));
+  ({ LambdaToolFunctionsService } =
+    await import('src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-tool-functions.service'));
 });
 
 const buildHarness = ({ namePrefix }: { namePrefix?: string }) => {
@@ -98,7 +97,10 @@ describe('LambdaToolFunctionsService', () => {
 
     const arn = await service.ensureCommonLayerExists();
 
-    const publishes = callsNamed(fakeLambda.calls, 'PublishLayerVersionCommand');
+    const publishes = callsNamed(
+      fakeLambda.calls,
+      'PublishLayerVersionCommand',
+    );
 
     expect(publishes).toHaveLength(1);
     expect(publishes[0].input.LayerName.startsWith(NAME_PREFIX)).toBe(true);
@@ -110,7 +112,10 @@ describe('LambdaToolFunctionsService', () => {
 
     await service.ensureCommonLayerExists();
 
-    const publishes = callsNamed(fakeLambda.calls, 'PublishLayerVersionCommand');
+    const publishes = callsNamed(
+      fakeLambda.calls,
+      'PublishLayerVersionCommand',
+    );
 
     expect(publishes[0].input.LayerName.startsWith(NAME_PREFIX)).toBe(false);
   });
@@ -200,10 +205,14 @@ describe('LambdaToolFunctionsService', () => {
     });
 
     const fs = await import('fs/promises');
-    const { BUILDER_FUNCTION_NAME_PREFIX, BUILDER_HANDLER_PATH, BUILDER_LAMBDA_MEMORY_MB, BUILDER_LAMBDA_TIMEOUT_SECONDS, LAMBDA_EPHEMERAL_STORAGE_MB } =
-      await import(
-        'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/constants/lambda-driver.constant'
-      );
+    const {
+      BUILDER_FUNCTION_NAME_PREFIX,
+      BUILDER_HANDLER_PATH,
+      BUILDER_LAMBDA_MEMORY_MB,
+      BUILDER_LAMBDA_TIMEOUT_SECONDS,
+      LAMBDA_EPHEMERAL_STORAGE_MB,
+    } =
+      await import('src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/constants/lambda-driver.constant');
     const handlerContent = await fs.readFile(BUILDER_HANDLER_PATH, 'utf-8');
 
     const expectedName = computeHashedLambdaResourceName({

@@ -50,9 +50,8 @@ let LambdaDriver: typeof LambdaDriverType;
 
 beforeAll(async () => {
   jest.useRealTimers();
-  ({ LambdaDriver } = await import(
-    'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda.driver'
-  ));
+  ({ LambdaDriver } =
+    await import('src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda.driver'));
 });
 
 const buildOptions = (
@@ -109,13 +108,11 @@ describe('LambdaDriver.execute', () => {
   // specs) provisioning chain a cold build would otherwise trigger.
   const seedUpToDateExecutor = ({
     fakeLambda,
-    flatLogicFunction,
     flatApplication,
     namePrefix,
     expectedFunctionName,
   }: {
     fakeLambda: ReturnType<typeof createFakeLambdaClient>;
-    flatLogicFunction: ReturnType<typeof buildFlatLogicFunction>;
     flatApplication: ReturnType<typeof buildFlatApplication>;
     namePrefix: string | undefined;
     expectedFunctionName: string;
@@ -137,8 +134,12 @@ describe('LambdaDriver.execute', () => {
         State: 'Active',
         FunctionArn: `arn:aws:lambda:eu-west-1:123456789012:function:${expectedFunctionName}`,
         Layers: [
-          { Arn: `arn:aws:lambda:eu-west-1:123456789012:layer:${depsLayerName}:1` },
-          { Arn: `arn:aws:lambda:eu-west-1:123456789012:layer:${sdkLayerName}:1` },
+          {
+            Arn: `arn:aws:lambda:eu-west-1:123456789012:layer:${depsLayerName}:1`,
+          },
+          {
+            Arn: `arn:aws:lambda:eu-west-1:123456789012:layer:${sdkLayerName}:1`,
+          },
         ],
       },
       Tags: {},
@@ -158,7 +159,6 @@ describe('LambdaDriver.execute', () => {
 
     seedUpToDateExecutor({
       fakeLambda,
-      flatLogicFunction,
       flatApplication,
       namePrefix: NAME_PREFIX,
       expectedFunctionName,
@@ -198,7 +198,6 @@ describe('LambdaDriver.execute', () => {
 
     seedUpToDateExecutor({
       fakeLambda,
-      flatLogicFunction,
       flatApplication,
       namePrefix: undefined,
       expectedFunctionName: flatLogicFunction.id,

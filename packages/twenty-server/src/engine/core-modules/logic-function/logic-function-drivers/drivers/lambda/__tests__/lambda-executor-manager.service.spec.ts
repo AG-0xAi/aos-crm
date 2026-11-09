@@ -46,9 +46,8 @@ let LambdaExecutorManagerService: typeof LambdaExecutorManagerServiceType;
 
 beforeAll(async () => {
   jest.useRealTimers();
-  ({ LambdaExecutorManagerService } = await import(
-    'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-executor-manager.service'
-  ));
+  ({ LambdaExecutorManagerService } =
+    await import('src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-executor-manager.service'));
 });
 
 const buildHarness = ({ namePrefix }: { namePrefix?: string }) => {
@@ -116,8 +115,9 @@ describe('LambdaExecutorManagerService', () => {
   });
 
   it('creates a new executor with the prefixed FunctionName when it does not exist yet, then updates it once layers go stale', async () => {
-    const { service, layerManager, fakeLambda, flatApplication } =
-      buildHarness({ namePrefix: NAME_PREFIX });
+    const { service, layerManager, fakeLambda, flatApplication } = buildHarness(
+      { namePrefix: NAME_PREFIX },
+    );
     const flatLogicFunction = buildFlatLogicFunction();
     const expectedFunctionName = `${NAME_PREFIX}${flatLogicFunction.id}`;
 
@@ -136,8 +136,9 @@ describe('LambdaExecutorManagerService', () => {
       'arn:aws:lambda:eu-west-1:123456789012:layer:deps:1',
       'arn:aws:lambda:eu-west-1:123456789012:layer:sdk:1',
     ]);
-    expect(callsNamed(fakeLambda.calls, 'UpdateFunctionConfigurationCommand'))
-      .toHaveLength(0);
+    expect(
+      callsNamed(fakeLambda.calls, 'UpdateFunctionConfigurationCommand'),
+    ).toHaveLength(0);
 
     // Layers are now reported stale: the second build must update the
     // existing function in place, using the same prefixed FunctionName.
@@ -195,14 +196,18 @@ describe('LambdaExecutorManagerService', () => {
       applicationUniversalIdentifier: 'app-universal-id',
     });
 
-    const updatesCode = callsNamed(fakeLambda.calls, 'UpdateFunctionCodeCommand');
+    const updatesCode = callsNamed(
+      fakeLambda.calls,
+      'UpdateFunctionCodeCommand',
+    );
 
     expect(updatesCode).toHaveLength(1);
     expect(updatesCode[0].input.FunctionName).toBe(expectedFunctionName);
 
     const tags = callsNamed(fakeLambda.calls, 'TagResourceCommand');
     const bundleTag = tags.find(
-      (tag) => tag.input.Tags?.['twenty:bundle-checksum'] === 'bundle-checksum-v1',
+      (tag) =>
+        tag.input.Tags?.['twenty:bundle-checksum'] === 'bundle-checksum-v1',
     );
 
     expect(bundleTag).toBeDefined();
