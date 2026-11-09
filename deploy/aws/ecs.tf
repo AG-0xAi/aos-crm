@@ -135,7 +135,7 @@ locals {
     MAX_WORKSPACES                 = "0"
     # SEC-01 (SECURITY_AUDIT.md) is now var.logic_function_type
     # (variables.tf), defaulting to "DISABLED" so applying this file alone
-    # still enables nothing (CRM-035). The four LOGIC_FUNCTION_LAMBDA_* values
+    # still enables nothing (CRM-035). The five LOGIC_FUNCTION_LAMBDA_* values
     # below are inert while it stays DISABLED or LOCAL, same reasoning as
     # EMAIL_SMTP_HOST staying set while EMAIL_DRIVER=LOGGER above: they hold
     # no credential, so stating them ahead of the switch costs nothing and
