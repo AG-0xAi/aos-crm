@@ -14281,6 +14281,17 @@ msgstr "Invite by Link"
 msgid "Invite link sent to email addresses"
 msgstr "Invite link sent to email addresses"
 
+#. js-lingui-id: l+/rog
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/pages/settings/invite-to-betty/SettingsInviteToBetty.tsx
+msgid "Invite someone to Betty"
+msgstr "Invite someone to Betty"
+
+#. js-lingui-id: 8y71FF
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "Invite someone to your workspace"
+msgstr "Invite someone to your workspace"
+
 #. js-lingui-id: x1m5RZ
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
 msgid "Invite user"
@@ -25497,6 +25508,16 @@ msgstr "There is no activity associated with this record."
 msgid "There was an error while updating password."
 msgstr "There was an error while updating password."
 
+#. js-lingui-id: NaZquI
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They create their own Betty account and workspace"
+msgstr "They create their own Betty account and workspace"
+
+#. js-lingui-id: NG7YDf
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They join this workspace"
+msgstr "They join this workspace"
+
 #. js-lingui-id: 5Ml5Nr
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
 msgid "Thickness"
@@ -26648,11 +26669,6 @@ msgstr "Turns true into false and false into true."
 msgid "Turquoise"
 msgstr "Turquoise"
 
-#. js-lingui-id: iZcj2X
-#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
-msgid "Based on"
-msgstr "Based on"
-
 #. js-lingui-id: 8pmRvi
 #: src/pages/onboarding/SyncEmails.tsx
 msgid "Betty adds the people you email and meet, and keeps them up to date without manual data entry."
@@ -26667,11 +26683,6 @@ msgstr "Betty fields"
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
 msgid "Betty fills each level with the best model that meets your requirements"
 msgstr "Betty fills each level with the best model that meets your requirements"
-
-#. js-lingui-id: Y+V5Ym
-#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
-msgid "Betty version"
-msgstr "Betty version"
 
 #. js-lingui-id: qUadjH
 #: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
@@ -29940,3 +29951,12 @@ msgstr "Welcome."
 msgid "Skip animation"
 msgstr "Skip animation"
 
+#. js-lingui-id: iZcj2X
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Based on"
+msgstr "Based on"
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Betty version"
