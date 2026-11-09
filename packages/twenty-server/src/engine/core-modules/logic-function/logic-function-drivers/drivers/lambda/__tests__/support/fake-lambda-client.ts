@@ -11,7 +11,21 @@ export type FakeLambdaCall = { command: string; input: Record<string, any> };
 const arnFor = (kind: 'function' | 'layer', name: string): string =>
   `arn:aws:lambda:eu-west-1:123456789012:${kind}:${name}`;
 
-export const createFakeLambdaClient = () => {
+// The real SDK hands InvokeCommand callers a Uint8ArrayBlobAdapter, not a
+// plain Buffer -- callers call `.transformToString()` on it. Code under
+// test (lambda.driver.ts, lambda-tool-functions.service.ts) relies on that
+// method, so any fake InvokeCommand response needs it too.
+export const fakeLambdaPayload = (value: unknown): Buffer => {
+  const buffer = Buffer.from(JSON.stringify(value));
+
+  return Object.assign(buffer, {
+    transformToString: () => buffer.toString('utf-8'),
+  });
+};
+
+export const createFakeLambdaClient = (
+  overrides: Partial<Record<string, (input: any) => any>> = {},
+) => {
   const calls: FakeLambdaCall[] = [];
   const functions = new Map<string, any>();
   const layerVersions = new Map<
@@ -108,7 +122,7 @@ export const createFakeLambdaClient = () => {
       return {};
     },
     InvokeCommand: (input) => ({
-      Payload: Buffer.from(JSON.stringify({ echoed: input.Payload ?? null })),
+      Payload: fakeLambdaPayload({ echoed: input.Payload ?? null }),
     }),
   };
 
@@ -117,7 +131,7 @@ export const createFakeLambdaClient = () => {
 
     calls.push({ command: name, input: { ...command.input } });
 
-    const handler = handlers[name];
+    const handler = overrides[name] ?? handlers[name];
 
     if (!handler) {
       throw new Error(`fake-lambda-client: no handler for ${name}`);
