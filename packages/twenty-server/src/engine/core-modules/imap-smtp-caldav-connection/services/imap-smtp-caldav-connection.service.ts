@@ -23,6 +23,7 @@ import { SecureHttpClientService } from 'src/engine/core-modules/secure-http-cli
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { CalDavClientService } from 'src/modules/calendar/calendar-event-import-manager/drivers/caldav/services/caldav-client.service';
 import { CalDavFetchEventsService } from 'src/modules/calendar/calendar-event-import-manager/drivers/caldav/services/caldav-fetch-events.service';
+import { resolveMailServerUsername } from 'src/engine/core-modules/imap-smtp-caldav-connection/utils/resolve-mail-server-username.util';
 
 @Injectable()
 export class ImapSmtpCaldavService {
@@ -48,7 +49,7 @@ export class ImapSmtpCaldavService {
       port: params.port,
       ...buildImapTlsOptions(params.connectionSecurity),
       auth: {
-        user: params.username ?? handle,
+        user: resolveMailServerUsername(params.username, handle),
         pass: params.password,
       },
       logger: false,
@@ -143,7 +144,7 @@ export class ImapSmtpCaldavService {
       port: params.port,
       ...buildSmtpTlsOptions(params.connectionSecurity),
       auth: {
-        user: params.username ?? handle,
+        user: resolveMailServerUsername(params.username, handle),
         pass: params.password,
       },
       tls: buildMailServerCertificateOptions({
@@ -176,7 +177,7 @@ export class ImapSmtpCaldavService {
     try {
       const client = await this.caldavClientService.getClient({
         serverUrl: params.host,
-        username: params.username ?? handle,
+        username: resolveMailServerUsername(params.username, handle),
         password: params.password,
       });
 
