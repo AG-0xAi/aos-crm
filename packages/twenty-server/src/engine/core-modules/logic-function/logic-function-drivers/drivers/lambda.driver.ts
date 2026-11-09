@@ -26,7 +26,9 @@ import { LambdaExecutorManagerService } from 'src/engine/core-modules/logic-func
 import { LambdaLayerManagerService } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-layer-manager.service';
 import { LambdaToolFunctionsService } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-tool-functions.service';
 import { buildLogicFunctionTimeoutResult } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/utils/build-logic-function-timeout-result.util';
+import { getLambdaExecutorFunctionName } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/utils/get-lambda-executor-function-name.util';
 import { parseLambdaLogResult } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/utils/parse-lambda-log-result.util';
+import { assertLambdaNamePrefixFitsNameLimits } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/utils/validate-lambda-name-prefix.util';
 import { HANDLER_NAME_REGEX } from 'src/engine/metadata-modules/logic-function/constants/handler.contant';
 import { LogicFunctionExecutionStatus } from 'src/engine/metadata-modules/logic-function/dtos/logic-function-execution-result.dto';
 import { LogicFunctionExecutionMode } from 'src/engine/metadata-modules/logic-function/logic-function.entity';
@@ -53,8 +55,11 @@ export class LambdaDriver implements LogicFunctionDriver {
   private readonly layerManager: LambdaLayerManagerService;
   private readonly executorManager: LambdaExecutorManagerService;
   private readonly logicFunctionResourceService: LogicFunctionResourceService;
+  private readonly namePrefix: string | undefined;
 
   constructor(options: LambdaDriverOptions) {
+    assertLambdaNamePrefixFitsNameLimits(options.namePrefix);
+    this.namePrefix = options.namePrefix;
     this.logicFunctionResourceService = options.logicFunctionResourceService;
     this.awsClient = new LambdaAwsClientService(options);
     this.toolFunctions = new LambdaToolFunctionsService(
@@ -192,7 +197,10 @@ export class LambdaDriver implements LogicFunctionDriver {
 
       const payloadString = JSON.stringify(executorPayload);
       const params: InvokeCommandInput = {
-        FunctionName: flatLogicFunction.id,
+        FunctionName: getLambdaExecutorFunctionName({
+          flatLogicFunction,
+          namePrefix: this.namePrefix,
+        }),
         Payload: payloadString,
         LogType: LogType.Tail,
       };

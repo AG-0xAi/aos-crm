@@ -571,7 +571,84 @@ Nunca lleva contraseñas, tokens ni enlaces de invitación.
 
 Quitar la línea de `terraform.tfvars` y aplicar. No hay que tocar código ni reconstruir la imagen.
 
-## 11. Lo que este runbook no cubre
+## 11. Funciones de workflows en Lambda
+
+Un paso **CODE** de un workflow ejecuta el código del workflow. Con `LOGIC_FUNCTION_TYPE=LOCAL`
+(el único driver activo hasta CRM-035), ese código corre como proceso hijo del propio servidor y
+hereda su `process.env` completo -- incluida `PG_DATABASE_URL` y `ENCRYPTION_KEY`
+(`local-child-process-runner.service.ts:166-170`). Aceptable en un dev box de un solo tenant;
+inaceptable en esta beta, donde varios espacios comparten el mismo servidor. `LOGIC_FUNCTION_TYPE=LAMBDA`
+ejecuta ese código en AWS Lambda en su lugar, con una IAM de mínimo privilegio: cada función y cada
+capa que el driver crea lleva el prefijo `aos-crm-<entorno>-lf-`
+(`LOGIC_FUNCTION_LAMBDA_NAME_PREFIX`), así que la política IAM puede acotar a `function:<prefijo>*`
+y `layer:<prefijo>*` en vez de `function:*` sobre toda la cuenta (evidencia y tabla de acciones en
+`docs/aos/evidence/CRM-035/README.md`).
+
+Esta plataforma (esta sesión) no puede crear un usuario IAM ni una access key -- la cuenta se lo
+niega. Por eso el orden de encendido tiene un paso que solo el founder puede dar, y es exactamente
+este orden -- invertir (b) y (a), o saltarse (a), deja a ECS arrancando con el bloque `secrets` de
+las dos claves de Lambda apuntando a secretos vacíos, y la tarea falla con
+`ResourceInitializationError` antes de que el servidor llegue a arrancar:
+
+(a) **La plataforma aplica Terraform** con `logic_function_type = "DISABLED"` (su valor por
+    defecto, §2). Esto crea el rol de ejecución, el bucket de capas y los dos secretos vacíos
+    (`logic-function.tf`), y extiende la política `read-app-secrets` del rol de ejecución de ECS
+    (`iam.tf`) para que pueda leerlos -- sin activar nada: el bloque `secrets` de esas dos claves
+    (`ecs.tf`) solo existe cuando `logic_function_type == "LAMBDA"`, así que con `"DISABLED"` ECS
+    nunca intenta resolverlas y no hay `ResourceInitializationError` por secretos vacíos.
+
+(b) **El founder corre el script**, desde AWS CloudShell (tiene las credenciales de administrador
+    que esta sesión no tiene):
+
+    ```
+    deploy/aws-bootstrap/logic-function-user/create-user.sh \
+      --region <aws_region> \
+      --environment <environment> \
+      --name-prefix <logic_function_name_prefix> \
+      --exec-role-arn <logic_function_exec_role_arn> \
+      --layer-bucket <logic_function_layers_bucket> \
+      --permissions-boundary-arn <ARN de aos-limite-roles>
+    ```
+
+    Los tres valores entre `<...>` que no son suyos de memoria salen de `terraform output` en
+    `deploy/aws`, ya generados por el `apply` de (a) (named igual: `logic_function_name_prefix`,
+    `logic_function_exec_role_arn`, `logic_function_layers_bucket`). El script crea el usuario
+    `aos-crm-<entorno>-logic-function`, le pone una política en línea acotada a las acciones
+    exactas de la tabla de evidencia (nunca `lambda:*`), crea una access key y la escribe
+    directamente en los dos secretos que (a) ya creó vacíos
+    (`aos-crm/<entorno>/logic-function-access-key-id` y `...-secret-access-key`). Vuelve a
+    correrlo es seguro: la política se sobrescribe siempre, y una segunda access key solo se crea
+    con `--rotate`.
+
+(c) **La plataforma aplica Terraform** otra vez, con `logic_function_type = "LAMBDA"` en
+    `terraform.tfvars` (una línea, igual que las etapas de correo del §9). Esto inyecta
+    `LOGIC_FUNCTION_TYPE=LAMBDA`, las cinco variables `LOGIC_FUNCTION_LAMBDA_*` de configuración
+    (`REGION`, `ROLE`, `LAYER_BUCKET`, `LAYER_BUCKET_REGION`, `NAME_PREFIX`) en el servidor y el
+    worker, y hace aparecer el bloque `secrets` que resuelve las dos claves de acceso que (b) ya
+    escribió -- ninguna credencial nueva en el `environment` en claro de la tarea.
+
+(d) **La prueba del paso CODE**: un workflow con un paso **CODE** trivial que solo devuelve un
+    valor fijo (por ejemplo `return { ok: true }`), publicado y ejecutado una vez a mano. Si el
+    paso devuelve ese valor, el driver creó la función ejecutora en Lambda, la invocó y recibió la
+    respuesta -- la cadena IAM completa (rol de ejecución, capas, `iam:PassRole`) funcionó de
+    punta a punta. El caso de uso real que motiva este track -- "Programar serie" calculando las
+    fechas de envío -- tiene su propio ejemplo listo para pegar en
+    `docs/aos/examples/logic-functions/registration-schedule/` (ver más abajo).
+
+**Vuelta atrás**: `logic_function_type = "DISABLED"` en `terraform.tfvars` y aplicar otra vez.
+Ningún paso CODE vuelve a ejecutarse hasta que se reactive -- no hay reconstrucción de imagen ni
+cambio de código.
+
+### Ejemplo: "Programar serie" (fechas de envío con huso horario)
+
+`docs/aos/examples/logic-functions/registration-schedule/` trae una función lista para pegar en un
+paso CODE: a partir de la fecha de alta de una persona y una lista de desplazamientos en días,
+calcula las fechas de envío a las 09:00 hora de Madrid de cada día `alta + N`, ya convertidas a
+UTC y cruzando correctamente los cambios de hora de verano/invierno. Sin red, sin dependencias,
+sin secretos. El `README.md` de esa carpeta explica cómo pegar el código en el paso y qué forma
+tienen la entrada y la salida.
+
+## 12. Lo que este runbook no cubre
 
 - **El resto del panel de administración del servidor** (`/settings/admin-panel`): búsqueda de
   usuarios, impersonación y variables de configuración. De ese panel, CRM-016 solo ejercita la

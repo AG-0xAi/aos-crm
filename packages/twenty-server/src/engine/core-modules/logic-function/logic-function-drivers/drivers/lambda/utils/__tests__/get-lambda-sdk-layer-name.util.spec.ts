@@ -22,4 +22,24 @@ describe('getLambdaSdkLayerName', () => {
 
     expect(a).not.toBe(b);
   });
+
+  it('prepends the namePrefix when it is set', () => {
+    expect(
+      getLambdaSdkLayerName({
+        workspaceId: 'workspace-1',
+        applicationUniversalIdentifier: 'app-1',
+        namePrefix: 'aos-crm-prod-lf-',
+      }),
+    ).toBe('aos-crm-prod-lf-sdk-workspace-1-app-1');
+  });
+
+  it('does not prepend anything when namePrefix is empty', () => {
+    expect(
+      getLambdaSdkLayerName({
+        workspaceId: 'workspace-1',
+        applicationUniversalIdentifier: 'app-1',
+        namePrefix: '',
+      }),
+    ).toBe('sdk-workspace-1-app-1');
+  });
 });

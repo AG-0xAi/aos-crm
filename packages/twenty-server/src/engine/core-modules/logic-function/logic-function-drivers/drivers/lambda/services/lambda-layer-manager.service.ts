@@ -53,7 +53,7 @@ export class LambdaLayerManagerService {
   constructor(
     private readonly options: Pick<
       LambdaDriverOptions,
-      'layerBucket' | 'resourceNamespace'
+      'layerBucket' | 'resourceNamespace' | 'namePrefix'
     >,
     private readonly awsClient: LambdaAwsClientService,
     private readonly toolFunctions: LambdaToolFunctionsService,
@@ -67,6 +67,7 @@ export class LambdaLayerManagerService {
     const layerName = getLambdaDepsLayerName({
       flatApplication: context.flatApplication,
       namespace: this.options.resourceNamespace,
+      namePrefix: this.options.namePrefix,
     });
 
     const existingArn = await this.awsClient.getExistingLayerArn(layerName);
@@ -106,6 +107,7 @@ export class LambdaLayerManagerService {
     const layerName = getLambdaSdkLayerName({
       workspaceId: flatApplication.workspaceId,
       applicationUniversalIdentifier,
+      namePrefix: this.options.namePrefix,
     });
 
     const existingArn = await this.findFreshSdkLayerArn({
@@ -207,6 +209,7 @@ export class LambdaLayerManagerService {
     const layerName = getLambdaSdkLayerName({
       workspaceId,
       applicationUniversalIdentifier,
+      namePrefix: this.options.namePrefix,
     });
 
     await this.deleteAllLayerVersions(layerName);
@@ -228,10 +231,12 @@ export class LambdaLayerManagerService {
     const depsLayerName = getLambdaDepsLayerName({
       flatApplication,
       namespace: this.options.resourceNamespace,
+      namePrefix: this.options.namePrefix,
     });
     const sdkLayerName = getLambdaSdkLayerName({
       workspaceId: flatApplication.workspaceId,
       applicationUniversalIdentifier,
+      namePrefix: this.options.namePrefix,
     });
 
     const isOnCurrentSdkClient =

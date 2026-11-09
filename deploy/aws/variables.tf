@@ -299,9 +299,22 @@ variable "image_digest" {
 # ---------------------------------------------------------------------------
 
 variable "environment" {
-  description = "Short environment tag applied to every resource."
+  description = <<-EOT
+    Short environment tag applied to every resource. Also feeds
+    local.logic_function_name_prefix (logic-function.tf), "aos-crm-<env>-lf-",
+    which the Lambda driver applies to every function/layer name it creates
+    (LOGIC_FUNCTION_LAMBDA_NAME_PREFIX, ecs.tf) -- validate-lambda-name-prefix.
+    util.ts caps that prefix at 21 characters so prefixed names stay under
+    AWS's 64-character Lambda function-name limit, hence this variable's
+    validation below (8 for "aos-crm-" + len(environment) + 4 for "-lf-" <= 21).
+  EOT
   type        = string
   default     = "staging"
+
+  validation {
+    condition     = length("aos-crm-${var.environment}-lf-") <= 21
+    error_message = "environment \"${var.environment}\" makes the Lambda name prefix \"aos-crm-${var.environment}-lf-\" ${length("aos-crm-${var.environment}-lf-")} characters long, but LOGIC_FUNCTION_LAMBDA_NAME_PREFIX must be at most 21 characters (AWS's 64-character Lambda function-name limit minus the 43-character yarn-install tool function name). Use a shorter environment tag (at most 9 characters)."
+  }
 }
 
 variable "vpc_cidr" {
@@ -458,6 +471,30 @@ variable "signup_webhook_url" {
   type        = string
   default     = ""
   sensitive   = true
+}
+
+variable "logic_function_type" {
+  description = <<-EOT
+    LOGIC_FUNCTION_TYPE for the server/worker tasks (ecs.tf). "DISABLED"
+    (default) keeps the forced-off posture this stack has run since CRM-011
+    (SECURITY_AUDIT.md SEC-01): applying this file alone enables nothing.
+    Set to "LAMBDA" only after the founder's CloudShell script
+    (deploy/aws-bootstrap/logic-function-user/create-user.sh) has written
+    both logic-function-* secrets this stack creates empty (logic-function.tf)
+    -- see BETA_RUNBOOK.md's "Funciones de workflows en Lambda" for the order.
+    "LOCAL" is deliberately not an allowed value here: it hands every
+    workflow's code the server's full process.env, including
+    PG_DATABASE_URL and ENCRYPTION_KEY (local-child-process-runner.service.ts),
+    which is only acceptable for a single-tenant local dev box, never this
+    multi-workspace stack.
+  EOT
+  type        = string
+  default     = "DISABLED"
+
+  validation {
+    condition     = contains(["DISABLED", "LAMBDA"], var.logic_function_type)
+    error_message = "logic_function_type must be DISABLED or LAMBDA (LOCAL is refused here; see this variable's description)."
+  }
 }
 
 variable "apex_mailbox_mx_records" {

@@ -51,4 +51,14 @@ describe('getLambdaDepsLayerName', () => {
       }),
     ).toBe('deps-abc123');
   });
+
+  it('prepends the namePrefix when it is set', () => {
+    expect(
+      getLambdaDepsLayerName({
+        flatApplication: buildFlatApplication(),
+        namespace: 'ns123',
+        namePrefix: 'aos-crm-prod-lf-',
+      }),
+    ).toBe('aos-crm-prod-lf-deps-ns123-abc123');
+  });
 });

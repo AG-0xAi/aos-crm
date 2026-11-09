@@ -45,4 +45,14 @@ describe('computeHashedLambdaResourceName', () => {
 
     expect(name).toMatch(/^twenty-builder-[0-9a-f]{12}$/);
   });
+
+  it('prepends the namePrefix when it is set', () => {
+    const name = computeHashedLambdaResourceName({
+      namePrefix: 'aos-crm-prod-lf-',
+      resourceNamePrefix: 'twenty-builder',
+      contents: ['handler-code'],
+    });
+
+    expect(name).toMatch(/^aos-crm-prod-lf-twenty-builder-[0-9a-f]{12}$/);
+  });
 });

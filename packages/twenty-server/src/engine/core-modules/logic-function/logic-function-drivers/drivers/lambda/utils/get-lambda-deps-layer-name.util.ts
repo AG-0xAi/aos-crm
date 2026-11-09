@@ -6,11 +6,14 @@ const DEPS_LAYER_NAME_PREFIX = 'deps';
 export const getLambdaDepsLayerName = ({
   flatApplication,
   namespace,
+  namePrefix,
 }: {
   flatApplication: FlatApplication;
   namespace?: string;
+  namePrefix?: string;
 }): string =>
   buildLambdaResourceName({
+    namePrefix,
     resourceNamePrefix: DEPS_LAYER_NAME_PREFIX,
     namespace,
     checksum: flatApplication.yarnLockChecksum ?? 'default',
