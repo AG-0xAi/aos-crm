@@ -113,7 +113,7 @@ export const PagesAndWorkspaceLinks: Story = {
       });
       expect(
         canvas.getByRole('menuitem', {
-          name: 'Invite someone to your workspace',
+          name: /Invite someone to your workspace/,
         }),
       ).toHaveAttribute('href', '/settings/members#invite');
       await userEvent.click(canvas.getByRole('menuitem', { name: /Open in/ }));
