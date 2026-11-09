@@ -125,9 +125,17 @@ resource "aws_route53_record" "apex_mailbox_cname" {
 # actions.
 data "aws_iam_policy_document" "ses_smtp_send" {
   statement {
-    effect    = "Allow"
-    actions   = ["ses:SendRawEmail"]
-    resources = [aws_sesv2_email_identity.this.arn]
+    effect  = "Allow"
+    actions = ["ses:SendRawEmail"]
+    # While the account is in the SES sandbox, SendRawEmail is also
+    # authorised against the verified recipient identity, so the domain
+    # identity alone yields "554 Access denied ... identity/<recipient>".
+    # identity/* stays bounded by the ses:FromAddress condition below; once
+    # SES leaves the sandbox this can go back to the domain identity only.
+    resources = [
+      aws_sesv2_email_identity.this.arn,
+      "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/*",
+    ]
 
     condition {
       test     = "StringEquals"
