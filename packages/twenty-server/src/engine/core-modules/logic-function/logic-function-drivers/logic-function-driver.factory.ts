@@ -95,6 +95,10 @@ export class LogicFunctionDriverFactory extends DriverFactoryBase<LogicFunctionD
           'LOGIC_FUNCTION_LAMBDA_NAME_PREFIX',
         );
 
+        const yarnInstallMemoryMb = this.twentyConfigService.get(
+          'LOGIC_FUNCTION_LAMBDA_YARN_INSTALL_MEMORY_MB',
+        );
+
         return new LambdaDriver({
           logicFunctionResourceService: this.logicFunctionResourceService,
           cacheLockService: this.cacheLockService,
@@ -113,6 +117,7 @@ export class LogicFunctionDriverFactory extends DriverFactoryBase<LogicFunctionD
           layerBucketRegion,
           resourceNamespace,
           namePrefix,
+          yarnInstallMemoryMb,
           sdkClientArchiveService: this.sdkClientArchiveService,
         });
       }

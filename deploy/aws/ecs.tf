@@ -141,13 +141,14 @@ locals {
     # no credential, so stating them ahead of the switch costs nothing and
     # means flipping to LAMBDA is a tfvars change, not a reshape of this
     # block. The actual AWS keys ride app_secrets below, never this one.
-    LOGIC_FUNCTION_TYPE                       = var.logic_function_type
-    LOGIC_FUNCTION_LAMBDA_REGION              = var.aws_region
-    LOGIC_FUNCTION_LAMBDA_ROLE                = aws_iam_role.logic_function_exec.arn
-    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET        = aws_s3_bucket.logic_function_layers.bucket
-    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET_REGION = var.aws_region
-    LOGIC_FUNCTION_LAMBDA_NAME_PREFIX         = local.logic_function_name_prefix
-    CODE_INTERPRETER_TYPE                     = "DISABLED"
+    LOGIC_FUNCTION_TYPE                          = var.logic_function_type
+    LOGIC_FUNCTION_LAMBDA_REGION                 = var.aws_region
+    LOGIC_FUNCTION_LAMBDA_ROLE                   = aws_iam_role.logic_function_exec.arn
+    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET           = aws_s3_bucket.logic_function_layers.bucket
+    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET_REGION    = var.aws_region
+    LOGIC_FUNCTION_LAMBDA_NAME_PREFIX            = local.logic_function_name_prefix
+    LOGIC_FUNCTION_LAMBDA_YARN_INSTALL_MEMORY_MB = tostring(var.logic_function_yarn_install_memory_mb)
+    CODE_INTERPRETER_TYPE                        = "DISABLED"
     # RDS Postgres 16 enforces SSL by default (rds.force_ssl) and rejects a
     # plaintext connection outright ("no pg_hba.conf entry ... no
     # encryption") -- the migrate task below hit exactly that during the

@@ -575,3 +575,14 @@ variable "apex_mailbox_cname_records" {
     error_message = "apex_mailbox_cname_records values must be hostnames, not URLs."
   }
 }
+
+variable "logic_function_yarn_install_memory_mb" {
+  description = "Memory (MB) for the Lambda that installs workflow-code dependencies (LOGIC_FUNCTION_LAMBDA_YARN_INSTALL_MEMORY_MB, ecs.tf). New AWS accounts cap Lambda memory at 3008 MB until a quota increase; Twenty's own default of 4096 fails there with 'MemorySize ... less than or equal to 3008'."
+  type        = number
+  default     = 3008
+
+  validation {
+    condition     = var.logic_function_yarn_install_memory_mb >= 128 && var.logic_function_yarn_install_memory_mb <= 10240
+    error_message = "logic_function_yarn_install_memory_mb must be between 128 and 10240."
+  }
+}
