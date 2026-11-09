@@ -29960,6 +29960,16 @@ msgstr "Te damos la bienvenida."
 msgid "Skip animation"
 msgstr "Saltar animación"
 
+#. js-lingui-id: iZcj2X
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Based on"
+msgstr "Basado en"
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Versión de Betty"
+
 #. js-lingui-id: OJp5A8
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
 #: src/modules/settings/hooks/useSettingsNavigationItems.tsx
@@ -30001,3 +30011,4 @@ msgstr "Los conectores personalizados se añaden en claude.ai desde el navegador
 #: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
 msgid "The URL must be your workspace's address ending in \"/mcp\"."
 msgstr "La URL debe ser la dirección de tu espacio de trabajo terminada en «/mcp»."
+

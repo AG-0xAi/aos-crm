@@ -2,21 +2,25 @@ import { SettingsTableCard } from '@/settings/components/SettingsTableCard';
 import { useApolloAdminClient } from '@/settings/admin-panel/apollo/hooks/useApolloAdminClient';
 import { SettingsAdminVersionDisplay } from '@/settings/admin-panel/components/SettingsAdminVersionDisplay';
 import { t } from '@lingui/core/macro';
+import { doNotTranslate } from 'twenty-shared/i18n';
 import { IconCircleDot, IconVersions } from 'twenty-ui/icon';
 import { useQuery } from '@apollo/client/react';
 import { GetVersionInfoDocument } from '~/generated-admin/graphql';
+
+// Bump this when the fork re-syncs its base with a newer Twenty upstream tag.
+const UPSTREAM_TWENTY_VERSION = doNotTranslate('Twenty v2.51.0');
 
 export const SettingsAdminVersionContainer = () => {
   const apolloAdminClient = useApolloAdminClient();
   const { data, loading } = useQuery(GetVersionInfoDocument, {
     client: apolloAdminClient,
   });
-  const { currentVersion, latestVersion } = data?.versionInfo ?? {};
+  const { currentVersion } = data?.versionInfo ?? {};
 
   const versionItems = [
     {
       Icon: IconCircleDot,
-      label: t`Current version`,
+      label: t`Betty version`,
       value: (
         <SettingsAdminVersionDisplay
           version={currentVersion}
@@ -27,12 +31,12 @@ export const SettingsAdminVersionContainer = () => {
     },
     {
       Icon: IconVersions,
-      label: t`Latest version`,
+      label: t`Based on`,
       value: (
         <SettingsAdminVersionDisplay
-          version={latestVersion}
-          loading={loading}
-          noVersionMessage={t`No latest version found`}
+          version={UPSTREAM_TWENTY_VERSION}
+          loading={false}
+          noVersionMessage={t`Unknown`}
         />
       ),
     },
