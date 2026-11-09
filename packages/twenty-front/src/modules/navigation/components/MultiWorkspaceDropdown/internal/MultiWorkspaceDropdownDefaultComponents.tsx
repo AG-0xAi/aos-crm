@@ -26,6 +26,7 @@ import {
   IconDotsVertical,
   IconLogout,
   IconMessage,
+  IconPlug,
   IconPlus,
   IconSettings,
   IconSwitchHorizontal,
@@ -188,6 +189,12 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
           startIcon={<IconUserPlus />}
         >
           {t`Invite user`}
+        </Dropdown.ActionItem>
+        <Dropdown.ActionItem
+          render={<Link to={getSettingsPath(SettingsPath.ConnectAssistant)} />}
+          startIcon={<IconPlug />}
+        >
+          {t`Connect ChatGPT or Claude`}
         </Dropdown.ActionItem>
         {isSupportChatConfigured && (
           <Dropdown.ActionItem

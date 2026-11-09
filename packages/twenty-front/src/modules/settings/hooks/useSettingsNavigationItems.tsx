@@ -29,6 +29,7 @@ import {
   IconMail,
   IconMessage,
   IconMessageCircle,
+  IconPlug,
   IconServer,
   IconSettings2,
   IconSparkles,
@@ -91,6 +92,11 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
           label: t`Experience`,
           path: SettingsPath.Experience,
           Icon: IconColorSwatch,
+        },
+        {
+          label: t`Connect ChatGPT or Claude`,
+          path: SettingsPath.ConnectAssistant,
+          Icon: IconPlug,
         },
         {
           label: isAppPreferencesEnabled ? t`App preferences` : t`Accounts`,

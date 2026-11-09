@@ -29810,6 +29810,48 @@ msgstr "source code link not configured on this server ({version})"
 msgid "version not reported"
 msgstr "version not reported"
 
+#. js-lingui-id: OJp5A8
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Connect ChatGPT or Claude"
+msgstr "Connect ChatGPT or Claude"
+
+#. js-lingui-id: DjrDw1
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "You connect with your own account, so this is personal to you, not a workspace setting."
+msgstr "You connect with your own account, so this is personal to you, not a workspace setting."
+
+#. js-lingui-id: qlwLcm
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Troubleshooting"
+msgstr "Troubleshooting"
+
+#. js-lingui-id: t6FENf
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "If the connector stops showing up inside Claude or ChatGPT, check these first."
+msgstr "If the connector stops showing up inside Claude or ChatGPT, check these first."
+
+#. js-lingui-id: om8roM
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
+msgstr "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
+
+#. js-lingui-id: esKwv8
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Inside a chat, turn Betty on from the tools menu."
+msgstr "Inside a chat, turn Betty on from the tools menu."
+
+#. js-lingui-id: YrG04M
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Custom connectors are added on claude.ai on the web or in the desktop app, not in the phone app."
+msgstr "Custom connectors are added on claude.ai on the web or in the desktop app, not in the phone app."
+
+#. js-lingui-id: TAcIr5
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "The URL must be your workspace's address ending in \"/mcp\"."
+msgstr "The URL must be your workspace's address ending in \"/mcp\"."
+
 #: src/modules/settings/admin-panel/sign-up-invitations/components/SettingsAdminSignUpInvitations.tsx
 msgid "This invitation is for this address only."
 msgstr "This invitation is for this address only."
