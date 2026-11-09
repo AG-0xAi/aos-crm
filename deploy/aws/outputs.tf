@@ -66,12 +66,29 @@ output "s3_bucket_name" {
 
 output "secrets_manager_secret_arns" {
   value = {
-    pg_database_url   = aws_secretsmanager_secret.pg_database_url.arn
-    redis_url         = aws_secretsmanager_secret.redis_url.arn
-    encryption_key    = aws_secretsmanager_secret.encryption_key.arn
-    ses_smtp_user     = aws_secretsmanager_secret.ses_smtp_user.arn
-    ses_smtp_password = aws_secretsmanager_secret.ses_smtp_password.arn
+    pg_database_url                  = aws_secretsmanager_secret.pg_database_url.arn
+    redis_url                        = aws_secretsmanager_secret.redis_url.arn
+    encryption_key                   = aws_secretsmanager_secret.encryption_key.arn
+    ses_smtp_user                    = aws_secretsmanager_secret.ses_smtp_user.arn
+    ses_smtp_password                = aws_secretsmanager_secret.ses_smtp_password.arn
+    logic_function_access_key_id     = aws_secretsmanager_secret.logic_function_access_key_id.arn
+    logic_function_secret_access_key = aws_secretsmanager_secret.logic_function_secret_access_key.arn
   }
+}
+
+output "logic_function_exec_role_arn" {
+  description = "Lambda execution role (logic-function.tf). Pass to deploy/aws-bootstrap/logic-function-user/create-user.sh so its policy can grant iam:PassRole on exactly this ARN."
+  value       = aws_iam_role.logic_function_exec.arn
+}
+
+output "logic_function_layers_bucket" {
+  description = "S3 bucket the Lambda driver uploads dependency layer zips to (logic-function.tf)."
+  value       = aws_s3_bucket.logic_function_layers.bucket
+}
+
+output "logic_function_name_prefix" {
+  description = "LOGIC_FUNCTION_LAMBDA_NAME_PREFIX (ecs.tf). Pass to create-user.sh so its IAM policy scopes to function:<prefix>*/layer:<prefix>* instead of needing function:*."
+  value       = local.logic_function_name_prefix
 }
 
 output "ses_email_identity_arn" {

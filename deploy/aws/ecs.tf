@@ -133,10 +133,21 @@ locals {
     # reject unrecognised env keys.
     IS_EMAIL_VERIFICATION_REQUIRED = tostring(var.email_verification_required)
     MAX_WORKSPACES                 = "0"
-    # SEC-01 (SECURITY_AUDIT.md): forced regardless of any upstream
-    # default, same as deploy/local/compose.yaml's x-aos-crm-env anchor.
-    LOGIC_FUNCTION_TYPE   = "DISABLED"
-    CODE_INTERPRETER_TYPE = "DISABLED"
+    # SEC-01 (SECURITY_AUDIT.md) is now var.logic_function_type
+    # (variables.tf), defaulting to "DISABLED" so applying this file alone
+    # still enables nothing (CRM-035). The four LOGIC_FUNCTION_LAMBDA_* values
+    # below are inert while it stays DISABLED or LOCAL, same reasoning as
+    # EMAIL_SMTP_HOST staying set while EMAIL_DRIVER=LOGGER above: they hold
+    # no credential, so stating them ahead of the switch costs nothing and
+    # means flipping to LAMBDA is a tfvars change, not a reshape of this
+    # block. The actual AWS keys ride app_secrets below, never this one.
+    LOGIC_FUNCTION_TYPE                       = var.logic_function_type
+    LOGIC_FUNCTION_LAMBDA_REGION              = var.aws_region
+    LOGIC_FUNCTION_LAMBDA_ROLE                = aws_iam_role.logic_function_exec.arn
+    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET        = aws_s3_bucket.logic_function_layers.bucket
+    LOGIC_FUNCTION_LAMBDA_LAYER_BUCKET_REGION = var.aws_region
+    LOGIC_FUNCTION_LAMBDA_NAME_PREFIX         = local.logic_function_name_prefix
+    CODE_INTERPRETER_TYPE                     = "DISABLED"
     # RDS Postgres 16 enforces SSL by default (rds.force_ssl) and rejects a
     # plaintext connection outright ("no pg_hba.conf entry ... no
     # encryption") -- the migrate task below hit exactly that during the
@@ -176,6 +187,15 @@ locals {
     var.outbound_email_enabled ? [
       { name = "EMAIL_SMTP_USER", valueFrom = aws_secretsmanager_secret.ses_smtp_user.arn },
       { name = "EMAIL_SMTP_PASSWORD", valueFrom = aws_secretsmanager_secret.ses_smtp_password.arn },
+    ] : [],
+    # Same switch as the SES pair above: a Lambda access key that
+    # LOGIC_FUNCTION_TYPE=DISABLED/LOCAL never reads is a credential sitting
+    # in three tasks' environment for nothing. The secrets themselves and
+    # the execution role's read grant on them (logic-function.tf, iam.tf)
+    # stay unconditional, so turning this on is still only a tfvars change.
+    var.logic_function_type == "LAMBDA" ? [
+      { name = "LOGIC_FUNCTION_LAMBDA_ACCESS_KEY_ID", valueFrom = aws_secretsmanager_secret.logic_function_access_key_id.arn },
+      { name = "LOGIC_FUNCTION_LAMBDA_SECRET_ACCESS_KEY", valueFrom = aws_secretsmanager_secret.logic_function_secret_access_key.arn },
     ] : []
   )
 }

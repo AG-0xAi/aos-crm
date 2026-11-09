@@ -46,6 +46,14 @@ permissions_boundary_arn = "arn:aws:iam::REPLACE_ME:policy/aos-limite-roles"
 # shipped here: it is a secret the operator's own Betty workflow issues.
 # signup_webhook_url = "https://REPLACE_ME/webhooks/signup"
 
+# Workflow CODE steps on AWS Lambda (CRM-035). "DISABLED" (the default, so
+# this line can stay commented) is what the beta runs today -- applying this
+# stack alone enables nothing. Uncomment only after the founder's CloudShell
+# script (deploy/aws-bootstrap/logic-function-user/create-user.sh) has written
+# both logic-function-* secrets this stack creates empty; see
+# BETA_RUNBOOK.md's "Funciones de workflows en Lambda".
+# logic_function_type = "LAMBDA"
+
 # External mailbox at the apex (a provider like the one the founder uses, not
 # SES: SES only sends). The MX and SPF values come from the provider's own
 # setup page; the CNAME map carries its DKIM keys and, if it publishes them,

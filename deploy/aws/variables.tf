@@ -460,6 +460,30 @@ variable "signup_webhook_url" {
   sensitive   = true
 }
 
+variable "logic_function_type" {
+  description = <<-EOT
+    LOGIC_FUNCTION_TYPE for the server/worker tasks (ecs.tf). "DISABLED"
+    (default) keeps the forced-off posture this stack has run since CRM-011
+    (SECURITY_AUDIT.md SEC-01): applying this file alone enables nothing.
+    Set to "LAMBDA" only after the founder's CloudShell script
+    (deploy/aws-bootstrap/logic-function-user/create-user.sh) has written
+    both logic-function-* secrets this stack creates empty (logic-function.tf)
+    -- see BETA_RUNBOOK.md's "Funciones de workflows en Lambda" for the order.
+    "LOCAL" is deliberately not an allowed value here: it hands every
+    workflow's code the server's full process.env, including
+    PG_DATABASE_URL and ENCRYPTION_KEY (local-child-process-runner.service.ts),
+    which is only acceptable for a single-tenant local dev box, never this
+    multi-workspace stack.
+  EOT
+  type        = string
+  default     = "DISABLED"
+
+  validation {
+    condition     = contains(["DISABLED", "LAMBDA"], var.logic_function_type)
+    error_message = "logic_function_type must be DISABLED or LAMBDA (LOCAL is refused here; see this variable's description)."
+  }
+}
+
 variable "apex_mailbox_mx_records" {
   description = <<-EOT
     Optional MX records for an external mailbox provider receiving mail at

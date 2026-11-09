@@ -52,6 +52,12 @@ data "aws_iam_policy_document" "ecs_task_execution_secrets" {
       aws_secretsmanager_secret.encryption_key.arn,
       aws_secretsmanager_secret.ses_smtp_user.arn,
       aws_secretsmanager_secret.ses_smtp_password.arn,
+      # CRM-035: resolved into LOGIC_FUNCTION_LAMBDA_ACCESS_KEY_ID/
+      # _SECRET_ACCESS_KEY only when logic_function_type == "LAMBDA"
+      # (ecs.tf's app_secrets); the secrets themselves (logic-function.tf)
+      # exist and are readable either way, same as the SES pair above.
+      aws_secretsmanager_secret.logic_function_access_key_id.arn,
+      aws_secretsmanager_secret.logic_function_secret_access_key.arn,
     ]
   }
 }
