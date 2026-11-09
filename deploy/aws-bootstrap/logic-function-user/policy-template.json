@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeManageFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:InvokeFunction",
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:TagResource"
+      ],
+      "Resource": "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:__NAME_PREFIX__*"
+    },
+    {
+      "Sid": "ManageLayers",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:PublishLayerVersion",
+        "lambda:ListLayerVersions",
+        "lambda:DeleteLayerVersion",
+        "lambda:GetLayerVersion"
+      ],
+      "Resource": "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:layer:__NAME_PREFIX__*"
+    },
+    {
+      "Sid": "PassExecRoleToLambdaOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "__EXEC_ROLE_ARN__",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "UploadLayerArchives",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::__LAYER_BUCKET__/*"
+    }
+  ]
+}
