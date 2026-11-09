@@ -644,6 +644,14 @@ const SettingsAdmin = lazy(() =>
   })),
 );
 
+const SettingsInviteToBetty = lazy(() =>
+  import('~/pages/settings/invite-to-betty/SettingsInviteToBetty').then(
+    (module) => ({
+      default: module.SettingsInviteToBetty,
+    }),
+  ),
+);
+
 const SettingsAdminIndicatorHealthStatus = lazy(() =>
   import('~/pages/settings/admin-panel/SettingsAdminIndicatorHealthStatus').then(
     (module) => ({
@@ -1228,6 +1236,10 @@ const createSettingsRouteElements = ({
     {isAdminPageEnabled && (
       <>
         <Route path={SettingsPath.AdminPanel} element={<SettingsAdmin />} />
+        <Route
+          path={SettingsPath.InviteToBetty}
+          element={<SettingsInviteToBetty />}
+        />
         <Route
           path={SettingsPath.Enterprise}
           element={

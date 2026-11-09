@@ -14286,6 +14286,17 @@ msgstr "Invitar por enlace"
 msgid "Invite link sent to email addresses"
 msgstr "Enlace de invitación enviado a las direcciones de correo electrónico"
 
+#. js-lingui-id: l+/rog
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/pages/settings/invite-to-betty/SettingsInviteToBetty.tsx
+msgid "Invite someone to Betty"
+msgstr "Invitar a alguien a Betty"
+
+#. js-lingui-id: 8y71FF
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "Invite someone to your workspace"
+msgstr "Invitar a alguien a tu espacio"
+
 #. js-lingui-id: x1m5RZ
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
 msgid "Invite user"
@@ -25501,6 +25512,16 @@ msgstr "No hay actividad asociada con este registro."
 #: src/pages/auth/PasswordReset.tsx
 msgid "There was an error while updating password."
 msgstr "Hubo un error al actualizar la contraseña."
+
+#. js-lingui-id: NaZquI
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They create their own Betty account and workspace"
+msgstr "Crea su propia cuenta y espacio en Betty"
+
+#. js-lingui-id: NG7YDf
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They join this workspace"
+msgstr "Se une a este espacio"
 
 #. js-lingui-id: 5Ml5Nr
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts

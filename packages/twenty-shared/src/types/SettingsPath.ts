@@ -112,4 +112,5 @@ export enum SettingsPath {
   LegalDpaNew = 'legal/dpa/new',
 
   About = 'about',
+  InviteToBetty = 'invite-to-betty',
 }

@@ -1,5 +1,6 @@
 import { useAuth } from '@/auth/hooks/useAuth';
 import { availableWorkspacesState } from '@/auth/states/availableWorkspacesState';
+import { currentUserState } from '@/auth/states/currentUserState';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { countAvailableWorkspaces } from '@/auth/utils/availableWorkspacesUtils';
 import { isMultiWorkspaceEnabledState } from '@/client-config/states/isMultiWorkspaceEnabledState';
@@ -27,6 +28,7 @@ import {
   IconLogout,
   IconMessage,
   IconPlus,
+  IconSend,
   IconSettings,
   IconSwitchHorizontal,
   IconUserPlus,
@@ -37,6 +39,8 @@ import { useNavigateSettings } from '~/hooks/useNavigateSettings';
 import { getAbsoluteImageUrl } from '~/utils/image/getAbsoluteImageUrl';
 
 export const MultiWorkspaceDropdownDefaultComponents = () => {
+  const currentUser = useAtomStateValue(currentUserState);
+  const canAccessFullAdminPanel = currentUser?.canAccessFullAdminPanel ?? false;
   const currentWorkspace = useAtomStateValue(currentWorkspaceState);
   const isMultiWorkspaceEnabled = useAtomStateValue(
     isMultiWorkspaceEnabledState,
@@ -70,6 +74,10 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
       pathname: AppPath.SignInUp,
       searchParams: { action: 'create-new-workspace' },
     });
+  };
+
+  const handleInviteToBetty = () => {
+    navigateSettings(SettingsPath.InviteToBetty);
   };
 
   return (
@@ -179,6 +187,16 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
             {t`Open in`}
           </Dropdown.ActionItem>
         )}
+        {canAccessFullAdminPanel && (
+          <Dropdown.ActionItem
+            startIcon={<IconSend />}
+            description={t`They create their own Betty account and workspace`}
+            descriptionPlacement="below"
+            onClick={handleInviteToBetty}
+          >
+            {t`Invite someone to Betty`}
+          </Dropdown.ActionItem>
+        )}
         <Dropdown.ActionItem
           render={
             <Link
@@ -186,8 +204,10 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
             />
           }
           startIcon={<IconUserPlus />}
+          description={t`They join this workspace`}
+          descriptionPlacement="below"
         >
-          {t`Invite user`}
+          {t`Invite someone to your workspace`}
         </Dropdown.ActionItem>
         {isSupportChatConfigured && (
           <Dropdown.ActionItem
