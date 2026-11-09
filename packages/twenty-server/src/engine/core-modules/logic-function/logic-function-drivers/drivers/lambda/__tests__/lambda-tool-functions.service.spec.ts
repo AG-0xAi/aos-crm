@@ -67,7 +67,13 @@ beforeAll(async () => {
     await import('src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/services/lambda-tool-functions.service'));
 });
 
-const buildHarness = ({ namePrefix }: { namePrefix?: string }) => {
+const buildHarness = ({
+  namePrefix,
+  yarnInstallMemoryMb,
+}: {
+  namePrefix?: string;
+  yarnInstallMemoryMb?: number;
+}) => {
   const fakeLambda = createFakeLambdaClient({
     InvokeCommand: invokeCommandOverride,
   });
@@ -80,7 +86,12 @@ const buildHarness = ({ namePrefix }: { namePrefix?: string }) => {
   } as unknown as LambdaDriverOptions);
 
   const service = new LambdaToolFunctionsService(
-    { lambdaRole: LAMBDA_ROLE_ARN, resourceNamespace: 'test-ns', namePrefix },
+    {
+      lambdaRole: LAMBDA_ROLE_ARN,
+      resourceNamespace: 'test-ns',
+      namePrefix,
+      yarnInstallMemoryMb,
+    },
     awsClient,
   );
 
@@ -140,6 +151,23 @@ describe('LambdaToolFunctionsService', () => {
 
     expect(invokes).toHaveLength(1);
     expect(invokes[0].input.FunctionName).toBe(creates[0].input.FunctionName);
+  });
+
+  it('creates the yarn-install tool Lambda with the configured memory', async () => {
+    const { service, fakeLambda } = buildHarness({
+      namePrefix: NAME_PREFIX,
+      yarnInstallMemoryMb: 3008,
+    });
+
+    await service.runYarnInstallCreateLayer({
+      packageJson: '{}',
+      yarnLock: '',
+      presignedUploadUrl: 'https://example.invalid/upload',
+    });
+
+    const creates = callsNamed(fakeLambda.calls, 'CreateFunctionCommand');
+
+    expect(creates[0].input.MemorySize).toBe(3008);
   });
 
   it('creates the yarn-install tool Lambda with an unprefixed FunctionName when no prefix is set', async () => {

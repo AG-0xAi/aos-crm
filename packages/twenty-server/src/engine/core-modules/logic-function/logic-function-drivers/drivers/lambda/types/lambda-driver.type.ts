@@ -50,6 +50,7 @@ export interface LambdaDriverOptions extends LambdaClientConfig {
   layerBucketRegion: string;
   resourceNamespace: string;
   namePrefix?: string;
+  yarnInstallMemoryMb?: number;
 }
 
 export enum LambdaExecutionPhase {

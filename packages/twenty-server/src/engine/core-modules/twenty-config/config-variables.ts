@@ -907,6 +907,16 @@ export class ConfigVariables {
   LOGIC_FUNCTION_LAMBDA_NAME_PREFIX?: string;
 
   @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.LOGIC_FUNCTION_CONFIG,
+    description:
+      'Memory (MB) for the yarn-install tool Lambda. Defaults to 4096; new AWS accounts cap Lambda memory at 3008 MB until a quota increase, so set 3008 there.',
+    type: ConfigVariableType.NUMBER,
+  })
+  @CastToPositiveNumber()
+  @IsOptional()
+  LOGIC_FUNCTION_LAMBDA_YARN_INSTALL_MEMORY_MB?: number;
+
+  @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.CODE_INTERPRETER_CONFIG,
     description:
       'Code interpreter driver type - LOCAL for development (unsafe), E2B for sandboxed execution',

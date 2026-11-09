@@ -1,3 +1,4 @@
+import { resolveYarnInstallMemoryMb } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/utils/resolve-yarn-install-memory-mb.util';
 import * as fs from 'fs/promises';
 import { join } from 'path';
 
@@ -21,7 +22,6 @@ import {
   LAMBDA_EPHEMERAL_STORAGE_MB,
   YARN_INSTALL_FUNCTION_NAME_PREFIX,
   YARN_INSTALL_HANDLER_PATH,
-  YARN_INSTALL_LAMBDA_MEMORY_MB,
   YARN_INSTALL_LAMBDA_TIMEOUT_SECONDS,
 } from 'src/engine/core-modules/logic-function/logic-function-drivers/drivers/lambda/constants/lambda-driver.constant';
 import {
@@ -53,7 +53,7 @@ export class LambdaToolFunctionsService {
   constructor(
     private readonly options: Pick<
       LambdaDriverOptions,
-      'lambdaRole' | 'resourceNamespace' | 'namePrefix'
+      'lambdaRole' | 'resourceNamespace' | 'namePrefix' | 'yarnInstallMemoryMb'
     >,
     private readonly awsClient: LambdaAwsClientService,
   ) {}
@@ -249,7 +249,7 @@ export class LambdaToolFunctionsService {
         Role: this.options.lambdaRole,
         Runtime: LogicFunctionRuntime.NODE22,
         Timeout: YARN_INSTALL_LAMBDA_TIMEOUT_SECONDS,
-        MemorySize: YARN_INSTALL_LAMBDA_MEMORY_MB,
+        MemorySize: this.getYarnInstallMemoryMb(),
         EphemeralStorage: { Size: LAMBDA_EPHEMERAL_STORAGE_MB },
       };
 
@@ -344,7 +344,7 @@ export class LambdaToolFunctionsService {
       namespace: this.options.resourceNamespace,
       contents: [
         handlerContent,
-        String(YARN_INSTALL_LAMBDA_MEMORY_MB),
+        String(this.getYarnInstallMemoryMb()),
         String(YARN_INSTALL_LAMBDA_TIMEOUT_SECONDS),
         String(LAMBDA_EPHEMERAL_STORAGE_MB),
       ],
@@ -373,5 +373,9 @@ export class LambdaToolFunctionsService {
     });
 
     return this.builderFunctionName;
+  }
+
+  private getYarnInstallMemoryMb(): number {
+    return resolveYarnInstallMemoryMb(this.options.yarnInstallMemoryMb);
   }
 }
