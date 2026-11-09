@@ -130,6 +130,24 @@ fi
 previous_xtrace_state="$(set +o | grep xtrace)"
 set +x
 
+access_key_id=""
+secret_access_key=""
+
+# If put-secret-value fails after create-access-key already succeeded, this
+# would otherwise leave a live access key that was never stored anywhere:
+# nobody could use it, but nobody could find and delete it either. The trap
+# deletes it and keeps the key out of the error output; `set +x` is reasserted
+# here because a failing command re-enables the caller's xtrace state before
+# the trap runs.
+cleanup_new_key_on_failure() {
+  set +x
+  if [ -n "$access_key_id" ]; then
+    aws iam delete-access-key --user-name "$user_name" --access-key-id "$access_key_id" >/dev/null 2>&1 || true
+    echo "Failed to store the new access key in Secrets Manager; deleted the just-created access key to avoid leaving an orphaned credential. Re-run this script." >&2
+  fi
+}
+trap cleanup_new_key_on_failure EXIT
+
 access_key_pair="$(aws iam create-access-key --user-name "$user_name" --query '[AccessKey.AccessKeyId, AccessKey.SecretAccessKey]' --output text)"
 access_key_id="${access_key_pair%%$'\t'*}"
 secret_access_key="${access_key_pair#*$'\t'}"
@@ -141,6 +159,7 @@ aws secretsmanager put-secret-value \
   --secret-id "$secret_access_key_secret_name" \
   --secret-string "$secret_access_key" >/dev/null
 
+trap - EXIT
 unset access_key_pair access_key_id secret_access_key
 eval "$previous_xtrace_state"
 unset previous_xtrace_state
