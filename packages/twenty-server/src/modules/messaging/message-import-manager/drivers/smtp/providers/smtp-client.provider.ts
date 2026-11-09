@@ -15,6 +15,7 @@ import { SecureHttpClientService } from 'src/engine/core-modules/secure-http-cli
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { ConnectedAccountEntity } from 'src/engine/metadata-modules/connected-account/entities/connected-account.entity';
 import { ConnectedAccountTokenEncryptionService } from 'src/engine/metadata-modules/connected-account/services/connected-account-token-encryption.service';
+import { resolveMailServerUsername } from 'src/engine/core-modules/imap-smtp-caldav-connection/utils/resolve-mail-server-username.util';
 
 @Injectable()
 export class SmtpClientProvider {
@@ -58,7 +59,10 @@ export class SmtpClientProvider {
       port: smtpParams.port,
       ...buildSmtpTlsOptions(smtpParams.connectionSecurity),
       auth: {
-        user: smtpParams.username ?? connectedAccount.handle ?? '',
+        user: resolveMailServerUsername(
+          smtpParams.username,
+          connectedAccount.handle ?? '',
+        ),
         pass: smtpParams.password,
       },
       tls: buildMailServerCertificateOptions({

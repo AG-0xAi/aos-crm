@@ -17,6 +17,7 @@ import {
   MessageImportDriverExceptionCode,
 } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
 import { parseImapAuthenticationError } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/parse-imap-authentication-error.util';
+import { resolveMailServerUsername } from 'src/engine/core-modules/imap-smtp-caldav-connection/utils/resolve-mail-server-username.util';
 
 @Injectable()
 export class ImapClientProvider {
@@ -100,9 +101,10 @@ export class ImapClientProvider {
       port: imapParams.port || 993,
       ...buildImapTlsOptions(imapParams.connectionSecurity),
       auth: {
-        user: isDefined(imapParams.username)
-          ? imapParams.username
-          : connectedAccount.handle,
+        user: resolveMailServerUsername(
+          imapParams.username,
+          connectedAccount.handle,
+        ),
         pass: imapParams.password,
       },
       logger: false,

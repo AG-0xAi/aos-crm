@@ -13,6 +13,7 @@ import {
   CalendarEventImportDriverExceptionCode,
 } from 'src/modules/calendar/calendar-event-import-manager/drivers/exceptions/calendar-event-import-driver.exception';
 import { CalDavClientService } from 'src/modules/calendar/calendar-event-import-manager/drivers/caldav/services/caldav-client.service';
+import { resolveMailServerUsername } from 'src/engine/core-modules/imap-smtp-caldav-connection/utils/resolve-mail-server-username.util';
 
 @Injectable()
 export class CalDavClientProvider {
@@ -47,7 +48,10 @@ export class CalDavClientProvider {
 
     return this.calDavClientService.getClient({
       serverUrl: params.host,
-      username: params.username ?? connectedAccount.handle,
+      username: resolveMailServerUsername(
+        params.username,
+        connectedAccount.handle,
+      ),
       password: params.password,
     });
   }
