@@ -14,6 +14,7 @@ import {
   SIGN_UP_INVITATION_TOKEN_SEARCH_PARAM,
   SignUpInvitationService,
 } from 'src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service';
+import { type SignupWebhookService } from 'src/engine/core-modules/signup-webhook/services/signup-webhook.service';
 import { type TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
 jest.mock('twenty-emails', () => ({
@@ -120,15 +121,26 @@ const buildService = ({
     })),
   } as unknown as I18nService;
 
+  const signupWebhookService = {
+    enqueue: jest.fn(async () => undefined),
+  } as unknown as SignupWebhookService;
+
   const service = new SignUpInvitationService(
     appTokenRepository,
     twentyConfigService,
     workspaceDomainsService,
     emailService,
     i18nService,
+    signupWebhookService,
   );
 
-  return { service, appTokenRepository, emailService, store };
+  return {
+    service,
+    appTokenRepository,
+    emailService,
+    signupWebhookService,
+    store,
+  };
 };
 
 // Indexed and not .at(-1): twenty-server's tsconfig lib predates it (TS2550).
@@ -278,12 +290,18 @@ describe('SignUpInvitationService', () => {
     });
 
     it('stores only the hash and mails a link carrying the plaintext', async () => {
-      const { service, appTokenRepository, emailService, store } =
-        buildService();
+      const {
+        service,
+        appTokenRepository,
+        emailService,
+        signupWebhookService,
+        store,
+      } = buildService();
 
       const created = await service.create({
         email: ' Ana@Example.Test ',
         issuedByUserId: 'operator',
+        locale: 'en',
       });
 
       expect(created.email).toBe(EMAIL);
@@ -309,6 +327,13 @@ describe('SignUpInvitationService', () => {
         store.get(created.id)?.value,
       );
       expect(mailedLink()).not.toContain(store.get(created.id)?.value);
+
+      expect(signupWebhookService.enqueue).toHaveBeenCalledWith({
+        event: 'signup_invitation.created',
+        email: EMAIL,
+        locale: 'en',
+        expiresAt: created.expiresAt.toISOString(),
+      });
     });
   });
 

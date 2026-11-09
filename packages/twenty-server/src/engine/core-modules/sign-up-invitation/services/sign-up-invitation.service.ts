@@ -26,6 +26,8 @@ import { I18nService } from 'src/engine/core-modules/i18n/i18n.service';
 import { type SignUpInvitationDTO } from 'src/engine/core-modules/sign-up-invitation/dtos/sign-up-invitation.dto';
 import { SignUpInvitationStatusEnum } from 'src/engine/core-modules/sign-up-invitation/enums/sign-up-invitation-status.enum';
 import { getSignUpInvitationStatus } from 'src/engine/core-modules/sign-up-invitation/utils/get-sign-up-invitation-status.util';
+import { SignupWebhookService } from 'src/engine/core-modules/signup-webhook/services/signup-webhook.service';
+import { SIGNUP_INVITATION_CREATED_EVENT } from 'src/engine/core-modules/signup-webhook/types/signup-webhook-event.type';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
 const TOKEN_BYTES = 32;
@@ -45,6 +47,7 @@ export class SignUpInvitationService {
     private readonly workspaceDomainsService: WorkspaceDomainsService,
     private readonly emailService: EmailService,
     private readonly i18nService: I18nService,
+    private readonly signupWebhookService: SignupWebhookService,
   ) {}
 
   async findAll(): Promise<SignUpInvitationDTO[]> {
@@ -89,6 +92,15 @@ export class SignUpInvitationService {
       expiresAt,
       locale,
     });
+
+    this.signupWebhookService
+      .enqueue({
+        event: SIGNUP_INVITATION_CREATED_EVENT,
+        email: normalizedEmail,
+        locale,
+        expiresAt: expiresAt.toISOString(),
+      })
+      .catch(() => undefined);
 
     return this.toDTO(await this.findByIdOrThrow(invitationId));
   }

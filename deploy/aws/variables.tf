@@ -445,6 +445,21 @@ variable "email_verification_required" {
   }
 }
 
+variable "signup_webhook_url" {
+  description = <<-EOT
+    Webhook URL this stack POSTs a JSON event to on every Betty invitation
+    and sign-up (SIGNUP_WEBHOOK_URL, ecs.tf), for the operator's own lead
+    funnel (CRM-034, founder request 09/11/2026). Empty (default) disables
+    it entirely -- the server and worker never enqueue the job. Marked
+    sensitive: it is a secret URL, same reasoning as the SMTP credentials
+    below, but it rides the plain environment rather than Secrets Manager,
+    since it needs no IAM grant to reach the task.
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "apex_mailbox_mx_records" {
   description = <<-EOT
     Optional MX records for an external mailbox provider receiving mail at

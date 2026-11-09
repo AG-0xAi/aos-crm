@@ -50,6 +50,8 @@ import { MetricsService } from 'src/engine/core-modules/metrics/metrics.service'
 import { MetricsKeys } from 'src/engine/core-modules/metrics/types/metrics-keys.type';
 import { OnboardingService } from 'src/engine/core-modules/onboarding/onboarding.service';
 import { SignUpInvitationService } from 'src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service';
+import { SignupWebhookService } from 'src/engine/core-modules/signup-webhook/services/signup-webhook.service';
+import { USER_SIGNED_UP_EVENT } from 'src/engine/core-modules/signup-webhook/types/signup-webhook-event.type';
 import { TelemetryEventType } from 'src/engine/core-modules/telemetry/telemetry-event.type';
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { UserWorkspaceService } from 'src/engine/core-modules/user-workspace/user-workspace.service';
@@ -92,6 +94,7 @@ export class SignInUpService {
     private readonly eventLogEmitterService: EventLogEmitterService,
     private readonly billingService: BillingService,
     private readonly signUpInvitationService: SignUpInvitationService,
+    private readonly signupWebhookService: SignupWebhookService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -309,6 +312,21 @@ export class SignInUpService {
         params.workspace,
         params.roleId,
       );
+
+      this.signupWebhookService
+        .enqueue({
+          event: USER_SIGNED_UP_EVENT,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          locale: user.locale,
+          workspace: {
+            subdomain: params.workspace.subdomain,
+            displayName: params.workspace.displayName,
+          },
+          via: 'workspace_invitation',
+        })
+        .catch(() => undefined);
 
       return user;
     }
@@ -718,6 +736,21 @@ export class SignInUpService {
       void this.eventLogEmitterService
         .createContext({ workspaceId })
         .insertWorkspaceEvent(WORKSPACE_CREATED_EVENT, {});
+
+      this.signupWebhookService
+        .enqueue({
+          event: USER_SIGNED_UP_EVENT,
+          email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          locale: user.locale,
+          workspace: {
+            subdomain: workspace.subdomain,
+            displayName: workspace.displayName,
+          },
+          via: isDefined(signUpInvitation) ? 'signup_invitation' : 'other',
+        })
+        .catch(() => undefined);
 
       if (this.billingService.isBillingEnabled()) {
         await this.billingService.ensureBillingCustomer({

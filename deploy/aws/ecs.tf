@@ -148,6 +148,12 @@ locals {
     # encrypted but not verifying RDS's certificate chain. Verifying it
     # would need a core change, out of this spec (AWS_DEPLOYMENT_PLAN.md).
     PG_SSL_ALLOW_SELF_SIGNED = "true"
+    # Operator's own lead funnel (CRM-034, founder request 09/11/2026): the
+    # server and worker POST a JSON event here on every invitation/sign-up.
+    # Empty (default) disables it; it rides the plain environment rather
+    # than Secrets Manager (var.signup_webhook_url, variables.tf) since it
+    # needs no IAM grant.
+    SIGNUP_WEBHOOK_URL = var.signup_webhook_url
   }
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through

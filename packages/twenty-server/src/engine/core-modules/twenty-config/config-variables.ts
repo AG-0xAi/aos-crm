@@ -599,6 +599,17 @@ export class ConfigVariables {
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    isSensitive: true,
+    description:
+      "POSTs a JSON event on every Betty invitation and sign-up, for the operator's own funnel. Treat it as a secret URL.",
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptionalOrEmptyString()
+  @IsUrl({ require_tld: false, require_protocol: true })
+  SIGNUP_WEBHOOK_URL = '';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
     description:
       'Maximum number of workspaces allowed without a valid enterprise key. Empty or 0 means no limit. A valid Organization key lifts this limit regardless of its value.',
     type: ConfigVariableType.NUMBER,
