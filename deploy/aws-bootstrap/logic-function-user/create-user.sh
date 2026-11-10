@@ -152,12 +152,14 @@ access_key_pair="$(aws iam create-access-key --user-name "$user_name" --query '[
 access_key_id="${access_key_pair%%$'\t'*}"
 secret_access_key="${access_key_pair#*$'\t'}"
 
-aws secretsmanager put-secret-value \
+# The key goes through a pipe, not argv, so it never shows up in `ps` while
+# the call runs. printf adds no trailing newline to the stored value.
+printf '%s' "$access_key_id" | aws secretsmanager put-secret-value \
   --secret-id "$access_key_id_secret_name" \
-  --secret-string "$access_key_id" >/dev/null
-aws secretsmanager put-secret-value \
+  --secret-string file:///dev/stdin >/dev/null
+printf '%s' "$secret_access_key" | aws secretsmanager put-secret-value \
   --secret-id "$secret_access_key_secret_name" \
-  --secret-string "$secret_access_key" >/dev/null
+  --secret-string file:///dev/stdin >/dev/null
 
 trap - EXIT
 unset access_key_pair access_key_id secret_access_key
