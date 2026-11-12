@@ -5873,11 +5873,6 @@ msgstr "Cerrar vista previa"
 msgid "Close side panel"
 msgstr "Cerrar panel lateral"
 
-#. js-lingui-id: H4meUz
-#: src/modules/settings/components/SettingsCustomizeVideoModal.tsx
-msgid "Close video"
-msgstr "Cerrar video"
-
 #. js-lingui-id: gZoap8
 #: src/modules/settings/emailing-domains/utils/buildEmailingDomainAiSetupPrompt.ts
 msgid "Cloudflare may expect a name relative to the zone rather than the full hostname; avoid appending the domain twice. Show me the proposed changes and ask for confirmation before saving them."
@@ -6073,11 +6068,6 @@ msgstr "Elemento del menú de comandos"
 #: src/pages/settings/applications/SettingsApplicationCommandMenuItemDetail.tsx
 msgid "Command menu items"
 msgstr "Elementos del menú de comandos"
-
-#. js-lingui-id: 6anYzO
-#: src/pages/settings/developers/tabs/SettingsDevelopersCliTab.tsx
-msgid "Command reference"
-msgstr "Referencia de comandos"
 
 #. js-lingui-id: 45MZFs
 #: src/modules/settings/layout/components/SettingsLayoutItemsStats.tsx
@@ -24542,10 +24532,10 @@ msgstr "Subcampos"
 msgid "Subdomain"
 msgstr "Subdominio"
 
-#. js-lingui-id: Sv4BSp
+#. js-lingui-id: Jh3ZwL
 #: src/modules/settings/billing/constants/SettingsBillingPlanComparisonRows.ts
-msgid "Subdomain (yourco.twenty.com)"
-msgstr "Subdominio (yourco.twenty.com)"
+msgid "Subdomain (yourco.betty.management)"
+msgstr "Subdominio (yourco.betty.management)"
 
 #. js-lingui-id: mGO3xy
 #: src/modules/auth/sign-in-up/components/internal/SignInUpWorkspaceCreationForm.tsx
@@ -28211,11 +28201,6 @@ msgstr "Videollamada"
 msgid "Video conferencing"
 msgstr "Videoconferencia"
 
-#. js-lingui-id: 5LXK/o
-#: src/modules/settings/components/SettingsCustomizeVideoModal.tsx
-msgid "Video tutorials"
-msgstr "Tutoriales en vídeo"
-
 #. js-lingui-id: fROFIL
 #: src/modules/localization/hooks/useLocaleOptions.ts
 msgid "Vietnamese"
@@ -28496,16 +28481,6 @@ msgstr "Esperando permiso"
 msgid "Waiting for your approval"
 msgstr "Esperando tu aprobación"
 
-#. js-lingui-id: THYlSm
-#: src/pages/settings/ai/SettingsAI.tsx
-#: src/pages/settings/applications/SettingsApplications.tsx
-#: src/pages/settings/data-model/SettingsObjects.tsx
-#: src/pages/settings/developers/SettingsDevelopers.tsx
-#: src/pages/settings/layout/SettingsLayout.tsx
-#: src/pages/settings/members/SettingsWorkspaceMembers.tsx
-msgid "Walkthrough"
-msgstr "Guía paso a paso"
-
 #. js-lingui-id: r6y+jM
 #: src/modules/log-console/constants/LogConsoleLevels.ts
 #: src/modules/ui/feedback/toast/utils/getLocalizedToastProps.ts
@@ -28531,41 +28506,6 @@ msgstr "fue eliminado por"
 #: src/modules/activities/timeline-activities/rows/main-object/components/EventRowMainObject.tsx
 msgid "was restored by"
 msgstr "fue restaurado por"
-
-#. js-lingui-id: 0WPnTI
-#: src/pages/settings/ai/SettingsAI.tsx
-msgid "Watch AI demo"
-msgstr "Ver demo de IA"
-
-#. js-lingui-id: 5qU4Mu
-#: src/pages/settings/developers/SettingsDevelopers.tsx
-msgid "Watch API demo"
-msgstr "Ver demo de la API"
-
-#. js-lingui-id: inpQ46
-#: src/pages/settings/applications/SettingsApplications.tsx
-msgid "Watch apps demo"
-msgstr "Ver demo de aplicaciones"
-
-#. js-lingui-id: uIrZTC
-#: src/pages/settings/layout/SettingsLayout.tsx
-msgid "Watch customization demo"
-msgstr "Ver demo de personalización"
-
-#. js-lingui-id: syeoTg
-#: src/pages/settings/data-model/SettingsObjects.tsx
-msgid "Watch data model demo"
-msgstr "Ver demo del modelo de datos"
-
-#. js-lingui-id: egkNh9
-#: src/modules/settings/components/SettingsDiscoveryHeroCard.tsx
-msgid "Watch demo"
-msgstr "Ver demo"
-
-#. js-lingui-id: 6ZDYQy
-#: src/pages/settings/members/SettingsWorkspaceMembers.tsx
-msgid "Watch members demo"
-msgstr "Ver demo de miembros"
 
 #. js-lingui-id: Rxoy7e
 #: src/pages/settings/applications/SettingsApplicationDetails.tsx

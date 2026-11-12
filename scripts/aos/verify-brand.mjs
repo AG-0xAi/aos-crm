@@ -145,8 +145,7 @@ export const ALLOWLIST = [
   {
     file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template-version.constant.ts',
     match: 'Twenty Data Processing Agreement (DPA)',
-    reason:
-      "The title of Twenty Inc.'s own DPA template. Same reason as the template itself.",
+    reason: "The title of Twenty Inc.'s own DPA template. Same reason as the template itself.",
   },
   {
     file: 'packages/twenty-server/src/engine/core-modules/dpa/config/dpa-region-config.constant.ts',
@@ -210,20 +209,17 @@ export const ALLOWLIST = [
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/constants/agent-chat-seeds.constant.ts',
     match: 'Twenty field',
-    reason:
-      'Development seed chat transcript, never installed by a real workspace.',
+    reason: 'Development seed chat transcript, never installed by a real workspace.',
   },
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/utils/get-page-layout-widget-data-seeds.util.ts',
     match: 'Twenty Star History',
-    reason:
-      'Development seed dashboard widget, never installed by a real workspace.',
+    reason: 'Development seed dashboard widget, never installed by a real workspace.',
   },
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/core/utils/seed-agents.util.ts',
     match: 'Twenty',
-    reason:
-      'Development seed agent transcript, never installed by a real workspace.',
+    reason: 'Development seed agent transcript, never installed by a real workspace.',
   },
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-agent-chat-pending-input.workspace-service.ts',
@@ -234,14 +230,12 @@ export const ALLOWLIST = [
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-workflow-pending-input.workspace-service.ts',
     match: 'Twenty subscription renews',
-    reason:
-      'Development seed workflow draft, never installed by a real workspace.',
+    reason: 'Development seed workflow draft, never installed by a real workspace.',
   },
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/services/dev-seeder-workflow-pending-input.workspace-service.ts',
     match: 'Your Twenty renewal on October 31',
-    reason:
-      'Development seed workflow draft, never installed by a real workspace.',
+    reason: 'Development seed workflow draft, never installed by a real workspace.',
   },
   {
     file: 'packages/twenty-server/src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1792741864752-backfill-standard-application-default-role.command.ts',
@@ -265,7 +259,7 @@ export const ALLOWLIST = [
     file: 'packages/twenty-ui/src/icon/constants/TwentyIconDictionary.ts',
     match: 'figma.com/design/xt8O9mFeLl46C5InWwoMrN/Twenty',
     reason:
-      'The upstream Figma file this icon dictionary is generated from, kept as provenance. Figma-hosted, not Twenty-hosted, and it is not rendered anywhere.',
+      "The upstream Figma file this icon dictionary is generated from, kept as provenance. Figma-hosted, not Twenty-hosted, and it is not rendered anywhere.",
   },
   {
     file: 'packages/twenty-server/src/engine/core-modules/telemetry/telemetry.service.ts',
@@ -283,7 +277,7 @@ export const ALLOWLIST = [
     file: 'packages/twenty-server/src/engine/api/mcp/constants/mcp-excluded-tool-names.constant.ts',
     match: 'https://docs.twenty.com/mcp',
     reason:
-      'A comment recording WHY search_help_center is excluded from MCP. CRM-019 also removed the request itself from the tool, so this names a destination the code no longer has.',
+      "A comment recording WHY search_help_center is excluded from MCP. CRM-019 also removed the request itself from the tool, so this names a destination the code no longer has.",
   },
   {
     file: 'packages/twenty-shared/src/utils/image/getLogoUrlFromDomainName.ts',
@@ -389,12 +383,9 @@ export function extractUserFacingStrings(source, { isHtml = false } = {}) {
     // from '...' on its own line (multi-line import tails)
     if (/^}?\s*from\s+['"]/.test(line)) continue;
 
-    for (const match of line.matchAll(/'((?:[^'\\]|\\.)*)'/g))
-      strings.push(match[1]);
-    for (const match of line.matchAll(/"((?:[^"\\]|\\.)*)"/g))
-      strings.push(match[1]);
-    for (const match of line.matchAll(/`((?:[^`\\]|\\.)*)`/g))
-      strings.push(match[1]);
+    for (const match of line.matchAll(/'((?:[^'\\]|\\.)*)'/g)) strings.push(match[1]);
+    for (const match of line.matchAll(/"((?:[^"\\]|\\.)*)"/g)) strings.push(match[1]);
+    for (const match of line.matchAll(/`((?:[^`\\]|\\.)*)`/g)) strings.push(match[1]);
 
     // JSX text between tags on the same line, e.g. <Trans>By using X</Trans>
     for (const match of line.matchAll(/>([^<>{}]*[A-Za-z]{3}[^<>{}]*)</g)) {
@@ -431,11 +422,7 @@ export function findViolations({ relativePath, source }) {
       const asset = pattern.exec(value);
 
       if (asset !== null) {
-        violations.push({
-          kind: 'twenty-asset',
-          text: asset[0],
-          inside: value,
-        });
+        violations.push({ kind: 'twenty-asset', text: asset[0], inside: value });
       }
     }
   }
@@ -452,10 +439,7 @@ export function isAllowed(violation, allowlist = ALLOWLIST) {
   );
 }
 
-export function scanRepository({
-  root = REPO_ROOT,
-  allowlist = ALLOWLIST,
-} = {}) {
+export function scanRepository({ root = REPO_ROOT, allowlist = ALLOWLIST } = {}) {
   const files = SCANNED_GLOBS.flatMap((pattern) =>
     globSync(pattern, { cwd: root }),
   )
@@ -841,24 +825,16 @@ function selfTest() {
   const assert = (condition, message) => {
     if (!condition) throw new Error(message);
   };
-  const scan = (
-    source,
-    relativePath = 'packages/twenty-front/src/fixture.tsx',
-  ) => findViolations({ relativePath, source });
+  const scan = (source, relativePath = 'packages/twenty-front/src/fixture.tsx') =>
+    findViolations({ relativePath, source });
 
-  record(
-    'a seeded visible "Twenty" in a Lingui message FAILS the guard',
-    () => {
-      const found = scan('const title = t`Welcome to Twenty`;');
-      assert(found.length === 1, `expected 1 violation, got ${found.length}`);
-      assert(found[0].kind === 'twenty-name', found[0].kind);
-    },
-  );
+  record('a seeded visible "Twenty" in a Lingui message FAILS the guard', () => {
+    const found = scan('const title = t`Welcome to Twenty`;');
+    assert(found.length === 1, `expected 1 violation, got ${found.length}`);
+    assert(found[0].kind === 'twenty-name', found[0].kind);
+  });
   record('the same message saying Betty passes', () => {
-    assert(
-      scan('const title = t`Welcome to Betty`;').length === 0,
-      'Betty was flagged',
-    );
+    assert(scan('const title = t`Welcome to Betty`;').length === 0, 'Betty was flagged');
   });
   record('a seeded "Twenty" in JSX text FAILS', () => {
     const found = scan('<Trans>By using Twenty, you agree to the</Trans>');
@@ -874,24 +850,21 @@ function selfTest() {
       assert(scan(source).length >= 1, `not flagged: ${source}`);
     }
   });
-  record(
-    'a seeded Twenty-hosted URL FAILS, for every host family that leaked',
-    () => {
-      for (const url of [
-        'https://docs.twenty.com/getting-started',
-        'https://twenty-icons.com/acme.com',
-        'https://twenty-telemetry.com/api/v2',
-        'https://twentyhq.github.io/placeholder-images/x.png',
-        'https://app.twenty.com/images/icons/x.png',
-      ]) {
-        const found = scan(`const url = '${url}';`);
-        assert(
-          found.some((violation) => violation.kind === 'twenty-host'),
-          `not flagged as a host: ${url}`,
-        );
-      }
-    },
-  );
+  record('a seeded Twenty-hosted URL FAILS, for every host family that leaked', () => {
+    for (const url of [
+      'https://docs.twenty.com/getting-started',
+      'https://twenty-icons.com/acme.com',
+      'https://twenty-telemetry.com/api/v2',
+      'https://twentyhq.github.io/placeholder-images/x.png',
+      'https://app.twenty.com/images/icons/x.png',
+    ]) {
+      const found = scan(`const url = '${url}';`);
+      assert(
+        found.some((violation) => violation.kind === 'twenty-host'),
+        `not flagged as a host: ${url}`,
+      );
+    }
+  });
   record(
     'a bare Twenty domain with no "https://" FAILS, the exact shape example data took',
     () => {
@@ -908,33 +881,26 @@ function selfTest() {
       }
     },
   );
-  record(
-    'code identifiers, package names and import paths are NOT flagged',
-    () => {
-      for (const source of [
-        "import { BRAND_NAME } from 'twenty-shared/constants';",
-        "import { isTwentyStandardApplication } from '@/applications/utils/isTwentyStandardApplication';",
-        'const x = isTwentyStandardApplication(app);',
-        'type WhatIsTwentyProps = { i18n: I18n };',
-        'export class TwentyConfigService {}',
-        "} from 'twenty-ui/theme';",
-        '// the upstream Twenty footer linked three sites',
-      ]) {
-        assert(scan(source).length === 0, `false positive: ${source}`);
-      }
-    },
-  );
+  record('code identifiers, package names and import paths are NOT flagged', () => {
+    for (const source of [
+      "import { BRAND_NAME } from 'twenty-shared/constants';",
+      "import { isTwentyStandardApplication } from '@/applications/utils/isTwentyStandardApplication';",
+      'const x = isTwentyStandardApplication(app);',
+      'type WhatIsTwentyProps = { i18n: I18n };',
+      'export class TwentyConfigService {}',
+      "} from 'twenty-ui/theme';",
+      '// the upstream Twenty footer linked three sites',
+    ]) {
+      assert(scan(source).length === 0, `false positive: ${source}`);
+    }
+  });
   record('index.html text, title, meta and hrefs are read', () => {
-    const html =
-      '<title>Twenty</title><meta property="og:title" content="Twenty" />';
+    const html = '<title>Twenty</title><meta property="og:title" content="Twenty" />';
     const found = findViolations({
       relativePath: 'packages/twenty-front/index.html',
       source: html,
     });
-    assert(
-      found.length >= 2,
-      `expected the title and the meta, got ${found.length}`,
-    );
+    assert(found.length >= 2, `expected the title and the meta, got ${found.length}`);
   });
   record("this repo's own index.html says Betty and nothing else", () => {
     const found = findViolations({
@@ -944,40 +910,28 @@ function selfTest() {
         'utf8',
       ),
     });
-    assert(
-      found.length === 0,
-      `index.html still names Twenty: ${JSON.stringify(found)}`,
-    );
+    assert(found.length === 0, `index.html still names Twenty: ${JSON.stringify(found)}`);
   });
   record('the allowlist is explicit: no wildcards, no bare directories', () => {
     for (const entry of ALLOWLIST) {
-      assert(
-        !/[*?]/.test(entry.file),
-        `wildcard in allowlist file: ${entry.file}`,
-      );
-      assert(
-        entry.match.length >= 6,
-        `allowlist match too broad: ${entry.match}`,
-      );
+      assert(!/[*?]/.test(entry.file), `wildcard in allowlist file: ${entry.file}`);
+      assert(entry.match.length >= 6, `allowlist match too broad: ${entry.match}`);
       assert(
         typeof entry.reason === 'string' && entry.reason.length > 30,
         `allowlist entry without a real reason: ${entry.file}`,
       );
     }
   });
-  record(
-    'every allowlist entry still names a file that exists and text it still excuses',
-    () => {
-      for (const entry of ALLOWLIST) {
-        statSync(resolve(REPO_ROOT, entry.file));
-        const source = readFileSync(resolve(REPO_ROOT, entry.file), 'utf8');
-        assert(
-          source.includes(entry.match),
-          `stale allowlist entry: ${entry.file} no longer contains ${JSON.stringify(entry.match)}`,
-        );
-      }
-    },
-  );
+  record('every allowlist entry still names a file that exists and text it still excuses', () => {
+    for (const entry of ALLOWLIST) {
+      statSync(resolve(REPO_ROOT, entry.file));
+      const source = readFileSync(resolve(REPO_ROOT, entry.file), 'utf8');
+      assert(
+        source.includes(entry.match),
+        `stale allowlist entry: ${entry.file} no longer contains ${JSON.stringify(entry.match)}`,
+      );
+    }
+  });
   record('an allowlist entry excuses only its own file', () => {
     const entry = ALLOWLIST[0];
     const violation = {
@@ -987,36 +941,30 @@ function selfTest() {
     };
     assert(!isAllowed(violation, [entry]), 'the allowlist leaked across files');
   });
-  record(
-    'generated catalogues, tests, mocks and stories are out of scope',
-    () => {
-      for (const path of [
-        'packages/twenty-front/src/locales/es-ES.po',
-        'packages/twenty-front/src/locales/generated/en.ts',
-        'packages/twenty-front/src/modules/x/__tests__/y.test.tsx',
-        'packages/twenty-front/src/modules/x/__mocks__/y.ts',
-        'packages/twenty-front/src/modules/x/__stories__/y.stories.tsx',
-        'packages/twenty-front/src/testing/mock-data/users.ts',
-        'packages/twenty-server/src/x/y.spec.ts',
-      ]) {
-        assert(!isScannedPath(path), `should be skipped: ${path}`);
-      }
-      for (const path of [
-        'packages/twenty-front/src/pages/auth/SignInUp.tsx',
-        'packages/twenty-emails/src/components/Footer.tsx',
-        'packages/twenty-server/src/engine/core-modules/auth/services/sign-in-up.service.ts',
-      ]) {
-        assert(isScannedPath(path), `should be scanned: ${path}`);
-      }
-    },
-  );
-  record(
-    "the generated theme carries the brand's palette and typography, in both schemes",
-    () => {
-      const failures = checkThemeIdentity();
-      assert(failures.length === 0, failures.join('; '));
-    },
-  );
+  record('generated catalogues, tests, mocks and stories are out of scope', () => {
+    for (const path of [
+      'packages/twenty-front/src/locales/es-ES.po',
+      'packages/twenty-front/src/locales/generated/en.ts',
+      'packages/twenty-front/src/modules/x/__tests__/y.test.tsx',
+      'packages/twenty-front/src/modules/x/__mocks__/y.ts',
+      'packages/twenty-front/src/modules/x/__stories__/y.stories.tsx',
+      'packages/twenty-front/src/testing/mock-data/users.ts',
+      'packages/twenty-server/src/x/y.spec.ts',
+    ]) {
+      assert(!isScannedPath(path), `should be skipped: ${path}`);
+    }
+    for (const path of [
+      'packages/twenty-front/src/pages/auth/SignInUp.tsx',
+      'packages/twenty-emails/src/components/Footer.tsx',
+      'packages/twenty-server/src/engine/core-modules/auth/services/sign-in-up.service.ts',
+    ]) {
+      assert(isScannedPath(path), `should be scanned: ${path}`);
+    }
+  });
+  record("the generated theme carries the brand's palette and typography, in both schemes", () => {
+    const failures = checkThemeIdentity();
+    assert(failures.length === 0, failures.join('; '));
+  });
   record('a theme that still names Inter, or a blue accent, FAILS', () => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-theme-'));
 
@@ -1051,27 +999,24 @@ function selfTest() {
       rmSync(sandbox, { recursive: true, force: true });
     }
   });
-  record(
-    'a reference to a Twenty-branded ASSET FILE fails, even with no host and no word',
-    () => {
-      for (const source of [
-        "const logo = '/images/integrations/twenty-logo.svg';",
-        "background-image: url('/images/integrations/twenty-logo.svg');",
-        'const url = `${window.location.origin}/images/icons/android/android-launchericon-192-192.png`;',
-        "background-image: url('/images/integrations/oauth-modal-header.png');",
-        "const art = '/images/onboarding/welcome-halftone.svg';",
-        "const tile = '/images/icons/windows11/Square150x150Logo.scale-100.png';",
-        "const splash = '/images/icons/windows11/SplashScreen.scale-200.png';",
-      ]) {
-        const found = scan(source);
+  record('a reference to a Twenty-branded ASSET FILE fails, even with no host and no word', () => {
+    for (const source of [
+      "const logo = '/images/integrations/twenty-logo.svg';",
+      "background-image: url('/images/integrations/twenty-logo.svg');",
+      "const url = `${window.location.origin}/images/icons/android/android-launchericon-192-192.png`;",
+      "background-image: url('/images/integrations/oauth-modal-header.png');",
+      "const art = '/images/onboarding/welcome-halftone.svg';",
+      "const tile = '/images/icons/windows11/Square150x150Logo.scale-100.png';",
+      "const splash = '/images/icons/windows11/SplashScreen.scale-200.png';",
+    ]) {
+      const found = scan(source);
 
-        assert(
-          found.some((violation) => violation.kind === 'twenty-asset'),
-          `not flagged as a Twenty asset: ${source}`,
-        );
-      }
-    },
-  );
+      assert(
+        found.some((violation) => violation.kind === 'twenty-asset'),
+        `not flagged as a Twenty asset: ${source}`,
+      );
+    }
+  });
   record("the brand's own assets and third-party logos are NOT flagged", () => {
     for (const source of [
       "const logo = '/brand/logo/betty-app-icon.svg';",
@@ -1083,17 +1028,14 @@ function selfTest() {
       assert(scan(source).length === 0, `false positive: ${source}`);
     }
   });
-  record(
-    'this repo names no Twenty-branded asset file anywhere in scope',
-    () => {
-      const { violations } = scanRepository();
-      const assets = violations.filter(
-        (violation) => violation.kind === 'twenty-asset',
-      );
+  record('this repo names no Twenty-branded asset file anywhere in scope', () => {
+    const { violations } = scanRepository();
+    const assets = violations.filter(
+      (violation) => violation.kind === 'twenty-asset',
+    );
 
-      assert(assets.length === 0, JSON.stringify(assets.slice(0, 5)));
-    },
-  );
+    assert(assets.length === 0, JSON.stringify(assets.slice(0, 5)));
+  });
   record('a vimeoId prop left in shipped front code FAILS', () => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-vimeo-'));
 
@@ -1116,31 +1058,28 @@ function selfTest() {
       rmSync(sandbox, { recursive: true, force: true });
     }
   });
-  record(
-    'a player.vimeo.com embed URL left in shipped front code FAILS',
-    () => {
-      const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-vimeo-'));
+  record('a player.vimeo.com embed URL left in shipped front code FAILS', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-vimeo-'));
 
-      try {
-        const file = resolve(sandbox, 'packages/twenty-front/src/fixture.tsx');
+    try {
+      const file = resolve(sandbox, 'packages/twenty-front/src/fixture.tsx');
 
-        mkdirSync(dirname(file), { recursive: true });
-        writeFileSync(
-          file,
-          'const src = `https://player.vimeo.com/video/${id}`;\n',
-        );
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(
+        file,
+        'const src = `https://player.vimeo.com/video/${id}`;\n',
+      );
 
-        const failures = checkNoVimeoReferences(sandbox);
+      const failures = checkNoVimeoReferences(sandbox);
 
-        assert(
-          failures.some((failure) => /player\.vimeo\.com/.test(failure)),
-          `player.vimeo.com was not reported: ${failures.join('; ')}`,
-        );
-      } finally {
-        rmSync(sandbox, { recursive: true, force: true });
-      }
-    },
-  );
+      assert(
+        failures.some((failure) => /player\.vimeo\.com/.test(failure)),
+        `player.vimeo.com was not reported: ${failures.join('; ')}`,
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
   record('this repo embeds no Vimeo video anywhere in scope', () => {
     const failures = checkNoVimeoReferences();
 
@@ -1200,40 +1139,31 @@ function selfTest() {
     assert(failures.length === 1, `expected 1 failure, got ${failures.length}`);
     assert(/<ShadowText>/.test(failures[0]), failures[0]);
   });
-  record(
-    'the same markup wrapped in <Column> passes, and nesting is not miscounted',
-    () => {
-      const wrapped = `<Row>\n  <Column>\n    <ShadowText>\n      <Link href="x" value="y" />\n    </ShadowText>\n  </Column>\n</Row>`;
+  record('the same markup wrapped in <Column> passes, and nesting is not miscounted', () => {
+    const wrapped = `<Row>\n  <Column>\n    <ShadowText>\n      <Link href="x" value="y" />\n    </ShadowText>\n  </Column>\n</Row>`;
 
-      assert(
-        findEmailRowFailures({ relativePath: 'f.tsx', source: wrapped })
-          .length === 0,
-        'a wrapped Row was flagged',
-      );
-      assert(
-        directChildTagNames(
-          '<Column><Link /></Column><Column>x</Column>',
-        ).join() === 'Column,Column',
-        directChildTagNames(
-          '<Column><Link /></Column><Column>x</Column>',
-        ).join(),
-      );
-    },
-  );
+    assert(
+      findEmailRowFailures({ relativePath: 'f.tsx', source: wrapped }).length === 0,
+      'a wrapped Row was flagged',
+    );
+    assert(
+      directChildTagNames('<Column><Link /></Column><Column>x</Column>').join() ===
+        'Column,Column',
+      directChildTagNames('<Column><Link /></Column><Column>x</Column>').join(),
+    );
+  });
   record('a Column inside a Fragment still counts as the <td>', () => {
     const fragment = `<Row>\n  <Fragment key={i}>\n    <Column>x</Column>\n  </Fragment>\n</Row>`;
 
     assert(
-      findEmailRowFailures({ relativePath: 'f.tsx', source: fragment })
-        .length === 0,
+      findEmailRowFailures({ relativePath: 'f.tsx', source: fragment }).length === 0,
       'a Column wrapped in a Fragment was flagged',
     );
     // ... and a Fragment is not a hole the real offender can hide in.
     const hidden = `<Row>\n  <Fragment>\n    <ShadowText>x</ShadowText>\n  </Fragment>\n</Row>`;
 
     assert(
-      findEmailRowFailures({ relativePath: 'f.tsx', source: hidden }).length ===
-        1,
+      findEmailRowFailures({ relativePath: 'f.tsx', source: hidden }).length === 1,
       'a non-Column inside a Fragment was not flagged',
     );
   });
@@ -1242,79 +1172,71 @@ function selfTest() {
 
     assert(failures.length === 0, failures.join('; '));
   });
-  record(
-    'a RELATIVE social preview image FAILS, a missing tag too, and so does drift',
-    () => {
-      const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-social-'));
+  record('a RELATIVE social preview image FAILS, a missing tag too, and so does drift', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-social-'));
 
-      try {
-        const htmlPath = resolve(sandbox, 'packages/twenty-front/index.html');
-        const brandPath = resolve(
-          sandbox,
-          'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts',
-        );
+    try {
+      const htmlPath = resolve(sandbox, 'packages/twenty-front/index.html');
+      const brandPath = resolve(
+        sandbox,
+        'packages/twenty-shared/src/constants/BrandSocialPreviewImageUrl.ts',
+      );
 
-        mkdirSync(dirname(htmlPath), { recursive: true });
-        mkdirSync(dirname(brandPath), { recursive: true });
-        writeFileSync(
-          brandPath,
-          "export const BRAND_SOCIAL_PREVIEW_IMAGE_URL = 'https://brand.test/icon.png';\n",
-        );
-        // What the review found: both cards pointing at a path no crawler can
-        // resolve.
-        writeFileSync(
-          htmlPath,
-          '<meta property="og:image" content="/brand/logo/icon-512.png" />\n<meta name="twitter:image" content="/brand/logo/icon-512.png" />\n',
-        );
+      mkdirSync(dirname(htmlPath), { recursive: true });
+      mkdirSync(dirname(brandPath), { recursive: true });
+      writeFileSync(
+        brandPath,
+        "export const BRAND_SOCIAL_PREVIEW_IMAGE_URL = 'https://brand.test/icon.png';\n",
+      );
+      // What the review found: both cards pointing at a path no crawler can
+      // resolve.
+      writeFileSync(
+        htmlPath,
+        '<meta property="og:image" content="/brand/logo/icon-512.png" />\n<meta name="twitter:image" content="/brand/logo/icon-512.png" />\n',
+      );
 
-        const relative = checkSocialPreviewMetadata(sandbox);
+      const relative = checkSocialPreviewMetadata(sandbox);
 
-        assert(relative.length === 2, JSON.stringify(relative));
-        assert(
-          relative.every((failure) =>
-            /not an absolute https URL/.test(failure),
-          ),
-          JSON.stringify(relative),
-        );
+      assert(relative.length === 2, JSON.stringify(relative));
+      assert(
+        relative.every((failure) => /not an absolute https URL/.test(failure)),
+        JSON.stringify(relative),
+      );
 
-        writeFileSync(htmlPath, '<title>Betty</title>\n');
-        const missing = checkSocialPreviewMetadata(sandbox);
+      writeFileSync(htmlPath, '<title>Betty</title>\n');
+      const missing = checkSocialPreviewMetadata(sandbox);
 
-        assert(missing.length === 2, JSON.stringify(missing));
-        assert(
-          missing.every((failure) => /declares no <meta/.test(failure)),
-          JSON.stringify(missing),
-        );
+      assert(missing.length === 2, JSON.stringify(missing));
+      assert(
+        missing.every((failure) => /declares no <meta/.test(failure)),
+        JSON.stringify(missing),
+      );
 
-        writeFileSync(
-          htmlPath,
-          '<meta property="og:image" content="https://brand.test/icon.png" />\n<meta name="twitter:image" content="https://elsewhere.test/other.png" />\n',
-        );
-        const drifted = checkSocialPreviewMetadata(sandbox);
+      writeFileSync(
+        htmlPath,
+        '<meta property="og:image" content="https://brand.test/icon.png" />\n<meta name="twitter:image" content="https://elsewhere.test/other.png" />\n',
+      );
+      const drifted = checkSocialPreviewMetadata(sandbox);
 
-        assert(drifted.length === 1, JSON.stringify(drifted));
-        assert(/twitter:image/.test(drifted[0]), drifted[0]);
+      assert(drifted.length === 1, JSON.stringify(drifted));
+      assert(/twitter:image/.test(drifted[0]), drifted[0]);
 
-        rmSync(brandPath);
-        assert(
-          checkSocialPreviewMetadata(sandbox).some((failure) =>
-            /declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL/.test(failure),
-          ),
-          'a missing brand constant was not reported',
-        );
-      } finally {
-        rmSync(sandbox, { recursive: true, force: true });
-      }
-    },
-  );
-  record(
-    "this repo's index.html names an absolute https image for both cards",
-    () => {
-      const failures = checkSocialPreviewMetadata();
+      rmSync(brandPath);
+      assert(
+        checkSocialPreviewMetadata(sandbox).some((failure) =>
+          /declares no BRAND_SOCIAL_PREVIEW_IMAGE_URL/.test(failure),
+        ),
+        'a missing brand constant was not reported',
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+  record("this repo's index.html names an absolute https image for both cards", () => {
+    const failures = checkSocialPreviewMetadata();
 
-      assert(failures.length === 0, failures.join('; '));
-    },
-  );
+    assert(failures.length === 0, failures.join('; '));
+  });
   record('the guard is declared in the gate with its self-test', () => {
     const verify = JSON.parse(readFileSync(resolveGateFile(), 'utf8'));
     assert(
@@ -1337,7 +1259,9 @@ function selfTest() {
 // than by the name it was invoked under (CRM-004 fix5's lesson). Other
 // verifiers import resolveGateFile from here, and an import must not run a
 // scan.
-const invokedPath = process.argv[1] ? resolve(process.argv[1]) : null;
+const invokedPath = process.argv[1]
+  ? resolve(process.argv[1])
+  : null;
 
 if (invokedPath === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--self-test')) selfTest();
