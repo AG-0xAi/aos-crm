@@ -29,3 +29,5 @@
 
 # Compiled Lingui catalogs: one generated line per locale. Reviewed through the .po sources.
 packages/*/src/locales/generated/*.ts -diff
+packages/twenty-server/src/engine/core-modules/i18n/locales/generated/*.ts -diff
+packages/twenty-emails/src/locales/generated/*.ts -diff
