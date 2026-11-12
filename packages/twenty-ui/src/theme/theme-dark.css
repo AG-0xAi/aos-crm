@@ -160,7 +160,7 @@
       2px 4px 16px 0px rgba(0, 0, 0, 0.12), 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
     --t-font-color-primary: #f9f5ec;
     --t-font-color-secondary: #bda58d;
-    --t-font-color-tertiary: #bda58d;
+    --t-font-color-tertiary: #a6907b;
     --t-font-color-light: #725f50;
     --t-font-color-extra-light: #725f50;
     --t-font-color-inverted: #2a2b24;
@@ -267,7 +267,7 @@
     --t-gray-scale-gray6: #725f50;
     --t-gray-scale-gray7: #725f50;
     --t-gray-scale-gray8: #725f50;
-    --t-gray-scale-gray9: #bda58d;
+    --t-gray-scale-gray9: #a6907b;
     --t-gray-scale-gray10: #bda58d;
     --t-gray-scale-gray11: #bda58d;
     --t-gray-scale-gray12: #f9f5ec;
@@ -412,7 +412,7 @@
     --t-color-gray6: #725f50;
     --t-color-gray7: #725f50;
     --t-color-gray8: #725f50;
-    --t-color-gray9: #bda58d;
+    --t-color-gray9: #a6907b;
     --t-color-gray10: #bda58d;
     --t-color-gray11: #bda58d;
     --t-color-gray12: #f9f5ec;

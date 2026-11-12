@@ -8,7 +8,11 @@
 
   &[aria-pressed='true'] {
     --tw-button-background: var(--t-accent-tertiary);
-    --tw-button-color: var(--t-accent-accent10);
+    // accent9-12 (ACCENT_INK) is only vetted for contrast on ivory (CRM-019,
+    // design-tokens/accent.ts); on accent-tertiary it drops to 2.82:1/1.75:1.
+    // font-color-primary is the same charcoal/ivory pair the brand already
+    // uses for primary text, and clears 4.5:1 on both taupe and muted-text.
+    --tw-button-color: var(--t-font-color-primary);
     --tw-button-hover: var(--t-accent-secondary);
     --tw-button-active: var(--t-accent-secondary);
   }

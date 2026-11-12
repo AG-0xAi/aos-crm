@@ -164,7 +164,7 @@
       0px 24px 56px -16px color(display-p3 0 0 0 / 0.078);
     --t-font-color-primary: #35362e;
     --t-font-color-secondary: #725f50;
-    --t-font-color-tertiary: #725f50;
+    --t-font-color-tertiary: #816d5c;
     --t-font-color-light: #bda58d;
     --t-font-color-extra-light: #bda58d;
     --t-font-color-inverted: #fffdf9;
@@ -271,7 +271,7 @@
     --t-gray-scale-gray6: #bda58d;
     --t-gray-scale-gray7: #bda58d;
     --t-gray-scale-gray8: #bda58d;
-    --t-gray-scale-gray9: #725f50;
+    --t-gray-scale-gray9: #816d5c;
     --t-gray-scale-gray10: #725f50;
     --t-gray-scale-gray11: #725f50;
     --t-gray-scale-gray12: #35362e;
@@ -299,7 +299,7 @@
     --t-color-bronze: color(display-p3 0.611 0.507 0.455);
     --t-color-gold: color(display-p3 0.579 0.517 0.41);
     --t-color-brown: color(display-p3 0.651 0.505 0.368);
-    --t-color-gray: #725f50;
+    --t-color-gray: #816d5c;
     --t-color-yellow1: color(display-p3 0.992 0.992 0.978);
     --t-color-yellow2: color(display-p3 0.995 0.99 0.922);
     --t-color-yellow3: color(display-p3 0.997 0.982 0.749);
@@ -416,7 +416,7 @@
     --t-color-gray6: #bda58d;
     --t-color-gray7: #bda58d;
     --t-color-gray8: #bda58d;
-    --t-color-gray9: #725f50;
+    --t-color-gray9: #816d5c;
     --t-color-gray10: #725f50;
     --t-color-gray11: #725f50;
     --t-color-gray12: #35362e;

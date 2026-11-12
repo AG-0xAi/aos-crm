@@ -9,7 +9,7 @@ export const GRAY_SCALE_DARK = {
   gray6: '#725f50',
   gray7: '#725f50',
   gray8: '#725f50',
-  gray9: '#bda58d',
+  gray9: '#a6907b',
   gray10: '#bda58d',
   gray11: '#bda58d',
   gray12: '#f9f5ec',
