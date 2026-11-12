@@ -9,14 +9,13 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 import { Section } from 'twenty-ui/components/layout';
-import { IconApps, IconShoppingBag, IconSparkle2 } from 'twenty-ui/icon';
+import { IconApps, IconShoppingBag } from 'twenty-ui/icon';
 import coverDark from '~/pages/settings/applications/assets/cover-dark.png';
 import coverLight from '~/pages/settings/applications/assets/cover-light.png';
 import { SettingsApplicationsAvailableTab } from '~/pages/settings/applications/tabs/SettingsApplicationsAvailableTab';
 import { SettingsApplicationsInstalledTab } from '~/pages/settings/applications/tabs/SettingsApplicationsInstalledTab';
 
 const APPLICATIONS_TAB_LIST_ID = 'applications-tab-list';
-const APPLICATIONS_HERO_INSTANCE_ID_PREFIX = 'settings-applications-hero';
 // Docs and older links still point to the developer tab that moved to the Developers page
 const LEGACY_DEVELOPER_TAB_HASH = '#developer';
 
@@ -79,21 +78,7 @@ export const SettingsApplications = () => {
     >
       <SettingsPageContainer>
         <Section.Root>
-          <SettingsDiscoveryHeroCard
-            lightSrc={coverLight}
-            darkSrc={coverDark}
-            instanceIdPrefix={APPLICATIONS_HERO_INSTANCE_ID_PREFIX}
-            tabs={[
-              {
-                id: 'app_marketplace_walkthrough',
-                title: t`Walkthrough`,
-                Icon: IconSparkle2,
-                vimeoId: '1217964666',
-                hasSound: true,
-              },
-            ]}
-            playButtonAriaLabel={t`Watch apps demo`}
-          />
+          <SettingsDiscoveryHeroCard lightSrc={coverLight} darkSrc={coverDark} />
         </Section.Root>
         {renderActiveTabContent()}
       </SettingsPageContainer>

@@ -181,8 +181,6 @@ export const SettingsWorkspaceCommunicationGroupChannelDetail = () => {
           <SettingsDiscoveryHeroCard
             lightSrc={channelSetupCoverLight}
             darkSrc={channelSetupCoverDark}
-            instanceIdPrefix="settings-email-channel-hero"
-            tabs={[]}
             footer={
               <SettingsDiscoveryHeroCardFooter
                 Icon={IconMail}

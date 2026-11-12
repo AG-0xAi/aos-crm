@@ -32,7 +32,6 @@ const StyledContentContainer = styled.div`
 `;
 
 const RESET_PAGE_LAYOUT_MODAL_ID = 'reset-page-layout-to-default-modal';
-const RECORD_PAGE_LAYOUT_HERO_INSTANCE_ID_PREFIX = 'record-page-layout-hero';
 
 type ObjectLayoutProps = {
   objectMetadataItem: EnrichedObjectMetadataItem;
@@ -105,8 +104,6 @@ export const ObjectLayout = ({ objectMetadataItem }: ObjectLayoutProps) => {
           lightSrc={recordPageLayoutCoverLight}
           darkSrc={recordPageLayoutCoverDark}
           coverHeight={153}
-          instanceIdPrefix={RECORD_PAGE_LAYOUT_HERO_INSTANCE_ID_PREFIX}
-          tabs={[]}
           footer={
             <SettingsDiscoveryHeroCardFooter
               Icon={IconAddressBook}

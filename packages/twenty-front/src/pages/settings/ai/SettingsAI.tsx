@@ -15,7 +15,6 @@ import {
   IconChartBar,
   IconCpu,
   IconPlus,
-  IconSparkle2,
   IconSparkles,
   IconTool,
 } from 'twenty-ui/icon';
@@ -32,8 +31,6 @@ import { useCreateTool } from '~/pages/settings/ai/hooks/useCreateTool';
 
 const AI_HERO_LIGHT = '/images/ai/ai-tools-cover-light.png';
 const AI_HERO_DARK = '/images/ai/ai-tools-cover-dark.png';
-
-const SETTINGS_AI_HERO_INSTANCE_ID_PREFIX = 'settings-ai-hero';
 
 export const SettingsAI = () => {
   const { handleCreateTool, isCreatingTool } = useCreateTool();
@@ -122,8 +119,6 @@ export const SettingsAI = () => {
               <SettingsDiscoveryHeroCard
                 lightSrc={McpCoverLight}
                 darkSrc={McpCoverDark}
-                instanceIdPrefix={SETTINGS_AI_HERO_INSTANCE_ID_PREFIX}
-                tabs={[]}
               />
             </Section.Root>
             <SettingsMcpSetup />
@@ -134,17 +129,6 @@ export const SettingsAI = () => {
             <SettingsDiscoveryHeroCard
               lightSrc={AI_HERO_LIGHT}
               darkSrc={AI_HERO_DARK}
-              instanceIdPrefix={SETTINGS_AI_HERO_INSTANCE_ID_PREFIX}
-              tabs={[
-                {
-                  id: 'ai_walkthrough',
-                  title: t`Walkthrough`,
-                  Icon: IconSparkle2,
-                  vimeoId: '1217964358',
-                  hasSound: true,
-                },
-              ]}
-              playButtonAriaLabel={t`Watch AI demo`}
             />
           </Section.Root>
         )}
