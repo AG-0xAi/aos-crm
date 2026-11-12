@@ -78,7 +78,10 @@ export const SettingsApplications = () => {
     >
       <SettingsPageContainer>
         <Section.Root>
-          <SettingsDiscoveryHeroCard lightSrc={coverLight} darkSrc={coverDark} />
+          <SettingsDiscoveryHeroCard
+            lightSrc={coverLight}
+            darkSrc={coverDark}
+          />
         </Section.Root>
         {renderActiveTabContent()}
       </SettingsPageContainer>

@@ -84,7 +84,10 @@ export const SettingsWorkspaceCommunications = () => {
     >
       <SettingsPageContainer>
         <Section.Root>
-          <SettingsDiscoveryHeroCard lightSrc={coverLight} darkSrc={coverDark} />
+          <SettingsDiscoveryHeroCard
+            lightSrc={coverLight}
+            darkSrc={coverDark}
+          />
         </Section.Root>
         <SettingsWorkspaceEmailGroupSection />
         <SettingsWorkspaceEmailSyncSection />
