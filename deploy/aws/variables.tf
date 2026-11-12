@@ -463,10 +463,15 @@ variable "signup_webhook_url" {
     Webhook URL this stack POSTs a JSON event to on every Betty invitation
     and sign-up (SIGNUP_WEBHOOK_URL, ecs.tf), for the operator's own lead
     funnel (CRM-034, founder request 09/11/2026). Empty (default) disables
-    it entirely -- the server and worker never enqueue the job. Marked
-    sensitive: it is a secret URL, same reasoning as the SMTP credentials
-    below, but it rides the plain environment rather than Secrets Manager,
-    since it needs no IAM grant to reach the task.
+    it entirely -- the server and worker never enqueue the job, and
+    secrets.tf creates no secret and no secret version for it. Marked
+    sensitive: it is a secret URL, so CRM-036 moved it off the plain
+    environment and into Secrets Manager (secrets.tf's
+    aws-crm/<environment>/signup-webhook-url), same as PG_DATABASE_URL and
+    REDIS_URL -- a plain ECS environment variable is readable by anyone
+    with DescribeTaskDefinition on the account, which this URL's bearer-
+    token-like capability (anyone holding it can trigger the founder's
+    workflow) cannot afford.
   EOT
   type        = string
   default     = ""

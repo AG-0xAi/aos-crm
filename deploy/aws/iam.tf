@@ -68,6 +68,34 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   policy = data.aws_iam_policy_document.ecs_task_execution_secrets.json
 }
 
+# CRM-036: its own resource, not folded into read-app-secrets above, on
+# purpose. This is the one genuine IAM change this track makes -- a new
+# grant on the execution role -- so it needs to show up in a `plan` as its
+# own add/destroy instead of hiding inside a diff of the combined policy's
+# JSON. deploy-beta.yaml (BETA_RUNBOOK.md §12) already refuses to apply any
+# plan that touches an IAM role, so setting var.signup_webhook_url is
+# always a two-step change: the founder (or the infrastructure session,
+# once the founder extends its permission set to allow this one role-
+# policy edit) applies this statement first, then the platform applies the
+# rest (the secret, its version and the `secrets` block entry) with
+# TF_VAR_signup_webhook_url. Scoped to the exact ARN, never a wildcard.
+data "aws_iam_policy_document" "ecs_task_execution_signup_webhook_secret" {
+  count = var.signup_webhook_url != "" ? 1 : 0
+
+  statement {
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.signup_webhook_url[0].arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_task_execution_signup_webhook_secret" {
+  count  = var.signup_webhook_url != "" ? 1 : 0
+  name   = "read-signup-webhook-secret"
+  role   = aws_iam_role.ecs_task_execution.id
+  policy = data.aws_iam_policy_document.ecs_task_execution_signup_webhook_secret[0].json
+}
+
 resource "aws_iam_role" "ecs_task_server" {
   name                 = "aos-crm-${var.environment}-ecs-task-server"
   assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json

@@ -160,12 +160,6 @@ locals {
     # encrypted but not verifying RDS's certificate chain. Verifying it
     # would need a core change, out of this spec (AWS_DEPLOYMENT_PLAN.md).
     PG_SSL_ALLOW_SELF_SIGNED = "true"
-    # Operator's own lead funnel (CRM-034, founder request 09/11/2026): the
-    # server and worker POST a JSON event here on every invitation/sign-up.
-    # Empty (default) disables it; it rides the plain environment rather
-    # than Secrets Manager (var.signup_webhook_url, variables.tf) since it
-    # needs no IAM grant.
-    SIGNUP_WEBHOOK_URL = var.signup_webhook_url
   }
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through
@@ -197,6 +191,15 @@ locals {
     var.logic_function_type == "LAMBDA" ? [
       { name = "LOGIC_FUNCTION_LAMBDA_ACCESS_KEY_ID", valueFrom = aws_secretsmanager_secret.logic_function_access_key_id.arn },
       { name = "LOGIC_FUNCTION_LAMBDA_SECRET_ACCESS_KEY", valueFrom = aws_secretsmanager_secret.logic_function_secret_access_key.arn },
+    ] : [],
+    # CRM-036: unlike the two switches above, this secret itself only
+    # exists when var.signup_webhook_url is set (secrets.tf) -- with it
+    # empty, this stays [] (no `secrets` entry for SIGNUP_WEBHOOK_URL at
+    # all) rather than pointing at a secret that was never created. The
+    # execution role's read grant on it (iam.tf's
+    # read-signup-webhook-secret) is conditional the same way.
+    var.signup_webhook_url != "" ? [
+      { name = "SIGNUP_WEBHOOK_URL", valueFrom = aws_secretsmanager_secret.signup_webhook_url[0].arn },
     ] : []
   )
 }
