@@ -301,7 +301,9 @@ export const AdvancedFilterCountBadge: Story = {
     await expect(badge).toBeVisible();
     await expect(badge).toHaveStyle({
       backgroundColor: badgeStyle.getPropertyValue('--t-accent-tertiary'),
-      color: badgeStyle.getPropertyValue('--t-accent-accent11'),
+      // CRM-021: the accent badge text is font-color-primary, for contrast on
+      // accent-tertiary (Badge.module.scss).
+      color: badgeStyle.getPropertyValue('--t-font-color-primary'),
     });
   },
 };
