@@ -14,9 +14,6 @@ import { themeCssVariables } from 'twenty-ui/theme';
 import { useCopyToClipboard } from '~/hooks/useCopyToClipboard';
 import { openUrlInNewTab } from '~/utils/openUrlInNewTab';
 
-const CLI_COMMAND_REFERENCE_URL =
-  'https://github.com/twentyhq/twenty/blob/main/packages/twenty-cli/docs/commands.md';
-
 const StyledButtonContainer = styled.div`
   display: flex;
   gap: ${themeCssVariables.spacing[2]};
@@ -95,22 +92,16 @@ export const SettingsDevelopersCliTab = () => {
         description={t`Scaffold an app, register it in this workspace and sync your changes as you code.`}
         commands={TWENTY_CLI_CREATE_APP_COMMANDS}
       >
-        <StyledButtonContainer>
-          <Button
-            startIcon={<IconArrowUpRight />}
-            size="sm"
-            variant="ghost"
-            onClick={() => openUrlInNewTab(CLI_COMMAND_REFERENCE_URL)}
-          >{t`Command reference`}</Button>
-          {isDefined(cliDocumentationUrl) && (
+        {isDefined(cliDocumentationUrl) && (
+          <StyledButtonContainer>
             <Button
               startIcon={<IconArrowUpRight />}
               size="sm"
               variant="outline"
               onClick={() => openUrlInNewTab(cliDocumentationUrl)}
             >{t`Read documentation`}</Button>
-          )}
-        </StyledButtonContainer>
+          </StyledButtonContainer>
+        )}
       </SettingsDevelopersCliCommandSection>
     </>
   );

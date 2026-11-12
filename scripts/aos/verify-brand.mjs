@@ -99,6 +99,14 @@ export const SKIPPED_PATH_FRAGMENTS = [
 export const TWENTY_HOST_PATTERN =
   /https?:\/\/[a-z0-9.-]*\btwenty(hq|-[a-z]+)?\b[a-z0-9.-]*\.[a-z]{2,}/gi;
 
+// The same host, with no "https://" in front. CRM-037 found exactly this
+// shape as EXAMPLE DATA with no scheme at all: 'tim@twenty.com' in a composite
+// field preview, 'twenty.com' as a Links field sample, a prefilled workflow's
+// sample domain value. None of those carry a protocol, so TWENTY_HOST_PATTERN
+// above never sees them.
+export const TWENTY_BARE_DOMAIN_PATTERN =
+  /\b(?:[a-z0-9-]+\.)*twenty(hq)?\.(?:com|io|dev|co)\b/gi;
+
 // The product name as a WORD, so TwentyOrm, isTwentyStandardApplication and
 // twenty-shared do not trip it -- those are code identifiers and package
 // names, which the contract says keep their upstream names.
@@ -144,6 +152,24 @@ export const ALLOWLIST = [
     match: 'Twenty.com',
     reason:
       "Twenty Inc.'s legal entities (Twenty.com PBC and Twenty.com SAS) as the DPA's processor. A legal entity name is a fact, not branding.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/config/dpa-region-config.constant.ts',
+    match: 'privacy@twenty.com',
+    reason:
+      "Twenty Inc.'s own Data Protection Officer contact address in its legal DPA. Same reason as the legal entity names above.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template.constant.ts',
+    match: 'privacy@twenty.com',
+    reason:
+      "Twenty Inc.'s own DPO contact address, repeated at several points of its legal Data Processing Agreement. Same reason as the template itself.",
+  },
+  {
+    file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template.constant.ts',
+    match: 'https://trust.twenty.com',
+    reason:
+      "Twenty Inc.'s own Trust Center, where its legal DPA tells a customer to find the current Sub-Processor list. Same reason as the template itself.",
   },
   {
     file: 'packages/twenty-server/src/engine/core-modules/dpa/services/dpa.service.ts',
@@ -297,12 +323,6 @@ export const ALLOWLIST = [
     reason: 'Same CLI package name, same server-admin-only tab.',
   },
   {
-    file: 'packages/twenty-front/src/pages/settings/developers/tabs/SettingsDevelopersCliTab.tsx',
-    match: 'https://github.com/twentyhq/twenty/blob/main/packages/twenty-cli/docs/commands.md',
-    reason:
-      "The CLI's own command reference. It documents the npm package above, is hosted by GitHub rather than by Twenty, and the tab is server-admin only.",
-  },
-  {
     file: 'packages/twenty-front/src/pages/settings/about/SettingsAbout.tsx',
     match: 'Its CRM is built on Twenty',
     reason:
@@ -388,6 +408,10 @@ export function findViolations({ relativePath, source }) {
 
     for (const url of value.match(TWENTY_HOST_PATTERN) ?? []) {
       violations.push({ kind: 'twenty-host', text: url, inside: value });
+    }
+
+    for (const domain of value.match(TWENTY_BARE_DOMAIN_PATTERN) ?? []) {
+      violations.push({ kind: 'twenty-host', text: domain, inside: value });
     }
 
     if (TWENTY_WORD_PATTERN.test(` ${value} `)) {
@@ -552,6 +576,36 @@ export function checkEmailMarkup(root = REPO_ROOT) {
   );
 }
 
+// CRM-037 deleted every hero-card walkthrough video: they played from
+// Twenty's own Vimeo account (player.vimeo.com) through a `vimeoId` prop on
+// SettingsDiscoveryHeroCard. Neither name is a code identifier anyone has a
+// reason to type again, so a bare substring match is enough and needs no
+// allowlist.
+export const VIMEO_REFERENCE_PATTERN = /\bvimeoId\b|player\.vimeo\.com/i;
+
+export function checkNoVimeoReferences(root = REPO_ROOT) {
+  const files = SCANNED_GLOBS.flatMap((pattern) =>
+    globSync(pattern, { cwd: root }),
+  )
+    .map((p) => p.split(sep).join(posix.sep))
+    .filter(isScannedPath)
+    .sort();
+
+  const failures = [];
+
+  for (const relativePath of files) {
+    const source = readFileSync(resolve(root, relativePath), 'utf8');
+
+    if (VIMEO_REFERENCE_PATTERN.test(source)) {
+      failures.push(
+        `${relativePath} references a Vimeo video (vimeoId or player.vimeo.com); CRM-037 removed every Twenty-hosted demo video`,
+      );
+    }
+  }
+
+  return failures;
+}
+
 export const BRAND_PUBLIC_ROOT = 'packages/twenty-front/public';
 
 // Every brand asset path this repo names, from both places one can be written:
@@ -704,6 +758,7 @@ function run() {
     ...checkBrandAssetsExist(),
     ...checkEmailMarkup(),
     ...checkSocialPreviewMetadata(),
+    ...checkNoVimeoReferences(),
   ];
 
   if (markupFailures.length > 0) {
@@ -807,6 +862,19 @@ function selfTest() {
       assert(
         found.some((violation) => violation.kind === 'twenty-host'),
         `not flagged as a host: ${url}`,
+      );
+    }
+  });
+  record('a bare Twenty domain with no "https://" FAILS, the exact shape example data took', () => {
+    for (const source of [
+      "const email = 'tim@twenty.com';",
+      "const primaryLinkUrl = 'twenty.com';",
+      "const value = 'twentyhq.io';",
+    ]) {
+      const found = scan(source);
+      assert(
+        found.some((violation) => violation.kind === 'twenty-host'),
+        `not flagged as a bare host: ${source}`,
       );
     }
   });
@@ -964,6 +1032,52 @@ function selfTest() {
     );
 
     assert(assets.length === 0, JSON.stringify(assets.slice(0, 5)));
+  });
+  record('a vimeoId prop left in shipped front code FAILS', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-vimeo-'));
+
+    try {
+      const file = resolve(sandbox, 'packages/twenty-front/src/fixture.tsx');
+
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "const tabs = [{ id: 'x', vimeoId: '1217964358' }];\n");
+
+      const failures = checkNoVimeoReferences(sandbox);
+
+      assert(
+        failures.some((failure) => /vimeoId/.test(failure)),
+        `vimeoId was not reported: ${failures.join('; ')}`,
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+  record('a player.vimeo.com embed URL left in shipped front code FAILS', () => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'aos-brand-vimeo-'));
+
+    try {
+      const file = resolve(sandbox, 'packages/twenty-front/src/fixture.tsx');
+
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(
+        file,
+        "const src = `https://player.vimeo.com/video/${id}`;\n",
+      );
+
+      const failures = checkNoVimeoReferences(sandbox);
+
+      assert(
+        failures.some((failure) => /player\.vimeo\.com/.test(failure)),
+        `player.vimeo.com was not reported: ${failures.join('; ')}`,
+      );
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+  record('this repo embeds no Vimeo video anywhere in scope', () => {
+    const failures = checkNoVimeoReferences();
+
+    assert(failures.length === 0, failures.join('; '));
   });
   record('every brand asset path this repo names exists on disk', () => {
     const references = collectBrandAssetReferences();
