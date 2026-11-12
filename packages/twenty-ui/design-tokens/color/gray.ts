@@ -13,13 +13,18 @@ import { BETTY_PALETTE } from './betty';
 //   2-3 background        ivory       / charcoal-hover
 //   4-5 raised + hairline beige       / charcoal
 //   6-8 borders, faint text taupe     / muted-text
-//   9-11 secondary text   muted-text  / taupe
+//   9  tertiary text      tertiary-text / tertiary-text-dark
+//   10-11 secondary text  muted-text  / taupe
 //   12 primary text, inverted surface charcoal / ivory
 //
 // MEASURED (scripts in .aos/reports/CRM-019.md): every text pair is equal or
 // better than upstream on the new background. font.color.tertiary, which draws
 // the sign-in legal links, goes from 2.85:1 to 5.96:1 and starts passing AA;
 // font.color.light stays below AA at 2.31:1, as it was at 2.10:1 before.
+// CRM-021 («Decision (2026-11-08): tertiary text tone») replaced that
+// repeated muted-text/taupe pair at step 9 with the coordinator's dedicated
+// tertiary tone: font.color.tertiary measures 4.51:1 on ivory in light and
+// 4.69:1 on charcoal-hover in dark.
 //
 // The `transparent` family below is unchanged: it is alpha over whatever is
 // underneath, so it follows these surfaces without being restated.
@@ -58,8 +63,8 @@ export const GRAY_COLOR_TOKENS = {
       dark: BETTY_PALETTE.mutedText,
     }),
     gray9: token({
-      light: BETTY_PALETTE.mutedText,
-      dark: BETTY_PALETTE.taupe,
+      light: BETTY_PALETTE.tertiaryText,
+      dark: BETTY_PALETTE.tertiaryTextDark,
     }),
     gray10: token({
       light: BETTY_PALETTE.mutedText,
