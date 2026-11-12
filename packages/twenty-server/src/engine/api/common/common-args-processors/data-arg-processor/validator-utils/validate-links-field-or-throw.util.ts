@@ -24,7 +24,9 @@ const assertDomainOrThrow = (value: unknown, fieldName: string) => {
     throw new CommonQueryRunnerException(
       `"${value}" is not a domain name, for domain-typed links field "${fieldName}"`,
       CommonQueryRunnerExceptionCode.INVALID_ARGS_DATA,
-      { userFriendlyMessage: msg`Please enter a domain name, like twenty.com` },
+      {
+        userFriendlyMessage: msg`Please enter a domain name, like example.com`,
+      },
     );
   }
 };

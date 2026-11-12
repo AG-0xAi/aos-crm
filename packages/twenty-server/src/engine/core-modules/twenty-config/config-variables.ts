@@ -2383,7 +2383,7 @@ export class ConfigVariables {
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.SERVER_CONFIG,
-    description: 'Base URL for the Enterprise API on twenty.com',
+    description: 'Base URL for the Enterprise API',
     isHiddenInAdminPanel: true,
     type: ConfigVariableType.STRING,
   })

@@ -126,20 +126,20 @@ export const SETTINGS_COMPOSITE_FIELD_TYPE_CONFIGS = {
     ],
     exampleValues: doNotTranslate([
       {
-        primaryEmail: 'tim@twenty.com',
+        primaryEmail: 'tim@example.com',
         additionalEmails: [
-          'tim@twenty.com',
-          'timapple@twenty.com',
-          'johnappletim@twenty.com',
+          'tim@example.com',
+          'timapple@example.com',
+          'johnappletim@example.com',
         ],
       },
       {
-        primaryEmail: 'jane@twenty.com',
-        additionalEmails: ['jane@twenty.com', 'jane.doe@twenty.com'],
+        primaryEmail: 'jane@example.com',
+        additionalEmails: ['jane@example.com', 'jane.doe@example.com'],
       },
       {
-        primaryEmail: 'john@twenty.com',
-        additionalEmails: ['john.doe@twenty.com'],
+        primaryEmail: 'john@example.com',
+        additionalEmails: ['john.doe@example.com'],
       },
     ]),
     category: 'Basic',
@@ -184,17 +184,17 @@ export const SETTINGS_COMPOSITE_FIELD_TYPE_CONFIGS = {
     ],
     exampleValues: doNotTranslate([
       {
-        primaryLinkUrl: 'twenty.com',
+        primaryLinkUrl: 'example.com',
         primaryLinkLabel: '',
         secondaryLinks: [{ url: BRAND_DOMAIN, label: BRAND_NAME }],
       },
       {
-        primaryLinkUrl: 'github.com/twentyhq/twenty',
-        primaryLinkLabel: `${BRAND_NAME} Repo`,
-        secondaryLinks: [{ url: 'twenty.com', label: '' }],
+        primaryLinkUrl: BRAND_DOMAIN,
+        primaryLinkLabel: `${BRAND_NAME} site`,
+        secondaryLinks: [{ url: 'example.com', label: '' }],
       },
       {
-        primaryLinkUrl: 'react.dev',
+        primaryLinkUrl: 'example.org',
         primaryLinkLabel: '',
         secondaryLinks: [],
       },

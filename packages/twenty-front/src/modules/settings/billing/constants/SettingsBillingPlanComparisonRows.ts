@@ -382,7 +382,7 @@ export const SETTINGS_BILLING_PLAN_COMPARISON_ROWS = [
     type: 'feature',
   },
   {
-    featureLabel: msg`Subdomain (yourco.twenty.com)`,
+    featureLabel: msg`Subdomain (yourco.betty.management)`,
     plans: {
       [BillingPlanKey.ENTERPRISE]: { kind: 'included' },
       [BillingPlanKey.ORGANIZATION_V2]: { kind: 'included' },

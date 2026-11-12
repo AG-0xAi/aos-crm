@@ -31,8 +31,6 @@ const renderCard = (colorScheme: 'light' | 'dark') => (
         lightSrc={recordPageLayoutCoverLight}
         darkSrc={recordPageLayoutCoverDark}
         coverHeight={153}
-        instanceIdPrefix={`object-layout-${colorScheme}`}
-        tabs={[]}
         footer={
           <SettingsDiscoveryHeroCardFooter
             Icon={IconAddressBook}
