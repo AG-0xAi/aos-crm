@@ -673,6 +673,22 @@ no el OK — por eso el entorno `beta` de GitHub puede exigir su aprobación
    si el servicio de `server`/`worker` no llega a estable — en ambos casos no
    hay que investigar a mano: el propio job ya dice qué paso falló.
 
+**El primer despliegue por este camino lo dispara el founder o la sesión de
+infraestructura con su OK, no la fábrica por su cuenta.** El rol y el entorno
+`beta` de GitHub pueden existir ya aplicados (§ "Configuración única", abajo)
+sin que eso autorice un primer `workflow_dispatch`: hasta que el founder diga
+que sí, nadie lanza este workflow contra la cuenta real, igual que ningún
+`apply` de `deploy/aws` se lanzó solo hasta CRM-013.
+
+**El rol no puede tocar IAM**, por el límite de permisos de
+`github-deploy-role/policy.tf` y por su *permissions boundary* (más abajo):
+si el `plan` de un despliegue cambia cualquier rol de ECS o el usuario SMTP
+de SES (por ejemplo, porque alguien tocó `iam.tf` o `ses.tf` en el mismo
+commit que el `image_digest`), el workflow se para antes del `apply` con un
+mensaje explícito en el job, en vez de fallar a medias con un `AccessDenied`
+de AWS. Ese cambio de IAM se aplica desde el PC del founder o la sesión de
+infraestructura, por separado — nunca desde este workflow.
+
 ### Volver atrás
 
 Mismo workflow, con `image_digest` puesto al digest anterior (el que salió
@@ -687,13 +703,18 @@ fiable sigue siendo restaurar por PITR, no un "down" de esquema.
 
 1. **Aplicar el rol.** Desde la sesión con credenciales SSO, aplicar
    `deploy/aws-bootstrap/github-deploy-role/` (su propio `README.md` tiene el
-   procedimiento exacto) y anotar `terraform output -raw role_arn`.
+   procedimiento exacto, incluido `permissions_boundary_arn`: el rol lleva la
+   misma política `aos-limite-roles` como *permissions boundary* que todo rol
+   `aos-*` desde CRM-027) y anotar `terraform output -raw role_arn`.
 2. **Crear el entorno `beta`** en GitHub (Settings → Environments → New
    environment → `beta`) y, dentro de él:
    - Variables: `AWS_DEPLOY_ROLE_ARN` (el ARN del paso 1), `AWS_REGION`
      (`eu-west-1`), `AWS_TFSTATE_BUCKET` (el bucket de estado de `deploy/aws`).
-   - Secreto: `AWS_TFVARS`, con el contenido completo de
-     `deploy/aws/terraform.tfvars`.
+   - Secretos: `AWS_TFVARS`, con el contenido completo de
+     `deploy/aws/terraform.tfvars`; `SIGNUP_WEBHOOK_URL`, con el valor de la
+     variable `signup_webhook_url` (§10) -- el workflow lo pasa al `plan`
+     como `TF_VAR_signup_webhook_url`, nunca escrito dentro de `AWS_TFVARS`
+     ni impreso en ningún log.
 3. **Opcional y recomendado:** marcar al founder como revisor obligatorio del
    entorno `beta` (misma pantalla → "Required reviewers"). Así cada
    despliegue espera su aprobación explícita antes de que el workflow pueda
