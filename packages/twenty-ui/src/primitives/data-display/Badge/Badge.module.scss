@@ -51,7 +51,11 @@
 
   &[data-badge-color='accent'] {
     background: var(--t-accent-tertiary);
-    color: var(--t-accent-accent11);
+    // accent9-12 (ACCENT_INK) is only vetted for contrast on ivory (CRM-019,
+    // design-tokens/accent.ts); on accent-tertiary it drops to 2.82:1/1.75:1.
+    // font-color-primary is the same charcoal/ivory pair the brand already
+    // uses for primary text, and clears 4.5:1 on both taupe and muted-text.
+    color: var(--t-font-color-primary);
   }
 
   &[data-badge-color='secondary'] {
