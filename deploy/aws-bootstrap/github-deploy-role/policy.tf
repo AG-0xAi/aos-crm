@@ -48,7 +48,7 @@ locals {
 
   secret_arn_pattern = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:aos-crm/${var.app_environment}/*"
 
-  s3_files_bucket_arn                = "arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"
+  s3_files_bucket_arn                 = "arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"
   s3_logic_function_layers_bucket_arn = "arn:aws:s3:::aos-crm-${var.app_environment}-logic-function-layers-${var.aws_account_id}"
 }
 
