@@ -39,7 +39,6 @@ export class SignupWebhookService {
       occurredAt: new Date().toISOString(),
       app: 'betty',
       appVersion: this.twentyConfigService.get('APP_VERSION') ?? 'unknown',
-      webhookUrl,
     };
 
     try {

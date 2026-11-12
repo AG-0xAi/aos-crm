@@ -1,5 +1,6 @@
 import { SignupWebhookJob } from 'src/engine/core-modules/signup-webhook/jobs/signup-webhook.job';
 import { type SignupWebhookJobData } from 'src/engine/core-modules/signup-webhook/types/signup-webhook-event.type';
+import { type TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 
 const DATA: SignupWebhookJobData = {
   event: 'user.signed_up',
@@ -12,7 +13,6 @@ const DATA: SignupWebhookJobData = {
   occurredAt: '2026-11-09T00:00:00.000Z',
   app: 'betty',
   appVersion: '1.2.3',
-  webhookUrl: 'https://founder.example.test/hooks/signup',
 };
 
 const httpError = (status?: number) => {
@@ -27,31 +27,52 @@ const httpError = (status?: number) => {
   return error;
 };
 
-const buildJob = (post: jest.Mock) => {
+const buildJob = (
+  post: jest.Mock,
+  {
+    webhookUrl = 'https://founder.example.test/hooks/signup',
+  }: { webhookUrl?: string } = {},
+) => {
   const secureHttpClientService = {
     getHttpClient: jest.fn(() => ({ post })),
   };
+  const twentyConfigService = {
+    get: jest.fn((key: string) =>
+      key === 'SIGNUP_WEBHOOK_URL' ? webhookUrl : undefined,
+    ),
+  } as unknown as TwentyConfigService;
 
-  return new SignupWebhookJob(secureHttpClientService as never);
+  return new SignupWebhookJob(
+    secureHttpClientService as never,
+    twentyConfigService,
+  );
 };
 
 describe('SignupWebhookJob', () => {
-  it('POSTs the payload without the webhook url as JSON', async () => {
+  it('POSTs the full job data (no webhook url in it) as JSON, to the url read from config', async () => {
     const post = jest.fn(async () => ({ status: 200 }));
     const job = buildJob(post);
 
     await job.handle(DATA);
 
-    const { webhookUrl, ...payload } = DATA;
-
+    expect(DATA).not.toHaveProperty('webhookUrl');
     expect(post).toHaveBeenCalledWith(
-      webhookUrl,
-      payload,
+      'https://founder.example.test/hooks/signup',
+      DATA,
       expect.objectContaining({
         headers: { 'Content-Type': 'application/json' },
         timeout: 10_000,
       }),
     );
+  });
+
+  it('does nothing when SIGNUP_WEBHOOK_URL is empty', async () => {
+    const post = jest.fn();
+    const job = buildJob(post, { webhookUrl: '' });
+
+    await job.handle(DATA);
+
+    expect(post).not.toHaveBeenCalled();
   });
 
   it('retries (rethrows) on a 5xx response', async () => {

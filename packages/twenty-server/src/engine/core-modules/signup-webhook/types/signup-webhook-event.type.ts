@@ -27,5 +27,4 @@ export type SignupWebhookJobData = SignupWebhookPayload & {
   occurredAt: string;
   app: 'betty';
   appVersion: string;
-  webhookUrl: string;
 };

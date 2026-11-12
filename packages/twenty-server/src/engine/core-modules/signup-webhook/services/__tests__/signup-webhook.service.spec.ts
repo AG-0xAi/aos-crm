@@ -43,11 +43,15 @@ describe('SignupWebhookService', () => {
     expect(messageQueueService.add).not.toHaveBeenCalled();
   });
 
-  it('enqueues the envelope with the configured url and retry policy', async () => {
+  it('enqueues the envelope with the retry policy, and never the webhook url', async () => {
     const { service, messageQueueService } = buildService();
 
     await service.enqueue(PAYLOAD);
 
+    const enqueuedData = (messageQueueService.add as jest.Mock).mock
+      .calls[0][1];
+
+    expect(enqueuedData).not.toHaveProperty('webhookUrl');
     expect(messageQueueService.add).toHaveBeenCalledWith(
       SignupWebhookJob.name,
       {
@@ -55,7 +59,6 @@ describe('SignupWebhookService', () => {
         occurredAt: expect.any(String),
         app: 'betty',
         appVersion: '1.2.3',
-        webhookUrl: 'https://founder.example.test/hooks/signup',
       },
       {
         retryLimit: 3,
