@@ -1,0 +1,236 @@
+name: Deploy beta
+
+# CRM-024: the only trigger. No push/pull_request -- a deploy is always a
+# deliberate dispatch, never a side effect of a merge.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build and deploy
+        type: string
+        default: betty/factory
+      image_digest:
+        description: "Existing image digest to deploy instead of building (sha256:...). Set this for a rollback: it skips build/push entirely."
+        type: string
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-beta
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, deploy and migrate
+    runs-on: ubuntu-latest
+    environment: beta
+    steps:
+      # Both inputs reach several later `run:` steps; validating the shape
+      # here (before either is ever interpolated into a shell script) is
+      # what keeps a crafted ref/digest from running as shell instead of
+      # being treated as data. Every later use also stays off `${{ }}`
+      # interpolation inside `run:` and goes through `env:` + "$VAR" instead.
+      - name: Validate inputs
+        env:
+          REF: ${{ inputs.ref }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          if ! [[ "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || \
+             [[ "$REF" == -* ]] || [[ "$REF" == *".."* ]] || \
+             [[ "$REF" == *"//"* ]] || [[ "$REF" == *"/" ]] || \
+             [[ "$REF" == *".lock" ]]; then
+            echo "ref '$REF' is not a plausible branch/tag name" >&2
+            exit 1
+          fi
+          if ! git check-ref-format --branch "$REF" >/dev/null 2>&1; then
+            echo "ref '$REF' fails git check-ref-format --branch" >&2
+            exit 1
+          fi
+          if [ -n "$IMAGE_DIGEST" ] && ! [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "image_digest '$IMAGE_DIGEST' is not sha256:<64 lowercase hex chars>" >&2
+            exit 1
+          fi
+
+      - name: Checkout ${{ inputs.ref }}
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      # The tag written to ECR must be the commit actually checked out, not
+      # github.sha (the workflow file's own commit on the default branch):
+      # inputs.ref can point anywhere, and the two only agree when ref is
+      # left at its default.
+      - name: Resolve the checked-out commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      # Never echoed: written straight from the secret to a gitignored file
+      # (deploy/aws/.gitignore already excludes terraform.tfvars).
+      - name: Write terraform.tfvars from the beta environment secret
+        working-directory: deploy/aws
+        env:
+          TFVARS: ${{ secrets.AWS_TFVARS }}
+        run: printf '%s' "$TFVARS" > terraform.tfvars
+
+      - name: Terraform init
+        working-directory: deploy/aws
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.AWS_TFSTATE_BUCKET }}" \
+            -backend-config="key=aos-crm/beta/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Read the currently deployed digest
+        id: previous
+        working-directory: deploy/aws
+        run: echo "digest=$(terraform output -raw image_digest 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the ECR repository URL
+        id: ecr
+        working-directory: deploy/aws
+        run: echo "url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Amazon ECR
+        if: ${{ inputs.image_digest == '' }}
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      # Same target as AWS_DEPLOYMENT_PLAN.md's manual procedure (CRM-013 R4
+      # step 5): `twenty` is the server plus the compiled frontend, the one
+      # image both the server and worker services run.
+      - name: Build the image
+        if: ${{ inputs.image_digest == '' }}
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.url }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          docker build --target twenty -f packages/twenty-docker/twenty/Dockerfile \
+            -t "$ECR_URL:$COMMIT_SHA" .
+
+      - name: Push the image
+        if: ${{ inputs.image_digest == '' }}
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.url }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+        run: docker push "$ECR_URL:$COMMIT_SHA"
+
+      # The digest, never the tag: a tag can move, image_digest must not
+      # (deploy/aws/variables.tf's own validation on that variable).
+      - name: Resolve the pushed digest
+        if: ${{ inputs.image_digest == '' }}
+        id: pushed
+        env:
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          digest=$(aws ecr describe-images \
+            --repository-name "aos-crm-beta" \
+            --image-ids imageTag="$COMMIT_SHA" \
+            --query 'imageDetails[0].imageDigest' --output text)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Choose the digest to deploy
+        id: deploy-digest
+        env:
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          PUSHED_DIGEST: ${{ steps.pushed.outputs.digest }}
+        run: |
+          if [ -n "$IMAGE_DIGEST" ]; then
+            echo "value=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=$PUSHED_DIGEST" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform plan
+        working-directory: deploy/aws
+        env:
+          DEPLOY_DIGEST: ${{ steps.deploy-digest.outputs.value }}
+          TF_VAR_signup_webhook_url: ${{ secrets.SIGNUP_WEBHOOK_URL }}
+        run: terraform plan -input=false -var="image_digest=$DEPLOY_DIGEST" -out=tfplan
+
+      # The CI role's permissions boundary (github-deploy-role/policy.tf)
+      # grants no `aws_iam_*` write: a plan that touches one would fail at
+      # apply anyway, with a confusing AccessDenied deep in a Terraform
+      # error. Stop earlier, with a clear reason -- those two things (the
+      # ECS task roles, the SES SMTP user and its key) are the founder's or
+      # the infrastructure session's to apply, not CI's (BETA_RUNBOOK.md).
+      - name: Stop if the plan touches any IAM resource
+        working-directory: deploy/aws
+        run: |
+          terraform show -json tfplan > tfplan.json
+          iam_changes=$(jq -r '
+            .resource_changes[]
+            | select(.mode == "managed")
+            | select(.type | startswith("aws_iam_"))
+            | select(.change.actions != ["no-op"])
+            | "\(.address): \(.change.actions | join(","))"
+          ' tfplan.json)
+          if [ -n "$iam_changes" ]; then
+            echo "::error::This plan changes IAM resources; the CI role's permissions boundary forbids IAM writes. Apply this from the founder's PC or the infrastructure session instead:"
+            echo "$iam_changes"
+            exit 1
+          fi
+
+      - name: Terraform apply
+        working-directory: deploy/aws
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # One-off task, never a service (AWS_DEPLOYMENT_PLAN.md CRM-013 R4 step
+      # 7): migrate before the redeployed server/worker can serve traffic
+      # with the new schema.
+      - name: Run the migrate task and wait for it
+        working-directory: deploy/aws
+        run: |
+          cluster=$(terraform output -raw ecs_cluster_name)
+          subnets=$(terraform output -json private_subnet_ids | tr -d '[]" ')
+          security_group=$(terraform output -raw ecs_tasks_security_group_id)
+
+          task_arn=$(aws ecs run-task \
+            --cluster "$cluster" \
+            --task-definition "$(terraform output -raw ecs_migrate_task_definition_arn)" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+
+          aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task_arn"
+
+          exit_code=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$exit_code" != "0" ]; then
+            echo "migrate task exited with $exit_code, see the migrate log group"
+            exit 1
+          fi
+
+      - name: Wait for server and worker to be stable
+        working-directory: deploy/aws
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$(terraform output -raw ecs_cluster_name)" \
+            --services "$(terraform output -raw ecs_server_service_name)" "$(terraform output -raw ecs_worker_service_name)"
+
+      - name: Job summary
+        if: always()
+        env:
+          REF: ${{ inputs.ref }}
+          PREVIOUS_DIGEST: ${{ steps.previous.outputs.digest }}
+          DEPLOYED_DIGEST: ${{ steps.deploy-digest.outputs.value }}
+        run: |
+          {
+            echo "### Deploy beta"
+            echo "- Ref: \`$REF\`"
+            echo "- Previous digest: \`$PREVIOUS_DIGEST\`"
+            echo "- Deployed digest: \`$DEPLOYED_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
