@@ -550,7 +550,7 @@ permiso de lectura en ECS (`DescribeTaskDefinition`); ahora Terraform la guarda 
 igual que `PG_DATABASE_URL` o `REDIS_URL`. Eso añade un paso de IAM que antes no hacía falta, así
 que encenderlo (o apagarlo) es en dos pasos, en este orden:
 
-1. **El founder aplica el cambio de IAM** -- el único que este track toca: el statement
+1. **El founder aplica el secreto y el cambio de IAM** (la política depende del ARN del secreto, así que el secreto se crea en el mismo `apply`: `terraform apply -target='aws_secretsmanager_secret.signup_webhook_url[0]' -target='aws_secretsmanager_secret_version.signup_webhook_url[0]' -target='aws_iam_role_policy.ecs_task_execution_signup_webhook_secret[0]'` con `TF_VAR_signup_webhook_url`, o un `apply` completo) -- el único que este track toca: el statement
    `read-signup-webhook-secret` del rol de ejecución de ECS (`iam.tf`), que le da permiso de leer
    ese secreto en concreto (ARN exacto, nunca un wildcard). Es su propio recurso, separado de
    `read-app-secrets`, justo para que el `plan` lo muestre como el único cambio de IAM y no se
@@ -589,6 +589,8 @@ campos propios:
 Nunca lleva contraseñas, tokens ni enlaces de invitación.
 
 ### Volver atrás
+
+Al apagarlo, Secrets Manager no borra el secreto al momento: lo programa para borrar con un periodo de recuperación (7 a 30 días). Volver a encenderlo con el mismo nombre dentro de ese periodo falla; antes, restaura el secreto (`aws secretsmanager restore-secret --secret-id aos-crm/<entorno>/signup-webhook-url`) o espera a que venza el periodo.
 
 Quitar la línea de `terraform.tfvars` y aplicar. No hay que tocar código ni reconstruir la imagen,
 pero sí pasa otra vez por el founder: ese `apply` destruye el secreto y el statement

@@ -36,7 +36,14 @@ export class SignupWebhookJob {
     try {
       const axiosClient = this.secureHttpClientService.getHttpClient();
 
-      await axiosClient.post(webhookUrl, data, {
+      // Jobs queued before CRM-036 still carry the URL in their data; never
+      // echo it back in the request body.
+      const { webhookUrl: _legacyWebhookUrl, ...payload } =
+        data as SignupWebhookJobData & {
+          webhookUrl?: string;
+        };
+
+      await axiosClient.post(webhookUrl, payload, {
         headers: { 'Content-Type': 'application/json' },
         timeout: SIGNUP_WEBHOOK_TIMEOUT_MS,
       });

@@ -467,7 +467,7 @@ variable "signup_webhook_url" {
     secrets.tf creates no secret and no secret version for it. Marked
     sensitive: it is a secret URL, so CRM-036 moved it off the plain
     environment and into Secrets Manager (secrets.tf's
-    aws-crm/<environment>/signup-webhook-url), same as PG_DATABASE_URL and
+    aos-crm/<environment>/signup-webhook-url), same as PG_DATABASE_URL and
     REDIS_URL -- a plain ECS environment variable is readable by anyone
     with DescribeTaskDefinition on the account, which this URL's bearer-
     token-like capability (anyone holding it can trigger the founder's
