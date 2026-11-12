@@ -1,0 +1,19 @@
+{
+  "_comment": "Static rendering of deploy/aws-bootstrap/github-deploy-role/role.tf's data.aws_iam_policy_document.trust, with example values substituted for every variable (aws_account_id=000000000000, github_repo=AG-0xAi/aos-crm default, github_environment=beta default) and a placeholder for the one value only AWS itself can provide (the account's real OIDC provider ARN, looked up by data.tf -- see README.md for why this could not be rendered by a real `terraform plan`).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:AG-0xAi/aos-crm:environment:beta"
+        }
+      }
+    }
+  ]
+}
