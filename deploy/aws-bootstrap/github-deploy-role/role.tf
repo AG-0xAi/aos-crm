@@ -31,8 +31,9 @@ data "aws_iam_policy_document" "trust" {
 }
 
 resource "aws_iam_role" "deploy" {
-  name               = var.role_name
-  assume_role_policy = data.aws_iam_policy_document.trust.json
+  name                 = var.role_name
+  assume_role_policy   = data.aws_iam_policy_document.trust.json
+  permissions_boundary = var.permissions_boundary_arn
 
   tags = {
     Name = var.role_name

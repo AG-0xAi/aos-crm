@@ -1,30 +1,59 @@
 # R1: no `*:*` anywhere below, no IAM user or access key creation, and every
 # resource that CAN be named is named "aos-crm-<app_environment>*" --
-# deploy/aws's own naming convention (ecr.tf, ecs.tf, iam.tf, s3.tf, rds.tf,
-# redis.tf, secrets.tf, logs.tf, budgets.tf), reproduced here as ARNs built
-# from var.aws_region/var.aws_account_id/var.app_environment, never a
-# hardcoded account id. Two kinds of statement:
+# deploy/aws's own naming convention, reproduced here as ARNs built from
+# var.aws_region/var.aws_account_id/var.app_environment, never a hardcoded
+# account id. Two kinds of statement:
 #   - WRITE statements grant exactly the mutations a routine "new
-#     image_digest" redeploy performs: push to the beta ECR repository,
-#     register/run/update the beta's own ECS task definitions and services,
-#     and PassRole limited to the beta's own task roles. This is R1's own
-#     enumerated list, verbatim.
+#     image_digest" redeploy performs, verbatim (R1's own enumerated list):
+#     push to the beta ECR repository, register/run/update the beta's own ECS
+#     task definitions and services, tag those same resources, and PassRole
+#     limited to the beta's own IAM roles. A write verb is always listed by
+#     its exact action name -- never behind a wildcard, even a narrow one.
 #   - READ statements exist only so `terraform plan`/`apply` can refresh the
-#     rest of deploy/aws's state without erroring; they grant no verb beyond
-#     Describe/Get/List. Where the resource type has no resource-level
-#     permission at all (documented per statement below), the Resource is
-#     "*" and the action list stays Describe/Get/List-only -- never a write
-#     verb rides on a "*" resource anywhere in this policy.
+#     rest of deploy/aws's state without erroring. Round 3 chased three of
+#     these one action at a time (`elasticache:DescribeCacheParameters`,
+#     `budgets:ListTagsForResource`, ...) and still wasn't done -- this round
+#     closes the class instead: each AWS service deploy/aws touches gets one
+#     statement granting that service's Describe*/List*/Get*/View* as a
+#     wildcard, so a refresh read Terraform starts calling tomorrow (a new
+#     provider version, a new sub-resource) is already covered. A wildcard
+#     read statement is scoped to this stack's own beta ARNs whenever that
+#     service supports resource-level permissions for reads at all; where it
+#     categorically does not (documented per statement, from each service's
+#     own IAM reference table), the statement's Resource is "*" -- still
+#     Describe*/List*/Get*/View* only, never a write verb riding along.
+#     A handful of individual actions are named explicitly instead of
+#     wildcarded even inside an otherwise-scoped statement: these are the
+#     specific actions a service's IAM reference documents as having no
+#     resource type at all (so they could only ever be granted on "*"), kept
+#     out of the scoped wildcard so that wildcard does not quietly widen to
+#     "*" for the whole service.
 locals {
   ecr_repository_arn              = "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/aos-crm-${var.app_environment}"
   ecs_cluster_arn                 = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:cluster/aos-crm-${var.app_environment}"
   ecs_task_definition_arn_pattern = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:task-definition/aos-crm-${var.app_environment}-*"
   ecs_service_arn_pattern         = "arn:aws:ecs:${var.aws_region}:${var.aws_account_id}:service/aos-crm-${var.app_environment}/aos-crm-${var.app_environment}-*"
   ecs_task_role_arn_pattern       = "arn:aws:iam::${var.aws_account_id}:role/aos-crm-${var.app_environment}-ecs-task-*"
+
+  # Every IAM role deploy/aws creates -- the four ECS task roles (iam.tf) and
+  # the Lambda logic-function execution role (logic-function.tf, CRM-035) --
+  # shares this one prefix. Read-only (Get*/List*): broad enough to cover
+  # today's roles and whatever role deploy/aws names the same way next.
+  # iam:PassRole stays scoped to ecs_task_role_arn_pattern only (R1: "the
+  # beta task roles only") -- the logic-function execution role is never
+  # passed by anything this CI role calls (Terraform does not manage the
+  # Lambda functions that assume it, logic-function.tf's own comment).
+  iam_role_arn_pattern = "arn:aws:iam::${var.aws_account_id}:role/aos-crm-${var.app_environment}-*"
+  iam_user_arn_pattern = "arn:aws:iam::${var.aws_account_id}:user/aos-crm-${var.app_environment}-*"
+
+  secret_arn_pattern = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:aos-crm/${var.app_environment}/*"
+
+  s3_files_bucket_arn                = "arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"
+  s3_logic_function_layers_bucket_arn = "arn:aws:s3:::aos-crm-${var.app_environment}-logic-function-layers-${var.aws_account_id}"
 }
 
 data "aws_iam_policy_document" "permissions" {
-  # --- WRITE: exactly R1's enumerated actions -------------------------------
+  # --- WRITE: exactly R1's enumerated actions, every verb named exactly ----
 
   # ecr:GetAuthorizationToken has no resource type at all in ECR's IAM
   # reference -- every account's ECR API requires calling it on "*" before
@@ -48,13 +77,6 @@ data "aws_iam_policy_document" "permissions" {
       "ecr:PutImage",
       "ecr:BatchGetImage",
       "ecr:GetDownloadUrlForLayer",
-      "ecr:DescribeRepositories",
-      "ecr:DescribeImages",
-      # Reads terraform plan/apply needs to refresh aws_ecr_repository and
-      # aws_ecr_lifecycle_policy (ecr.tf), scoped to the same repository.
-      "ecr:ListTagsForResource",
-      "ecr:GetLifecyclePolicy",
-      "ecr:GetRepositoryPolicy",
     ]
     resources = [local.ecr_repository_arn]
   }
@@ -62,8 +84,7 @@ data "aws_iam_policy_document" "permissions" {
   # ecs:RegisterTaskDefinition has no resource type in ECS's IAM reference
   # (the new revision's ARN does not exist until the call succeeds, and the
   # family name is a string inside the request, not an ARN component ECS
-  # checks against a Resource). Still only a write on this one action, no
-  # Describe/List rides along on this "*".
+  # checks against a Resource).
   statement {
     sid       = "EcsRegisterTaskDefinition"
     effect    = "Allow"
@@ -93,18 +114,15 @@ data "aws_iam_policy_document" "permissions" {
     resources = [local.ecs_service_arn_pattern]
   }
 
-  # DescribeTasks/DescribeServices have no resource type either (ECS's IAM
-  # reference lists none for either action): the migrate task waits on
-  # DescribeTasks and the post-apply wait waits on DescribeServices/
-  # services-stable, both needed every run.
+  # ecs:TagResource is a write (and the only one among the three resource-ARN
+  # Tag/Describe/List companions ecs.tf's provider calls on refresh) -- the
+  # read half of that trio (DescribeClusters, ListTagsForResource) lives in
+  # the wildcarded EcsReadForPlanRefresh statement below instead.
   statement {
-    sid    = "EcsDescribeForWaiters"
-    effect = "Allow"
-    actions = [
-      "ecs:DescribeTasks",
-      "ecs:DescribeServices",
-    ]
-    resources = ["*"]
+    sid       = "EcsTagBetaResources"
+    effect    = "Allow"
+    actions   = ["ecs:TagResource"]
+    resources = [local.ecs_cluster_arn, local.ecs_service_arn_pattern, local.ecs_task_definition_arn_pattern]
   }
 
   statement {
@@ -121,76 +139,74 @@ data "aws_iam_policy_document" "permissions" {
   }
 
   # --- READ: only so terraform plan/apply can refresh the rest of
-  #     deploy/aws's state. Describe/Get/List only, never a write verb. ------
+  #     deploy/aws's state, one wildcarded statement per AWS service. -------
 
-  # ecs:DescribeTaskDefinition has no resource type in ECS's IAM reference
-  # (same story as ecs:RegisterTaskDefinition above): every task definition
-  # refresh -- migrate, server and worker -- needs this on "*". Read-only,
-  # no write verb rides on it.
+  # ECR Describe*/List*/Get* all support resource-level permissions on a
+  # repository ARN, except GetAuthorizationToken (EcrAuthToken, above) --
+  # scoping this statement to the repository ARN already excludes it, no
+  # explicit carve-out needed.
   statement {
-    sid       = "EcsDescribeTaskDefinitionForPlanRefresh"
+    sid       = "EcrReadForPlanRefresh"
     effect    = "Allow"
-    actions   = ["ecs:DescribeTaskDefinition"]
-    resources = ["*"]
+    actions   = ["ecr:Describe*", "ecr:List*", "ecr:Get*"]
+    resources = [local.ecr_repository_arn]
   }
 
   # ecs:DescribeClusters and ecs:ListTagsForResource support resource-level
-  # permissions (cluster/service/task-definition ARNs), so they are scoped by
-  # name prefix like every other beta-only grant. ecs:TagResource rides along
-  # scoped to the same resources: apply would need it the moment any of these
-  # resources gets a `tags` block, and it is a write, so it never goes on "*".
+  # permissions (cluster/service/task-definition ARNs) and are covered by
+  # this scoped wildcard. ecs:DescribeTaskDefinition, ecs:DescribeTasks and
+  # ecs:DescribeServices have none in ECS's IAM reference at all -- named
+  # explicitly on "*" instead of folded into the wildcard above, so that
+  # wildcard does not have to widen to "*" for the rest of the service.
+  # DescribeTasks/DescribeServices are also what the migrate-task wait and
+  # the services-stable wait at the end of a deploy call, not just Terraform.
   statement {
-    sid    = "EcsDescribeAndTagForPlanRefresh"
-    effect = "Allow"
-    actions = [
-      "ecs:DescribeClusters",
-      "ecs:ListTagsForResource",
-      "ecs:TagResource",
-    ]
-    resources = [
-      local.ecs_cluster_arn,
-      local.ecs_service_arn_pattern,
-      local.ecs_task_definition_arn_pattern,
-    ]
+    sid       = "EcsReadForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["ecs:Describe*", "ecs:List*"]
+    resources = [local.ecs_cluster_arn, local.ecs_service_arn_pattern, local.ecs_task_definition_arn_pattern]
   }
 
   statement {
-    sid    = "IamReadBetaTaskRolesForPlanRefresh"
+    sid    = "EcsReadWithNoResourceLevelPermission"
     effect = "Allow"
     actions = [
-      "iam:GetRole",
-      "iam:GetRolePolicy",
-      "iam:ListRolePolicies",
-      "iam:ListAttachedRolePolicies",
-      "iam:ListRoleTags",
-      "iam:ListInstanceProfilesForRole",
+      "ecs:DescribeTaskDefinition",
+      "ecs:DescribeTasks",
+      "ecs:DescribeServices",
     ]
-    resources = [local.ecs_task_role_arn_pattern]
+    resources = ["*"]
   }
 
-  # ses.tf also creates an IAM user (aos-crm-${app_environment}-ses-smtp) and
-  # its access key. Reading them for plan refresh is fine; creating either
-  # is not (R1's own exclusion) and no Create*/Delete* action appears here.
+  # iam:Get*/iam:List* support resource-level permissions on a role or user
+  # ARN. Scoped to every role deploy/aws names "aos-crm-<app_environment>-*"
+  # (the four ECS task roles, iam.tf, and the Lambda logic-function execution
+  # role, logic-function.tf/CRM-035) and to the SES SMTP user it creates
+  # (ses.tf). Reading either is fine for plan refresh; creating, deleting or
+  # modifying either is not (R1's own exclusion), and no such action appears
+  # anywhere in this policy.
   statement {
-    sid    = "IamReadBetaSesUserForPlanRefresh"
-    effect = "Allow"
-    actions = [
-      "iam:GetUser",
-      "iam:GetUserPolicy",
-      "iam:ListUserPolicies",
-      "iam:ListAttachedUserPolicies",
-      "iam:ListAccessKeys",
-    ]
-    resources = ["arn:aws:iam::${var.aws_account_id}:user/aos-crm-${var.app_environment}-*"]
+    sid       = "IamReadBetaRolesForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["iam:Get*", "iam:List*"]
+    resources = [local.iam_role_arn_pattern]
   }
 
+  statement {
+    sid       = "IamReadBetaSesUserForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["iam:Get*", "iam:List*"]
+    resources = [local.iam_user_arn_pattern]
+  }
+
+  # rds:Describe*/List* support resource-level permissions on a DB instance
+  # or subnet group ARN.
   statement {
     sid    = "RdsReadForPlanRefresh"
     effect = "Allow"
     actions = [
-      "rds:DescribeDBInstances",
-      "rds:DescribeDBSubnetGroups",
-      "rds:ListTagsForResource",
+      "rds:Describe*",
+      "rds:List*",
     ]
     resources = [
       "arn:aws:rds:${var.aws_region}:${var.aws_account_id}:db:aos-crm-${var.app_environment}",
@@ -198,18 +214,18 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # elasticache:DescribeCacheClusters is not here: it has no resource type in
-  # ElastiCache's IAM reference, so it lives in
-  # NoResourceLevelPermissionReadForPlanRefresh below instead of on this
-  # resource-scoped statement.
+  # elasticache:Describe*/List* support resource-level permissions on a
+  # replication group, cache subnet group or cache parameter group ARN.
+  # elasticache:DescribeCacheClusters is the one exception (no resource type
+  # in ElastiCache's IAM reference -- aws_elasticache_replication_group's own
+  # Read calls it per member cluster to resolve engine_version_actual): named
+  # explicitly on "*" instead, so the wildcard above stays scoped.
   statement {
     sid    = "ElastiCacheReadForPlanRefresh"
     effect = "Allow"
     actions = [
-      "elasticache:DescribeReplicationGroups",
-      "elasticache:DescribeCacheSubnetGroups",
-      "elasticache:DescribeCacheParameterGroups",
-      "elasticache:ListTagsForResource",
+      "elasticache:Describe*",
+      "elasticache:List*",
     ]
     resources = [
       "arn:aws:elasticache:${var.aws_region}:${var.aws_account_id}:replicationgroup:aos-crm-${var.app_environment}",
@@ -218,126 +234,95 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # aws_s3_bucket's own Read (s3.tf) still calls every one of these Get*
-  # actions regardless of which sub-resources are actually declared
-  # (ACL/CORS/lifecycle/logging/ownership-controls/website/acceleration/
-  # request-payment/replication/object-lock have no Terraform resource here,
-  # but the provider reads them on every refresh anyway, for the resource's
-  # own backward-compatible computed attributes).
   statement {
-    sid    = "S3ReadFilesBucketForPlanRefresh"
-    effect = "Allow"
-    actions = [
-      "s3:GetBucketAcl",
-      "s3:GetBucketCORS",
-      "s3:GetBucketPolicy",
-      "s3:GetBucketVersioning",
-      "s3:GetEncryptionConfiguration",
-      "s3:GetBucketLogging",
-      "s3:GetLifecycleConfiguration",
-      "s3:GetBucketOwnershipControls",
-      "s3:GetBucketPublicAccessBlock",
-      "s3:GetBucketTagging",
-      "s3:GetBucketWebsite",
-      "s3:GetAccelerateConfiguration",
-      "s3:GetBucketRequestPayment",
-      "s3:GetReplicationConfiguration",
-      "s3:GetBucketObjectLockConfiguration",
-      "s3:ListBucket",
-    ]
-    resources = ["arn:aws:s3:::aos-crm-${var.app_environment}-files-${var.aws_account_id}"]
+    sid       = "ElastiCacheReadWithNoResourceLevelPermission"
+    effect    = "Allow"
+    actions   = ["elasticache:DescribeCacheClusters"]
+    resources = ["*"]
   }
 
+  # s3:Get*/List* support resource-level permissions on a bucket ARN. Both
+  # buckets deploy/aws's provider reads on every refresh (every Get* action
+  # for the bucket's own backward-compatible computed attributes, regardless
+  # of which sub-resources have a Terraform resource here, s3.tf's `files`
+  # and logic-function.tf's `logic_function_layers`, CRM-035) are covered by
+  # one wildcarded statement instead of the enumerated, drift-prone list
+  # round 3 maintained by hand.
   statement {
-    sid    = "SecretsManagerReadForPlanRefresh"
-    effect = "Allow"
-    actions = [
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:GetResourcePolicy",
-      "secretsmanager:ListSecretVersionIds",
-      # aws_secretsmanager_secret_version's own Read (secrets.tf, ses.tf) calls
-      # GetSecretValue to detect drift on secret_string -- needed on refresh,
-      # not just on apply.
-      "secretsmanager:GetSecretValue",
-    ]
-    resources = ["arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:aos-crm/${var.app_environment}/*"]
+    sid       = "S3ReadForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["s3:Get*", "s3:List*"]
+    resources = [local.s3_files_bucket_arn, local.s3_logic_function_layers_bucket_arn]
   }
 
-  # logs:DescribeLogGroups is a list call (it takes a name pattern, not an
-  # ARN) and has no resource-level permission in CloudWatch Logs' IAM
-  # reference: it lives in NoResourceLevelPermissionReadForPlanRefresh below,
-  # not here. logs:ListTagsForResource does support a log-group ARN, so it
-  # stays scoped.
+  # secretsmanager:Describe*/Get*/List* all support resource-level
+  # permissions on a secret ARN -- one wildcard covers every secret under
+  # aos-crm/<app_environment>/ (secrets.tf, ses.tf, logic-function.tf/CRM-035)
+  # and whatever refresh read Terraform adds next (DescribeSecret,
+  # GetResourcePolicy, GetSecretValue and ListSecretVersionIds today).
+  statement {
+    sid       = "SecretsManagerReadForPlanRefresh"
+    effect    = "Allow"
+    actions   = ["secretsmanager:Describe*", "secretsmanager:Get*", "secretsmanager:List*"]
+    resources = [local.secret_arn_pattern]
+  }
+
+  # logs:ListTagsForResource supports a log-group ARN; logs:DescribeLogGroups
+  # is a list call with no resource-level permission in CloudWatch Logs' IAM
+  # reference (it takes a name pattern, not an ARN) -- named explicitly on
+  # "*" instead of folded into a wildcard.
   statement {
     sid       = "LogsReadForPlanRefresh"
     effect    = "Allow"
-    actions   = ["logs:ListTagsForResource"]
+    actions   = ["logs:List*"]
     resources = ["arn:aws:logs:${var.aws_region}:${var.aws_account_id}:log-group:/ecs/aos-crm-${var.app_environment}/*"]
   }
 
   statement {
+    sid       = "LogsReadWithNoResourceLevelPermission"
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["*"]
+  }
+
+  # budgets:ViewBudget and budgets:ListTagsForResource both support
+  # resource-level permissions on a budget ARN -- the wildcard closes the gap
+  # round 3 found (ListTagsForResource was missing) and whatever read Budgets
+  # adds next.
+  statement {
     sid       = "BudgetsReadForPlanRefresh"
     effect    = "Allow"
-    actions   = ["budgets:ViewBudget"]
+    actions   = ["budgets:View*", "budgets:List*"]
     resources = ["arn:aws:budgets::${var.aws_account_id}:budget/aos-crm-${var.app_environment}-monthly"]
   }
 
   # EC2 (VPC/subnets/security groups/NAT/IGW/route tables, network.tf and
-  # security-groups.tf), ELBv2 (ALB/listener/target group, alb-acm.tf) and
-  # ACM (the wildcard certificate, alb-acm.tf) Describe/List actions do not
-  # support resource-level permissions in any of those three services' IAM
-  # reference tables -- every Describe* and List* action there is documented
-  # against resource type "*" only, regardless of how the resource is named
-  # or tagged. Granting them scoped to a name prefix is not an option AWS
-  # offers; Route 53 and SES are the same story for a different reason: a
-  # hosted zone id and an SES identity ARN are themselves account-specific
-  # values (like domain_name in ../../aws/variables.tf) that this public fork
-  # does not commit, so there is no name to scope by even in principle.
-  # logs:DescribeLogGroups (it takes a name pattern, not an ARN) and
-  # elasticache:DescribeCacheClusters (no resource type in ElastiCache's IAM
-  # reference either -- aws_elasticache_replication_group's own Read calls it
-  # per member cluster to resolve engine_version_actual) are the same story
-  # for their own services. Every action in this statement is read-only
-  # (Describe*/List*/Get*); no write verb for any of these services appears
-  # anywhere in this policy.
+  # security-groups.tf), ELBv2 (ALB/listener/target group, alb-acm.tf), ACM
+  # (the wildcard certificate, alb-acm.tf), Route 53 (the hosted zone and
+  # every record, data.tf/alb-acm.tf/ses.tf) and SESv2 (the domain identity,
+  # ses.tf) do not support resource-level permissions for Describe*/List*/
+  # Get* in any of those five services' IAM reference tables -- every one of
+  # those actions is documented against resource type "*" only, regardless
+  # of how the resource is named or tagged. Granting them scoped to a name
+  # prefix is not an option AWS offers; a hosted zone id and an SES identity
+  # ARN are also themselves account-specific values (like domain_name in
+  # ../../aws/variables.tf) that this public fork does not commit, so there
+  # is no name to scope by even in principle. Every action below is
+  # read-only (Describe*/List*/Get*); no write verb for any of these five
+  # services appears anywhere in this policy.
   statement {
     sid    = "NoResourceLevelPermissionReadForPlanRefresh"
     effect = "Allow"
     actions = [
-      "ec2:DescribeVpcs",
-      "ec2:DescribeVpcAttribute",
-      "ec2:DescribeSubnets",
-      "ec2:DescribeInternetGateways",
-      "ec2:DescribeNatGateways",
-      "ec2:DescribeAddresses",
-      "ec2:DescribeNetworkInterfaces",
-      "ec2:DescribeRouteTables",
-      "ec2:DescribeSecurityGroups",
-      "ec2:DescribeSecurityGroupRules",
-      "ec2:DescribeAvailabilityZones",
-      "ec2:DescribeTags",
-      "elasticloadbalancing:DescribeLoadBalancers",
-      "elasticloadbalancing:DescribeLoadBalancerAttributes",
-      "elasticloadbalancing:DescribeListeners",
-      "elasticloadbalancing:DescribeRules",
-      "elasticloadbalancing:DescribeTargetGroups",
-      "elasticloadbalancing:DescribeTargetGroupAttributes",
-      "elasticloadbalancing:DescribeTargetHealth",
-      "elasticloadbalancing:DescribeTags",
-      "acm:DescribeCertificate",
-      "acm:ListTagsForCertificate",
-      "acm:GetCertificate",
-      "route53:GetHostedZone",
-      # data.aws_route53_zone (data.tf) looks the zone up by domain name when
-      # var.route53_zone_id is null -- that lookup is this action, before any
-      # zone id (and therefore any GetHostedZone resource scope) is known.
-      "route53:ListHostedZonesByName",
-      "route53:ListResourceRecordSets",
-      "route53:ListTagsForResource",
-      "sesv2:GetEmailIdentity",
-      "sesv2:ListTagsForResource",
-      "logs:DescribeLogGroups",
-      "elasticache:DescribeCacheClusters",
+      "ec2:Describe*",
+      "elasticloadbalancing:Describe*",
+      "acm:Describe*",
+      "acm:List*",
+      "acm:Get*",
+      "route53:Get*",
+      "route53:List*",
+      "sesv2:Get*",
+      "sesv2:List*",
     ]
     resources = ["*"]
   }

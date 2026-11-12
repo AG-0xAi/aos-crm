@@ -158,7 +158,31 @@ jobs:
         working-directory: deploy/aws
         env:
           DEPLOY_DIGEST: ${{ steps.deploy-digest.outputs.value }}
+          TF_VAR_signup_webhook_url: ${{ secrets.SIGNUP_WEBHOOK_URL }}
         run: terraform plan -input=false -var="image_digest=$DEPLOY_DIGEST" -out=tfplan
+
+      # The CI role's permissions boundary (github-deploy-role/policy.tf)
+      # grants no `aws_iam_*` write: a plan that touches one would fail at
+      # apply anyway, with a confusing AccessDenied deep in a Terraform
+      # error. Stop earlier, with a clear reason -- those two things (the
+      # ECS task roles, the SES SMTP user and its key) are the founder's or
+      # the infrastructure session's to apply, not CI's (BETA_RUNBOOK.md).
+      - name: Stop if the plan touches any IAM resource
+        working-directory: deploy/aws
+        run: |
+          terraform show -json tfplan > tfplan.json
+          iam_changes=$(jq -r '
+            .resource_changes[]
+            | select(.mode == "managed")
+            | select(.type | startswith("aws_iam_"))
+            | select(.change.actions != ["no-op"])
+            | "\(.address): \(.change.actions | join(","))"
+          ' tfplan.json)
+          if [ -n "$iam_changes" ]; then
+            echo "::error::This plan changes IAM resources; the CI role's permissions boundary forbids IAM writes. Apply this from the founder's PC or the infrastructure session instead:"
+            echo "$iam_changes"
+            exit 1
+          fi
 
       - name: Terraform apply
         working-directory: deploy/aws

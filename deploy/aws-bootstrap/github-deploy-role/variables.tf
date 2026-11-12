@@ -10,6 +10,25 @@ variable "aws_region" {
   default     = "eu-west-1"
 }
 
+variable "permissions_boundary_arn" {
+  description = <<-EOT
+    ARN of the account's `aos-limite-roles` managed policy. Since 08/11/2026
+    every `aos-*` IAM role in the account carries this as its permissions
+    boundary (CRM-027), and removing a boundary is explicitly denied to
+    agents, so there is no safe default to fall back to here: a missing or
+    wrong value must fail validate/plan, not apply with no boundary. Same
+    variable, same validation, as ../../aws/variables.tf's -- this stack's
+    `aos-crm-beta-deploy-github` role is itself an `aos-*` role and must
+    carry the same boundary.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:policy/.+$", var.permissions_boundary_arn))
+    error_message = "permissions_boundary_arn must look like an IAM policy ARN: arn:aws:iam::<12-digit account id>:policy/<policy name>."
+  }
+}
+
 variable "aws_account_id" {
   description = <<-EOT
     AWS account id the beta stack runs in. No default: an account id is
