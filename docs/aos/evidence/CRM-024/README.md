@@ -11,6 +11,188 @@ Terraform CLI used everywhere below: `hashicorp/terraform@sha256:18f9986038bbaf0
 `AWS_DEPLOYMENT_PLAN.md` R4 already use). actionlint:
 `rhysd/actionlint:latest` (resolved to v1.7.12 at pull time).
 
+## Round 4 (12/11/2026): class-wildcard reads, permissions boundary, IAM stop, no network at all
+
+Three rounds patched the refresh-read list one action at a time
+(`elasticache:DescribeCacheParameters`, `budgets:ListTagsForResource`, ...)
+and still weren't done. This round closes the class instead: `policy.tf`'s
+read statements are now `<service>:Describe*`/`List*`/`Get*`/`View*`
+wildcards, scoped to this stack's own ARNs wherever that service supports
+resource-level permissions for reads, `*` only where it categorically does
+not (documented statement by statement, same method, now a wildcard instead
+of an enumerated list). Also this round: merged this track's own prior tip
+(`8eb07f9282`) onto the current `betty/factory` (one conflict, in
+`BETA_RUNBOOK.md` -- both sides' new sections kept, renumbered §10-§13);
+re-derived the role's reads for what `deploy/aws` gained since that tip
+(the logic-function IAM role, S3 bucket and Secrets Manager secrets,
+CRM-035); added `permissions_boundary_arn` to this stack and set it on
+`aws_iam_role.deploy`, matching every other `aos-*` role since CRM-027; added
+an IAM-change stop to `deploy-beta.yaml`, between `plan` and `apply`; wired
+`signup_webhook_url` into the plan step as `TF_VAR_signup_webhook_url` from a
+dedicated `SIGNUP_WEBHOOK_URL` environment secret.
+
+### Hard rule this round: no network to AWS at all, not even with fake credentials
+
+Round 3's own probe 2 (below, kept for the record) reached real AWS with a
+throwaway, invalid static key, because the AWS provider's `Configure` step
+calls `sts:GetCallerIdentity` to validate *any* credential before building a
+plan graph, network-enabled containers included. This round's dispatch
+closes that path outright: every Terraform/AWS-adjacent container below ran
+with `docker run --network none`, `AWS_EC2_METADATA_DISABLED=true` and empty
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_SESSION_TOKEN`. A container
+with no network cannot reach AWS by surprise the way round 1's instance-role
+path or round 3's fake-key probe did, regardless of what credentials (real,
+fake, or none) the provider is configured with.
+
+The one problem `--network none` creates: `terraform init` normally
+downloads the provider plugin from `registry.terraform.io`, which a
+network-isolated container cannot reach either. Solved by reusing the
+`hashicorp/aws` 5.100.0 (and, for `deploy/aws`, `hashicorp/random` 3.9.1)
+provider binaries a previous round's worktree already downloaded on this
+same machine (`.terraform/providers/registry.terraform.io/...`, from a run
+that *did* have network) as a local filesystem plugin source
+(`-plugin-dir=<path>` for `init`, the same directory bind-mounted straight
+onto `.terraform/providers` for `validate`) -- no new network call, nothing
+re-fetched, same exact provider build both `.terraform.lock.hcl` files
+already pin.
+
+### Why `permission-policy.example.json` can now be generated, and `trust-policy.example.json` still can't
+
+Round 2 and round 3 both concluded `terraform console`/`plan` couldn't
+render either policy document without a real credential, because the AWS
+provider's `Configure` step needs *some* credential source before it will
+evaluate anything in the config, data sources included -- round 3's probe 1
+(`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` both empty) got exactly that
+error (`No valid credential sources found`), independent of `-target`.
+
+That blocker is specific to *finding* a credential, not to validating one:
+the AWS provider exposes `skip_credentials_validation`,
+`skip_requesting_account_id` and `skip_metadata_api_check`, which together
+let it configure against throwaway static values
+(`access_key = "AKIAEXAMPLE00000000"`, an all-zero `secret_key`) without
+ever calling an AWS API to check them. `data.aws_iam_policy_document` itself
+already made no AWS call in round 1's own finding (`Read complete after
+0s`) -- it is a pure function of its own HCL. Combined, this renders
+`permission-policy.example.json` by a real `terraform plan`/`show -json`,
+fully offline, from a standalone scratch config holding a direct copy of
+`policy.tf`'s `locals`/`data` block (never committed, built and discarded
+in this run's worktree-local temp dir) plus the same example variables
+rounds 1-3 used by hand. This is the "local copy of the policy document
+only" the dispatch allows when an OIDC-backed render is not possible.
+
+`trust-policy.example.json` is unaffected and still hand-rendered, for the
+reason rounds 1-2 already found and this round re-confirms: its one data
+source, `data.aws_iam_openid_connect_provider.github`, is a genuine AWS
+lookup (`iam:ListOpenIDConnectProviders`/`GetOpenIDConnectProvider`) for the
+account's real OIDC provider ARN -- a value no skip-flag or local copy can
+substitute, because it is not computed from this stack's own HCL at all.
+
+```sh
+export AWS_EC2_METADATA_DISABLED=true AWS_ACCESS_KEY_ID= AWS_SECRET_ACCESS_KEY= \
+  AWS_SESSION_TOKEN= AWS_PROFILE= AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
+TF_IMG="hashicorp/terraform@sha256:18f9986038bbaf02cf49db9c09261c778161c51dcc7fb7e355ae8938459428cd"
+```
+Set in every `docker run` below (as `-e`) unless the command's own line
+overrides it.
+
+#### R1/R4. `fmt -check -recursive`, `init -backend=false`, `validate` -- `github-deploy-role`, after the `policy.tf`/`variables.tf`/`role.tf` edits, `--network none`
+
+```
+$ docker run --rm --network none -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" -w /w "$TF_IMG" fmt -check -recursive -diff
+```
+Exit 3 first pass (`policy.tf`'s new `locals` block misaligned by one
+column after adding `s3_logic_function_layers_bucket_arn`) -- fixed with
+`fmt -recursive` (no `-check`), re-run confirmed exit 0, no output.
+
+```
+$ docker run --rm --network none -e AWS_EC2_METADATA_DISABLED [...] \
+    -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" \
+    -v "<prior round's .terraform/providers>:/plugin-dir:ro" -w /w "$TF_IMG" \
+    init -backend=false -plugin-dir=/plugin-dir
+...
+Terraform has been successfully initialized!
+```
+Exit 0. `-plugin-dir` is what makes `init` skip the registry entirely (a
+plain `init -backend=false` with the plugin cache bind-mounted at the
+expected `.terraform/providers` path still tries a version-discovery call
+against `registry.terraform.io` and fails closed under `--network none`,
+confirmed as a negative control before settling on `-plugin-dir`).
+
+```
+$ docker run --rm --network none \
+    -v "$PWD/deploy/aws-bootstrap/github-deploy-role:/w" \
+    -v "<prior round's .terraform/providers>:/w/.terraform/providers:ro" -w /w "$TF_IMG" \
+    validate
+Success! The configuration is valid.
+```
+Exit 0.
+
+#### R1/R4 (repeat). Same three checks -- `deploy/aws` (unaffected by `policy.tf`, re-run to confirm after the merge)
+
+Same three commands, same flags, against `deploy/aws` with its own cached
+`hashicorp/aws`/`hashicorp/random` providers. All exit 0: `fmt -check`, no
+output; `init -backend=false -plugin-dir=...`, "Terraform has been
+successfully initialized!"; `validate`, "Success! The configuration is
+valid."
+
+#### R2/R4. `actionlint` on the IAM-stop step and the `TF_VAR_signup_webhook_url` wiring
+
+```
+$ docker run --rm --network none -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -no-color \
+    .github/workflows/deploy-beta.yaml
+```
+Exit 0, no output: still matches Scenario R2.1. `rhysd/actionlint:latest`
+was already pulled on this machine from an earlier round -- no network used
+this round either.
+
+#### R3/R4. IAM-stop step: filter logic, unit-tested against a synthetic plan (no real `terraform plan` ran against `deploy/aws`'s IAM resources this round -- R4 forbids it)
+
+The workflow's `jq` filter (`select(.mode == "managed") | select(.type |
+startswith("aws_iam_")) | select(.change.actions != ["no-op"])`) was run
+directly against a hand-built, throwaway JSON fixture shaped like
+`terraform show -json`'s `resource_changes` array: one `aws_iam_role` with
+`actions: ["update"]`, one `aws_ecs_service` with `actions: ["update"]`, one
+`aws_iam_role` with `actions: ["no-op"]`, and one `mode: "data"`
+`aws_iam_policy_document` with `actions: ["read"]`.
+
+```
+$ jq -r '.resource_changes[] | select(.mode == "managed") | select(.type | startswith("aws_iam_")) | select(.change.actions != ["no-op"]) | "\(.address): \(.change.actions | join(","))"' fixture.json
+aws_iam_role.ecs_task_server: update
+```
+Exit 0. Flags exactly the one genuine managed IAM change; the ECS change,
+the no-op IAM role and the IAM-shaped data source are all correctly left
+out (the last two are exactly the false positives a naive
+`.type | startswith("aws_iam_")` filter without the `mode`/`no-op` guards
+would have caught).
+
+#### R4. JSON validity and re-generation, `permission-policy.example.json` against `policy.tf`
+
+```
+$ python3 -I -c "import json; json.load(open('docs/aos/evidence/CRM-024/permission-policy.example.json'))"
+```
+Exit 0, no output (valid JSON) -- this file is now the direct output of
+`terraform show -json` against the scratch config described above (24
+statements, matching `policy.tf`'s 24 `sid`s one for one; `Sid`s added this
+round: `EcrReadForPlanRefresh`, `EcsReadForPlanRefresh`,
+`EcsReadWithNoResourceLevelPermission`, `IamReadBetaRolesForPlanRefresh`,
+`ElastiCacheReadWithNoResourceLevelPermission`, `S3ReadForPlanRefresh`,
+`LogsReadWithNoResourceLevelPermission`), not hand-transcribed, so there is
+no statement-by-statement sync to verify by hand this round.
+
+#### R4 (repeat). Privacy gate and secrets scan
+
+```
+$ node scripts/aos/verify-privacy.mjs
+...
+PASS: all 15 privacy checks passed.
+```
+Exit 0.
+
+```
+$ sh deploy/aws/scripts/scan-secrets.sh
+```
+Exit 0, no output.
+
 ## Round 3 (08/11/2026): the last refresh reads
 
 Fixes this round, all in `policy.tf` unless noted: the S3 refresh reads were
