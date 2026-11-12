@@ -543,16 +543,37 @@ la Persona, fija la etapa del funnel y encadena la serie de bienvenida (CRM-034,
 
 ### Encenderlo
 
-Una línea en `terraform.tfvars` y un apply, igual que las etapas de correo (§9):
+**La URL vive en Secrets Manager (CRM-036), no en el entorno en claro de la tarea.** Antes de
+CRM-036 viajaba como variable de entorno plana del task definition, legible por cualquiera con
+permiso de lectura en ECS (`DescribeTaskDefinition`); ahora Terraform la guarda en
+`aos-crm/<entorno>/signup-webhook-url` y el servidor/worker la reciben por el bloque `secrets`,
+igual que `PG_DATABASE_URL` o `REDIS_URL`. Eso añade un paso de IAM que antes no hacía falta, así
+que encenderlo (o apagarlo) es en dos pasos, en este orden:
 
-```
-signup_webhook_url = "<la URL que dio el workflow>"
-```
+1. **El founder aplica el secreto y el cambio de IAM** (la política depende del ARN del secreto, así que el secreto se crea en el mismo `apply`: `terraform apply -target='aws_secretsmanager_secret.signup_webhook_url[0]' -target='aws_secretsmanager_secret_version.signup_webhook_url[0]' -target='aws_iam_role_policy.ecs_task_execution_signup_webhook_secret[0]'` con `TF_VAR_signup_webhook_url`, o un `apply` completo) -- el único que este track toca: el statement
+   `read-signup-webhook-secret` del rol de ejecución de ECS (`iam.tf`), que le da permiso de leer
+   ese secreto en concreto (ARN exacto, nunca un wildcard). Es su propio recurso, separado de
+   `read-app-secrets`, justo para que el `plan` lo muestre como el único cambio de IAM y no se
+   mezcle con el resto. Esto lo aplica el founder desde su propio PC (o la sesión de
+   infraestructura, con su OK) -- **nunca** `deploy-beta.yaml`: ese workflow ya se niega a aplicar
+   un `plan` que toque cualquier rol de ECS (§12), así que un primer encendido (o un apagado)
+   lanzado solo por ese camino se para antes del `apply`, no a medias.
+2. **La plataforma aplica el resto** con `signup_webhook_url` puesta -- una línea en
+   `terraform.tfvars` igual que las etapas de correo (§9), o pasada como `TF_VAR_signup_webhook_url`
+   desde el gestor de secretos (SSM) al `plan` de `deploy-beta.yaml`, nunca escrita dentro de
+   `AWS_TFVARS` ni impresa en ningún log. Esto crea el secreto y su versión (`secrets.tf`) y hace
+   aparecer la entrada `SIGNUP_WEBHOOK_URL` en el bloque `secrets` del servidor y el worker
+   (`ecs.tf`) -- ningún cambio de IAM en este segundo paso, así que sí puede ir por
+   `deploy-beta.yaml`.
 
-Por defecto está vacía, y vacía significa apagado: ni el servidor ni el worker encolan nada. Puesta
-la URL, cada invitación y cada alta dispara un POST en segundo plano, con reintentos sobre 5xx y
-sobre fallos de red; un fallo del webhook nunca bloquea ni rompe la invitación o el alta que lo
-dispara.
+Invertir el orden (paso 2 antes del paso 1) deja a ECS con el bloque `secrets` apuntando a un ARN
+que el rol de ejecución todavía no puede leer, y la tarea falla con `ResourceInitializationError`
+antes de que el servidor llegue a arrancar -- mismo motivo que el orden del §11 para Lambda.
+
+Por defecto está vacía, y vacía significa apagado: ni el servidor ni el worker encolan nada, y
+Terraform no crea ni el secreto ni el grant de IAM. Puesta la URL, cada invitación y cada alta
+dispara un POST en segundo plano, con reintentos sobre 5xx y sobre fallos de red; un fallo del
+webhook nunca bloquea ni rompe la invitación o el alta que lo dispara.
 
 ### Qué llega en cada evento
 
@@ -569,7 +590,12 @@ Nunca lleva contraseñas, tokens ni enlaces de invitación.
 
 ### Volver atrás
 
-Quitar la línea de `terraform.tfvars` y aplicar. No hay que tocar código ni reconstruir la imagen.
+Al apagarlo, Secrets Manager no borra el secreto al momento: lo programa para borrar con un periodo de recuperación (7 a 30 días). Volver a encenderlo con el mismo nombre dentro de ese periodo falla; antes, restaura el secreto (`aws secretsmanager restore-secret --secret-id aos-crm/<entorno>/signup-webhook-url`) o espera a que venza el periodo.
+
+Quitar la línea de `terraform.tfvars` y aplicar. No hay que tocar código ni reconstruir la imagen,
+pero sí pasa otra vez por el founder: ese `apply` destruye el secreto y el statement
+`read-signup-webhook-secret` del rol de ejecución, que es un cambio de IAM igual que encenderlo, y
+`deploy-beta.yaml` lo para por el mismo motivo.
 
 ## 11. Funciones de workflows en Lambda
 
