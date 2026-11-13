@@ -60,9 +60,44 @@ describe('createStartBettyGuideTool', () => {
 
     const result = await tool.execute({});
 
-    expect(result.guide).toContain('Guide body');
+    expect(JSON.stringify(result)).not.toContain('Guide body');
+    expect(result.guideSummary.length).toBeLessThan(1300);
+    expect(result.fullGuide).toContain('load_skills');
+    expect(result.fullGuide).toContain(BETTY_GUIDE_SKILL_NAME);
     expect(result.profileNote).toBeNull();
-    expect(result.nextStep).toContain('discovery question');
+    expect(result.nextStep).toContain('Reply with firstMessage');
+  });
+
+  it('puts the whole reply in firstMessage, with the name when given', async () => {
+    const tool = createStartBettyGuideTool(
+      buildSkillServiceMock([
+        { name: BETTY_GUIDE_SKILL_NAME, content: 'Guide body' },
+      ]) as never,
+      buildWorkspaceOrmManagerMock(null) as never,
+      'workspace-a',
+      ROLE_PERMISSION_CONFIG,
+    );
+
+    const named = await tool.execute({ name: 'Andrés' });
+    const anonymous = await tool.execute({});
+
+    expect(named.firstMessage).toBe(
+      '¡Hola, Andrés! Soy Betty. Quiero entender cómo trabajas para proponerte las formas de usarme que más te ayuden. Para empezar: ¿a qué te dedicas y cómo es tu día a día?',
+    );
+    expect(anonymous.firstMessage).toBe(
+      '¡Hola! Soy Betty. Quiero entender cómo trabajas para proponerte las formas de usarme que más te ayuden. Para empezar: ¿a qué te dedicas y cómo es tu día a día?',
+    );
+  });
+
+  it('tells the assistant not to offer menus', () => {
+    const tool = createStartBettyGuideTool(
+      buildSkillServiceMock() as never,
+      buildWorkspaceOrmManagerMock(null) as never,
+      'workspace-a',
+      ROLE_PERMISSION_CONFIG,
+    );
+
+    expect(tool.description).toContain('Do not list options');
   });
 
   it('returns the profile note text and a resume-from-profile nextStep when a note exists', async () => {
@@ -83,7 +118,9 @@ describe('createStartBettyGuideTool', () => {
     const result = await tool.execute({});
 
     expect(result.profileNote).toBe('Andrés sells software to dentists');
-    expect(result.nextStep).toContain('already know from their profile note');
+    expect(result.firstMessage).toContain('Andrés sells software to dentists');
+    expect(result.firstMessage).toContain('¿Sigue siendo así');
+    expect(result.nextStep).toContain('Reply with firstMessage');
   });
 
   it('names the person in nextStep when a name was given', async () => {
@@ -101,7 +138,7 @@ describe('createStartBettyGuideTool', () => {
 
     const result = await tool.execute({ name: 'Andrés' });
 
-    expect(result.nextStep).toContain('Greet Andrés by name');
+    expect(result.firstMessage).toContain('Andrés');
   });
 
   it('returns a fallback message and question when betty-guia is missing, not an error', async () => {
@@ -117,8 +154,8 @@ describe('createStartBettyGuideTool', () => {
 
     const result = await tool.execute({});
 
-    expect(result.guide).toContain('not available');
-    expect(result.nextStep).toContain('¿A qué te dedicas');
+    expect(result.guideSummary).toContain('not available');
+    expect(result.firstMessage).toContain('¿a qué te dedicas');
   });
 
   it('still returns the guide and a nextStep when reading the profile note is denied', async () => {
@@ -140,7 +177,7 @@ describe('createStartBettyGuideTool', () => {
 
     const result = await tool.execute({});
 
-    expect(result.guide).toContain('Guide body');
+    expect(result.guideSummary.length).toBeGreaterThan(0);
     expect(result.profileNote).toBeNull();
     expect(result.nextStep.length).toBeGreaterThan(0);
   });
@@ -197,6 +234,5 @@ describe('createStartBettyGuideTool', () => {
     );
     expect(resultB.profileNote).toBe("B's profile");
     expect(resultB.profileNote).not.toBe(resultA.profileNote);
-    expect(resultB.guide).not.toBe(resultA.guide);
   });
 });

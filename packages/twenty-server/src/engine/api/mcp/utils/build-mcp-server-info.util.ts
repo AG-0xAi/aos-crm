@@ -3,9 +3,8 @@ import { getUrlSafely, isDefined } from 'twenty-shared/utils';
 
 import { MCP_SERVER_INFO } from 'src/engine/api/mcp/constants/mcp-server-info.const';
 
-// SVG, so one file covers every size the assistant renders it at.
-const MCP_SERVER_ICON_MIME_TYPE = 'image/svg+xml';
-const MCP_SERVER_ICON_SIZES = ['any'];
+// PNGs first: ChatGPT does not render SVG app icons. The SVG stays last for
+// clients that prefer a single scalable file.
 
 export type McpServerIcon = {
   src: string;
@@ -39,9 +38,19 @@ export const buildMcpServerInfo = (requestBaseUrl: string): McpServerInfo => {
     ...MCP_SERVER_INFO,
     icons: [
       {
+        src: new URL(BRAND_ASSET_PATHS.icon512, baseUrl).toString(),
+        mimeType: 'image/png',
+        sizes: ['512x512'],
+      },
+      {
+        src: new URL(BRAND_ASSET_PATHS.emailIcon, baseUrl).toString(),
+        mimeType: 'image/png',
+        sizes: ['180x180'],
+      },
+      {
         src: new URL(BRAND_ASSET_PATHS.appIcon, baseUrl).toString(),
-        mimeType: MCP_SERVER_ICON_MIME_TYPE,
-        sizes: MCP_SERVER_ICON_SIZES,
+        mimeType: 'image/svg+xml',
+        sizes: ['any'],
       },
     ],
   };

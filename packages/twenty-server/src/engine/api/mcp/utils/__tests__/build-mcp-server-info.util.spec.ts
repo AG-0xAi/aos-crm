@@ -4,10 +4,20 @@ import { MCP_SERVER_INFO } from 'src/engine/api/mcp/constants/mcp-server-info.co
 import { buildMcpServerInfo } from 'src/engine/api/mcp/utils/build-mcp-server-info.util';
 
 describe('buildMcpServerInfo', () => {
-  it('publishes one absolute https icon on the origin the request arrived on', () => {
+  it('publishes absolute https icons on the origin the request arrived on, PNGs before the SVG', () => {
     const serverInfo = buildMcpServerInfo('https://api.example.test');
 
     expect(serverInfo.icons).toEqual([
+      {
+        src: `https://api.example.test${BRAND_ASSET_PATHS.icon512}`,
+        mimeType: 'image/png',
+        sizes: ['512x512'],
+      },
+      {
+        src: `https://api.example.test${BRAND_ASSET_PATHS.emailIcon}`,
+        mimeType: 'image/png',
+        sizes: ['180x180'],
+      },
       {
         src: `https://api.example.test${BRAND_ASSET_PATHS.appIcon}`,
         mimeType: 'image/svg+xml',
@@ -21,10 +31,10 @@ describe('buildMcpServerInfo', () => {
     const secondHost = buildMcpServerInfo('https://two.example.test:8443');
 
     expect(firstHost.icons?.[0].src).toBe(
-      `https://one.example.test${BRAND_ASSET_PATHS.appIcon}`,
+      `https://one.example.test${BRAND_ASSET_PATHS.icon512}`,
     );
     expect(secondHost.icons?.[0].src).toBe(
-      `https://two.example.test:8443${BRAND_ASSET_PATHS.appIcon}`,
+      `https://two.example.test:8443${BRAND_ASSET_PATHS.icon512}`,
     );
   });
 
