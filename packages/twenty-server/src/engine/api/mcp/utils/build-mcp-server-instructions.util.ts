@@ -3,12 +3,12 @@ import { settings } from 'src/engine/constants/settings';
 export const buildMcpServerInstructions = ({
   objectNames,
   actionToolNames,
-  skillNames,
+  skills = [],
   isDirectMode,
 }: {
   objectNames: string;
   actionToolNames: string[];
-  skillNames?: string;
+  skills?: { name: string; description: string }[];
   isDirectMode: boolean;
 }): string => {
   const availableActionTools = new Set(actionToolNames);
@@ -42,7 +42,13 @@ export const buildMcpServerInstructions = ({
           `  get_tool_catalog(categories)        — fallback discovery, only when you do not know which tool exists. Pass ONE category, never call it unfiltered`,
         ]),
     ``,
-    ...(skillNames ? [`Available skills: ${skillNames}.`, ``] : []),
+    ...(skills.length > 0
+      ? [
+          `Available skills:`,
+          ...skills.map((skill) => `  ${skill.name} — ${skill.description}`),
+          ``,
+        ]
+      : []),
     `CRUD tool name grammar — construct names directly without prior discovery:`,
     `  Read:  find_many_{objects} | find_one_{object} | group_by_{objects}`,
     `  Write: create_one_{object} | create_many_{objects} | update_one_{object} | update_many_{objects} | delete_one_{object} | delete_many_{objects} | upsert_many_{objects}. Use upsert_many_{objects} instead of update_many_{objects} when each record has its own individual data.`,

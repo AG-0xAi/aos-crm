@@ -16,6 +16,7 @@ import {
   McpExceptionCode,
 } from 'src/engine/api/mcp/exceptions/mcp.exception';
 import { McpInstructionBuilderService } from 'src/engine/api/mcp/services/mcp-instruction-builder.service';
+import { McpPromptBuilderService } from 'src/engine/api/mcp/services/mcp-prompt-builder.service';
 import { McpToolExecutorService } from 'src/engine/api/mcp/services/mcp-tool-executor.service';
 import {
   createListObjectMetadataNamesTool,
@@ -29,6 +30,8 @@ import { type McpAnnotatedTool } from 'src/engine/api/mcp/types/mcp-annotated-to
 import { type McpCoreQueryContext } from 'src/engine/api/mcp/types/mcp-core-query-context.type';
 import { type McpInitializeResult } from 'src/engine/api/mcp/types/mcp-initialize-result.type';
 import { type McpMethod } from 'src/engine/api/mcp/types/mcp-method.type';
+import { type McpPromptGetResult } from 'src/engine/api/mcp/types/mcp-prompt-get-result.type';
+import { type McpPromptsListResult } from 'src/engine/api/mcp/types/mcp-prompts-list-result.type';
 import { type McpResult } from 'src/engine/api/mcp/types/mcp-result.type';
 import { type McpToolAnnotations } from 'src/engine/api/mcp/types/mcp-tool-annotations.type';
 import { type McpToolCallResult } from 'src/engine/api/mcp/types/mcp-tool-call-result.type';
@@ -39,6 +42,7 @@ import { buildMcpServerInfo } from 'src/engine/api/mcp/utils/build-mcp-server-in
 import { getMcpPreloadToolNames } from 'src/engine/api/mcp/utils/get-mcp-preload-tool-names.util';
 import { getMcpRegistryToolAnnotations } from 'src/engine/api/mcp/utils/get-mcp-registry-tool-annotations.util';
 import { isMcpMethod } from 'src/engine/api/mcp/utils/is-mcp-method.util';
+import { parseMcpPromptGetParams } from 'src/engine/api/mcp/utils/parse-mcp-prompt-get-params.util';
 import { parseMcpToolCallParams } from 'src/engine/api/mcp/utils/parse-mcp-tool-call-params.util';
 import { wrapJsonRpcResponse } from 'src/engine/api/mcp/utils/wrap-jsonrpc-response.util';
 import { ApiKeyRoleService } from 'src/engine/core-modules/api-key/services/api-key-role.service';
@@ -107,6 +111,7 @@ export class McpProtocolService {
     private readonly apiKeyRoleService: ApiKeyRoleService,
     private readonly skillService: SkillService,
     private readonly mcpInstructionBuilderService: McpInstructionBuilderService,
+    private readonly mcpPromptBuilderService: McpPromptBuilderService,
     private readonly flatEntityMapsCacheService: WorkspaceManyOrAllFlatEntityMapsCacheService,
     private readonly workspaceCacheService: WorkspaceCacheService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
@@ -430,7 +435,9 @@ export class McpProtocolService {
       case 'ping':
         return {};
       case 'prompts/list':
-        return { prompts: [] };
+        return this.handlePromptsList(context);
+      case 'prompts/get':
+        return this.handlePromptsGet({ params, context });
       case 'resources/list':
         return { resources: [] };
       case 'tools/list':
@@ -440,6 +447,38 @@ export class McpProtocolService {
       default:
         return assertUnreachable(method);
     }
+  }
+
+  private async handlePromptsList(
+    context: McpCoreQueryContext,
+  ): Promise<McpPromptsListResult> {
+    return {
+      prompts: await this.mcpPromptBuilderService.listPrompts(
+        context.workspace.id,
+      ),
+    };
+  }
+
+  private async handlePromptsGet({
+    params,
+    context,
+  }: {
+    params: Record<string, unknown> | undefined;
+    context: McpCoreQueryContext;
+  }): Promise<McpPromptGetResult> {
+    const promptName = parseMcpPromptGetParams(params);
+
+    if (!isDefined(promptName)) {
+      throw new McpException(
+        'prompts/get requires params with name',
+        McpExceptionCode.INVALID_PARAMS,
+      );
+    }
+
+    return this.mcpPromptBuilderService.getPrompt(
+      context.workspace.id,
+      promptName,
+    );
   }
 
   private async handleToolsList(

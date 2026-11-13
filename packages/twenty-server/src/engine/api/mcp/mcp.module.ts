@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { McpCoreController } from 'src/engine/api/mcp/controllers/mcp-core.controller';
 import { McpInstructionBuilderService } from 'src/engine/api/mcp/services/mcp-instruction-builder.service';
+import { McpPromptBuilderService } from 'src/engine/api/mcp/services/mcp-prompt-builder.service';
 import { McpProtocolService } from 'src/engine/api/mcp/services/mcp-protocol.service';
 import { McpToolExecutorService } from 'src/engine/api/mcp/services/mcp-tool-executor.service';
 import { ApiKeyModule } from 'src/engine/core-modules/api-key/api-key.module';
@@ -32,6 +33,7 @@ import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache
   providers: [
     JwtAuthGuard,
     McpInstructionBuilderService,
+    McpPromptBuilderService,
     McpProtocolService,
     McpToolExecutorService,
   ],

@@ -311,3 +311,79 @@ node scripts/aos/mcp/team-role.mjs --self-test
 Las tres sondas leen las credenciales del administrador local de `deploy/local/.env`, que está
 ignorado por git, y la API key de pruebas de `%USERPROFILE%\.aos-crm\local-mcp-api-key` o de
 `AOS_CRM_MCP_API_KEY`. Ninguna imprime una credencial: a lo sumo su longitud.
+
+## 9. CRM-040 — el menú de skills: instrucciones con descripción y `prompts/list`
+
+Antes de este track, las instrucciones del servidor sólo listaban los **nombres** de las skills
+(`Available skills: workflow-building, data-manipulation, ...`) y `prompts/list` devolvía siempre un
+array vacío. Ni Claude ni ChatGPT podían saber qué hace cada skill sin cargarla primero, y Claude no
+mostraba ningún menú de prompts (el icono `/` del cliente).
+
+### Qué ve el asistente ahora
+
+**Instrucciones (`initialize.instructions`).** Cada skill activa del workspace aparece con su nombre
+y su descripción, en una línea cada una, recortada a un largo razonable:
+
+```
+Available skills:
+  data-manipulation — Use when finding, filtering, creating, updating or importing records...
+  workflow-building — Use when the user wants something to happen automatically...
+```
+
+**`prompts/list`.** Un prompt por cada skill activa y usable, con `name` (el slug de la skill),
+`title` (su label) y `description`:
+
+```json
+{
+  "prompts": [
+    { "name": "data-manipulation", "title": "Data Manipulation", "description": "Use when finding, filtering, creating, updating or importing records..." }
+  ]
+}
+```
+
+En Claude, esto es lo que llena el menú `/` del cliente: cada skill del workspace aparece como un
+comando invocable, con su descripción como ayuda.
+
+**`prompts/get`.** Pide `{ "name": "<skill>" }` y devuelve un mensaje de usuario que le dice al
+asistente que cargue esa skill con `load_skills` y la siga:
+
+```json
+{
+  "description": "Use when finding, filtering, creating, updating or importing records...",
+  "messages": [
+    { "role": "user", "content": { "type": "text", "text": "Load the \"data-manipulation\" skill with load_skills and then follow it." } }
+  ]
+}
+```
+
+Hoy ninguna skill declara argumentos propios, así que `prompts/get` no pide ninguno; si una skill
+los declarara en el futuro, aparecerían en `arguments` de `prompts/list` y el cliente los pediría
+antes de invocar el prompt.
+
+La capacidad `prompts` ya se declaraba en `initialize.capabilities` desde antes de este track
+(`{ "listChanged": false }`); lo que cambiaba es que detrás no había prompts reales.
+
+### Skills de intérprete de código: fuera del menú cuando no hay sandbox
+
+Cinco skills (`code-interpreter`, `xlsx`, `pdf`, `docx`, `pptx`) sólo enseñan a usar la herramienta
+`code_interpreter`, que MCP nunca ofrece (`MCP_EXCLUDED_TOOL_NAMES`) y que el propio driver rechaza
+ejecutar mientras `CODE_INTERPRETER_TYPE` está en `DISABLED`. Mientras esté así, esas cinco skills no
+aparecen ni en las instrucciones ni en `prompts/list`, y `prompts/get` las rechaza igual que un
+nombre desconocido: no tiene sentido menuar una skill que el asistente no puede ejecutar en este
+despliegue. Si se habilita el sandbox (`CODE_INTERPRETER_TYPE=LOCAL` o `E2B`), las cinco vuelven a
+aparecer sin ningún otro cambio.
+
+### Cómo aparece una skill personalizada
+
+Una skill custom del workspace (creada por API o desde la interfaz, con su propio `name`, `label` y
+`description`) se incorpora al menú exactamente igual que las de fábrica: en cuanto queda activa
+(`isActive: true`), la siguiente llamada a `initialize` la lista en las instrucciones y la siguiente
+llamada a `prompts/list` la ofrece como prompt, con el `name` de la skill como slug y su `label` como
+título. Desactivarla (`isActive: false`) la quita de ambos sitios en la siguiente llamada.
+
+### Aislamiento por workspace
+
+Instrucciones y prompts se construyen a partir de las skills de **ese** workspace únicamente: la
+skill personalizada de un workspace nunca aparece en las instrucciones ni en el menú de otro
+workspace, aunque comparta el mismo despliegue. Lo prueba
+`mcp-instruction-builder.service.spec.ts` y `mcp-prompt-builder.service.spec.ts`.

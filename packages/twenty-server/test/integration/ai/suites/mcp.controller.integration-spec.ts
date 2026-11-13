@@ -192,7 +192,7 @@ describe('MCP Controller (integration)', () => {
       }
     }, 60_000);
 
-    it('should list prompts and resources as empty arrays', async () => {
+    it('should list prompts as a name/title/description array, and resources as an empty array', async () => {
       const prompts = await postMcp({
         jsonrpc: '2.0',
         method: 'prompts/list',
@@ -200,6 +200,11 @@ describe('MCP Controller (integration)', () => {
       }).expect(200);
 
       expect(Array.isArray(prompts.body.result.prompts)).toBe(true);
+      for (const prompt of prompts.body.result.prompts) {
+        expect(typeof prompt.name).toBe('string');
+        expect(typeof prompt.title).toBe('string');
+        expect(typeof prompt.description).toBe('string');
+      }
 
       const resources = await postMcp({
         jsonrpc: '2.0',
@@ -208,6 +213,51 @@ describe('MCP Controller (integration)', () => {
       }).expect(200);
 
       expect(Array.isArray(resources.body.result.resources)).toBe(true);
+    });
+
+    it('should return a loadable prompt for a skill listed by prompts/list', async () => {
+      const listResponse = await postMcp({
+        jsonrpc: '2.0',
+        method: 'prompts/list',
+        id: 'prompts-2',
+      }).expect(200);
+
+      const [firstPrompt] = listResponse.body.result.prompts;
+
+      if (!firstPrompt) {
+        return;
+      }
+
+      const getResponse = await postMcp({
+        jsonrpc: '2.0',
+        method: 'prompts/get',
+        params: { name: firstPrompt.name },
+        id: 'prompts-get-1',
+      }).expect(200);
+
+      expect(getResponse.body.result).toEqual({
+        description: firstPrompt.description,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: expect.stringContaining(firstPrompt.name),
+            },
+          },
+        ],
+      });
+    });
+
+    it('should reject prompts/get for an unknown prompt name', async () => {
+      const response = await postMcp({
+        jsonrpc: '2.0',
+        method: 'prompts/get',
+        params: { name: 'does-not-exist-as-a-skill' },
+        id: 'prompts-get-2',
+      }).expect(200);
+
+      expect(response.body.error).toBeDefined();
     });
   });
 
