@@ -1,0 +1,44 @@
+name: CI Deploy AWS
+
+on:
+  pull_request:
+    branches: [betty/factory]
+    paths:
+      - deploy/aws/**
+      - .github/workflows/ci-deploy-aws.yaml
+  push:
+    branches: [betty/factory]
+    paths:
+      - deploy/aws/**
+      - .github/workflows/ci-deploy-aws.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-checks:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/aws
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - name: Terraform format
+        run: terraform fmt -check -recursive
+      - name: Terraform init (no backend, no credentials)
+        run: terraform init -backend=false -input=false
+      - name: Terraform validate
+        run: terraform validate -no-color
+      # Offline tests: the AWS provider is mocked, so they need no
+      # credentials and never touch an account.
+      - name: Terraform test
+        run: terraform test -no-color
