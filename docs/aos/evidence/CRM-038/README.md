@@ -7,6 +7,8 @@ credentials for a seeded member of YCombinator (the "foreign" workspace,
 and uses no mock of any guard, resolver or repository. Every negative call has a positive twin with
 Apple's own credential on the same id.
 
+Every negative that returns a body (attachment, workflow version, logic function, search, and the record/metadata ones) runs `expectNoLeak`. API keys the suites mint for YCombinator are revoked in each suite's `afterAll` (`revokeYCombinatorAdminApiKeys`).
+
 Shared assertion helper: `utils/expect-no-leak.util.ts` (`expectNoLeak`) checks that a foreign
 record's id, name and `iso-<uuid>` marker are all absent from the whole serialized response body,
 not just a single field.
@@ -34,7 +36,7 @@ not just a single field.
 | Upload by id | `PUT /files/upload/:id` (`file-upload.controller.ts`) | `files.integration-spec.ts` | "YCombinator's real upload attempt into Apple's folder, through the upload controller, is refused and Apple's file is unchanged" | n/a (checked via re-read) | YCombinator's own signed upload token, Apple's fileId substituted in: refused; `completeFileUpload` on Apple's fileId with YCombinator's credential: GraphQL error; Apple's file unchanged after |
 | Attachment record | `/graphql` `attachment` | `files.integration-spec.ts` | "... cannot read Apple's attachment record, and Apple's own token can" | Apple: attachment returned | YCombinator: null |
 | Record export | `GET /file/record-export/:id?token=...` | `files.integration-spec.ts` | "Apple's export downloads with Apple's own credential, and is refused for YCombinator's credentials on the same signed path" | Apple's credential on Apple's signed path: 200 | YCombinator token/API key and no credential, same signed path: all 4xx |
-| Public assets route | `GET ${ApiPath.PublicAssets}/:workspaceId/:applicationId/*path` | not tested | — | — | Not an isolation surface: the route is deliberately public by design (`PublicEndpointGuard`, no credential at all), addressed explicitly by `workspaceId` + `applicationId` + path for branding/OAuth-page assets. The only real risk there is path traversal, already guarded by `validateFilePath` against `FileFolder.PublicAsset` — a separate concern from cross-workspace credential isolation, and one this suite's "no literal attack strings" rule rightly keeps out of scope. |
+| Public assets route | `GET /public-assets/:workspaceId/:applicationId/*path` | `public-assets.integration-spec.ts` | "serves Apple's asset under Apple's workspace id and refuses it under YCombinator's" | Apple's workspace id: 200, content matches marker | YCombinator's workspace id with the same application id and path: 4xx, marker absent. The route is public by design (no credential), so the workspace id in the path is the only boundary; path traversal stays covered by `validateFilePath`, out of scope here. |
 
 ## Workflows
 
@@ -76,7 +78,7 @@ environment without extra OAuth-channel fixtures.
 | Surface | Endpoint | Test file | Test name (abridged) | Positive | Negative |
 | --- | --- | --- | --- | --- | --- |
 | Find by id | `/metadata` `findOneLogicFunction` | `code-steps.integration-spec.ts` | "... cannot find Apple's logic function by id, and Apple's own token can" | Apple: function returned | YCombinator: GraphQL error |
-| Invoke by id | `/metadata` `executeOneLogicFunction` | `code-steps.integration-spec.ts` | "... cannot invoke Apple's logic function by id, and Apple's own token can" | n/a (checked via re-read) | YCombinator: GraphQL error on execution; function still findable by Apple afterward |
+| Invoke by id | `/metadata` `executeOneLogicFunction` | `code-steps.integration-spec.ts` | "... cannot invoke Apple's logic function by id, and Apple's own token can" | Apple: executes the handler, status SUCCESS, result echoes the marker | YCombinator: GraphQL error, no result, no leak (`expectNoLeak`); function still findable by Apple afterward |
 
 `LOGIC_FUNCTION_TYPE=LOCAL` in `.env.test`, so execution is reachable in the integration
 environment (not `DISABLED`) and this covers the real invocation path, not only the management
@@ -93,8 +95,8 @@ NODE_ENV=test NODE_OPTIONS="--max-old-space-size=6144" \
   npx jest --config ./jest-integration.config.ts test/integration/isolation/
 ```
 
-All 8 suites, 29 tests, pass together (`Test Suites: 8 passed, 8 total`, `Tests: 29 passed, 29 total`).
-Running each suite against this stack caught three issues the prior checkpoint's claim of a
+The 8 original suites (29 tests) passed together on that run; `public-assets.integration-spec.ts` and the follow-up changes (positive code-step execution, extra `expectNoLeak` checks, key revocation, job drain in the webhook twin) were added afterwards and are typechecked (`tsc --noEmit`, 0 errors) but not yet run against the integration stack; the fork's `server-integration-test` CI is the first real run.
+Running each suite against this stack caught four issues the prior checkpoint's claim of a
 "records suite green" did not surface, fixed in this run (see the worker report for commits):
 
 - `search.integration-spec.ts` only waited for one of the three markers to index, and Person's
