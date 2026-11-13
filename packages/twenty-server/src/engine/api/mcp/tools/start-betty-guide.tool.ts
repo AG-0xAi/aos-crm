@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 import { z } from 'zod';
 import { isDefined, tipTapDocumentToMarkdown } from 'twenty-shared/utils';
 
@@ -6,6 +8,8 @@ import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system
 import { type RolePermissionConfig } from 'src/engine/twenty-orm/types/role-permission-config.type';
 import { type WorkspaceOrmManager } from 'src/engine/twenty-orm/workspace-orm.manager';
 import { type NoteWorkspaceEntity } from 'src/modules/note/standard-objects/note.workspace-entity';
+
+const logger = new Logger('StartBettyGuideTool');
 
 export const START_BETTY_GUIDE_TOOL_NAME = 'start_betty_guide';
 
@@ -54,17 +58,25 @@ export const createStartBettyGuideTool = (
 
     const [guideSkills, profileNote] = await Promise.all([
       skillService.findFlatSkillsByNames([BETTY_GUIDE_SKILL_NAME], workspaceId),
-      workspaceOrmManager.executeInWorkspaceContext(async () => {
-        const noteRepository =
-          workspaceOrmManager.getRepository<NoteWorkspaceEntity>(
-            'note',
-            rolePermissionConfig,
+      workspaceOrmManager
+        .executeInWorkspaceContext(async () => {
+          const noteRepository =
+            workspaceOrmManager.getRepository<NoteWorkspaceEntity>(
+              'note',
+              rolePermissionConfig,
+            );
+
+          return noteRepository.findOne({
+            where: { title: BETTY_GUIDE_PROFILE_NOTE_TITLE },
+          });
+        }, buildSystemAuthContext(workspaceId))
+        .catch(() => {
+          logger.warn(
+            `Could not read the Betty profile note for workspace ${workspaceId}; continuing without it`,
           );
 
-        return noteRepository.findOne({
-          where: { title: BETTY_GUIDE_PROFILE_NOTE_TITLE },
-        });
-      }, buildSystemAuthContext(workspaceId)),
+          return null;
+        }),
     ]);
 
     const profileNoteText = isDefined(profileNote?.bodyV2?.markdown)

@@ -121,6 +121,30 @@ describe('createStartBettyGuideTool', () => {
     expect(result.nextStep).toContain('¿A qué te dedicas');
   });
 
+  it('still returns the guide and a nextStep when reading the profile note is denied', async () => {
+    const skillService = buildSkillServiceMock([
+      { name: BETTY_GUIDE_SKILL_NAME, content: 'Guide body' },
+    ]);
+    const workspaceOrmManager = buildWorkspaceOrmManagerMock(null);
+
+    workspaceOrmManager.findOne.mockRejectedValue(
+      new Error('Permission denied: cannot read note'),
+    );
+
+    const tool = createStartBettyGuideTool(
+      skillService as never,
+      workspaceOrmManager as never,
+      'workspace-a',
+      ROLE_PERMISSION_CONFIG,
+    );
+
+    const result = await tool.execute({});
+
+    expect(result.guide).toContain('Guide body');
+    expect(result.profileNote).toBeNull();
+    expect(result.nextStep.length).toBeGreaterThan(0);
+  });
+
   it('only reads skills and the profile note for the workspace it was built for', async () => {
     const skillServiceA = buildSkillServiceMock([
       { name: BETTY_GUIDE_SKILL_NAME, content: 'Guide A' },

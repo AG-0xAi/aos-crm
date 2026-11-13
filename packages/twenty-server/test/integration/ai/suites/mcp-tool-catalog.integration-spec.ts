@@ -303,6 +303,14 @@ describe('MCP tool catalog (integration)', () => {
   });
 
   describe('start_betty_guide', () => {
+    it('is listed in direct mode tools/list', async () => {
+      const toolNames = (
+        await listMcpTools(adminApiKeyToken, DIRECT_MODE_PATH)
+      ).map((tool) => tool.name);
+
+      expect(toolNames).toContain('start_betty_guide');
+    });
+
     it('is listed in plain tools/list, not only behind get_tool_catalog', async () => {
       const toolNames = (await listMcpTools(adminApiKeyToken, '/mcp')).map(
         (tool) => tool.name,
@@ -325,6 +333,8 @@ describe('MCP tool catalog (integration)', () => {
       };
 
       expect(output.guide).toContain('Conóceme');
+      expect(output).toHaveProperty('profileNote');
+      expect(output.profileNote).toBeNull();
       expect(output.nextStep.length).toBeGreaterThan(0);
     });
   });
