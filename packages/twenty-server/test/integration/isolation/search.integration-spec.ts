@@ -14,7 +14,11 @@ import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/gene
 // object's indexing path.
 const MARKER = `iso-${randomUUID()}`;
 const COMPANY_NAME = `Isolation Search Co ${MARKER}`;
-const PERSON_LAST_NAME = `Isolation-Search-${MARKER}`;
+// Space-separated, not hyphen-joined with MARKER: Postgres's text search
+// parser tokenizes a hyphen-joined word as one lexeme distinct from MARKER
+// alone, so a hyphen-joined last name would never match a search for
+// MARKER by itself.
+const PERSON_LAST_NAME = `Isolation Search ${MARKER}`;
 const NOTE_TITLE = `Isolation Search Note ${MARKER}`;
 const SEARCH_INDEX_TIMEOUT_MS = 30_000;
 const SEARCH_INDEX_POLL_INTERVAL_MS = 1_000;
@@ -54,13 +58,13 @@ const searchForOrThrow = async (
   );
 };
 
-const waitForOwnHit = async (recordId: string): Promise<string[]> => {
+const waitForOwnHits = async (recordIds: string[]): Promise<string[]> => {
   const deadline = Date.now() + SEARCH_INDEX_TIMEOUT_MS;
   let hits: string[] = [];
 
   while (Date.now() < deadline) {
     hits = await searchForOrThrow(MARKER);
-    if (hits.includes(recordId)) {
+    if (recordIds.every((recordId) => hits.includes(recordId))) {
       break;
     }
     await new Promise((resolve) =>
@@ -153,7 +157,7 @@ describe('cross-workspace isolation: search', () => {
   });
 
   it("finds Apple's own records with Apple's token, and none of it with YCombinator's credentials", async () => {
-    const ownHits = await waitForOwnHit(companyId);
+    const ownHits = await waitForOwnHits([companyId, personId, noteId]);
 
     expect(ownHits).toContain(companyId);
     expect(ownHits).toContain(personId);
