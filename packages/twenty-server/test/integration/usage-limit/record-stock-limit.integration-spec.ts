@@ -22,14 +22,12 @@ import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder
 const SCHEMA_NAME = getWorkspaceSchemaName(SEED_APPLE_WORKSPACE_ID);
 const HEADROOM = 2;
 const STATS_FLUSH_TIMEOUT_MS = 30_000;
-const STATS_POLL_MS = 1_500;
-const STABLE_READS = 8;
 
 describe('Record stock limit', () => {
   let usageLimitRepository: Repository<UsageLimitEntity>;
   let redis: Awaited<ReturnType<typeof createClient>>;
   let usageLimitId: string;
-  let statsOffset: number;
+  let baselineRecordCount: number;
   const createdRocketIds: string[] = [];
 
   const createRockets = async (count: number) => {
@@ -99,49 +97,28 @@ describe('Record stock limit', () => {
     return Number(row.quantity);
   };
 
-  const countRecordsExactly = async (): Promise<number> => {
-    let total = 0;
-
-    for (const tableName of await findTrackedTableNames()) {
-      const [row]: { quantity: string }[] = await global.testDataSource.query(
-        `SELECT COUNT(*) AS quantity FROM "${SCHEMA_NAME}"."${tableName}"`,
-      );
-
-      total += Number(row.quantity);
-    }
-
-    return total;
-  };
-
-  // Idle connections flush their pg_stat counters only every ~10s, so a stable
-  // reading shorter than that can still be overtaken by a late delta.
-  const waitForStatsToSettle = async (): Promise<number> => {
-    let previous = await countRecords();
-    let stableReads = 0;
-
-    while (stableReads < STABLE_READS) {
-      await new Promise((resolve) => setTimeout(resolve, STATS_POLL_MS));
-
-      const current = await countRecords();
-
-      stableReads = current === previous ? stableReads + 1 : 0;
-      previous = current;
-    }
-
-    return previous;
-  };
-
-  const waitForStatsToMatchRows = async (): Promise<number> => {
-    const expectedStats = (await countRecordsExactly()) + statsOffset;
-
-    await expectEventually(
+  const waitForRecordCount = (expected: number) =>
+    expectEventually(
       async () => {
-        expect(await countRecords()).toBe(expectedStats);
+        expect(await countRecords()).toBe(expected);
       },
       { timeoutMs: STATS_FLUSH_TIMEOUT_MS },
     );
 
-    return expectedStats;
+  const waitForStatsToSettle = async (): Promise<number> => {
+    let previous = await countRecords();
+
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+      const current = await countRecords();
+
+      if (current === previous) {
+        return current;
+      }
+
+      previous = current;
+    }
   };
 
   const dropKeys = async (pattern: string) => {
@@ -180,6 +157,8 @@ describe('Record stock limit', () => {
       workspaceId: SEED_APPLE_WORKSPACE_ID,
       resourceType: UsageResourceType.RECORD,
     });
+    baselineRecordCount = await waitForStatsToSettle();
+
     const [usageLimit] = await usageLimitRepository.save([
       {
         workspaceId: SEED_APPLE_WORKSPACE_ID,
@@ -191,27 +170,18 @@ describe('Record stock limit', () => {
         periodCount: 1,
         periodUnit: 'lifetime',
         unit: UsageUnit.RECORD,
-        limitValue: HEADROOM,
+        limitValue: baselineRecordCount + HEADROOM,
         burstValue: null,
       },
     ]);
 
     usageLimitId = usageLimit.id;
-    statsOffset =
-      (await waitForStatsToSettle()) - (await countRecordsExactly());
-  }, STATS_FLUSH_TIMEOUT_MS * 2);
 
-  // The limit is checked against pg_stat n_live_tup, which lags behind writes.
-  // A baseline taken once goes stale, so each test waits for the stats to catch
-  // up with the real row count and pins the limit to that value.
-  beforeEach(async () => {
-    const currentRecordCount = await waitForStatsToMatchRows();
-
-    await usageLimitRepository.update(
-      { id: usageLimitId },
-      { limitValue: currentRecordCount + HEADROOM },
-    );
     await refreshUsageLimitsCache();
+  });
+
+  beforeEach(async () => {
+    await waitForRecordCount(baselineRecordCount);
     await dropStockCounter();
   }, STATS_FLUSH_TIMEOUT_MS + 5_000);
 
