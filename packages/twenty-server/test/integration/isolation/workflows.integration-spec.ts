@@ -188,7 +188,15 @@ describe('cross-workspace isolation: workflows', () => {
         token,
       );
 
-      expect(deleted.errors).toBeDefined();
+      // A foreign id simply doesn't match anything in the caller's own
+      // workspace-scoped lookup, so this mutation answers with an empty
+      // list rather than an error -- isolation either way; what matters is
+      // the EFFECT, checked below via the still-active version.
+      const deletedIds = (
+        deleted.data?.deleteCoreWorkflows as { id: string }[] | null
+      )?.map((workflow) => workflow.id);
+
+      expect(deletedIds ?? []).toEqual([]);
     }
 
     const stillActive = await findCoreWorkflowVersion({
