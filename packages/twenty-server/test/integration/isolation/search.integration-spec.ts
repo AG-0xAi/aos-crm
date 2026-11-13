@@ -2,8 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import gql from 'graphql-tag';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 
 // CRM-038: the search resolver is workspace-scoped like every other record
 // surface. A marker string unique to this run, searched with YCombinator's
@@ -134,6 +138,8 @@ describe('cross-workspace isolation: search', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await makeGraphqlApiRequest({
       query: gql`
         mutation DestroyIsolationSearchRecords(
@@ -167,6 +173,14 @@ describe('cross-workspace isolation: search', () => {
       const foreignHits = await searchForOrThrow(MARKER, token);
 
       expect(foreignHits).toEqual([]);
+
+      for (const [id, name] of [
+        [companyId, COMPANY_NAME],
+        [personId, PERSON_LAST_NAME],
+        [noteId, NOTE_TITLE],
+      ]) {
+        expectNoLeak(foreignHits, { id, name, marker: MARKER });
+      }
     }
   });
 });

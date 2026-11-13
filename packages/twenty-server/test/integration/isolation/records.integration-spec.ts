@@ -4,7 +4,10 @@ import gql from 'graphql-tag';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
 import { makeRestApiRequest } from 'test/integration/rest/utils/make-rest-api-request.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 
 // CRM-038: a record created in Apple (the seeded workspace behind
@@ -86,6 +89,8 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await makeGraphqlApiRequest({
       query: gql`
         mutation DestroyIsolationRecords(
