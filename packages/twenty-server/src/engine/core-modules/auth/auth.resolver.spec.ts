@@ -1,4 +1,5 @@
 import { type CanActivate, Logger } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
@@ -462,4 +463,22 @@ describe('AuthResolver', () => {
       ).not.toHaveBeenCalled();
     });
   });
+});
+
+describe('AuthResolver CaptchaGuard coverage (CRM-042)', () => {
+  // signUp carries SignUpCredentialsInput's signUpInvitationToken
+  // (CRM-016): there is no separate "accept a sign-up invitation" mutation,
+  // so guarding signUp is what covers that path too.
+  it.each(['signUp', 'signUpInWorkspace'] as const)(
+    'guards %s with CaptchaGuard',
+    (methodName) => {
+      const guards =
+        Reflect.getMetadata(
+          GUARDS_METADATA,
+          AuthResolver.prototype[methodName],
+        ) ?? [];
+
+      expect(guards).toContain(CaptchaGuard);
+    },
+  );
 });

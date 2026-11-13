@@ -85,3 +85,24 @@ resource "aws_secretsmanager_secret_version" "signup_webhook_url" {
   secret_id     = aws_secretsmanager_secret.signup_webhook_url[0].id
   secret_string = var.signup_webhook_url
 }
+
+# CRM-042: same reasoning as signup_webhook_url above -- only created when
+# var.captcha_secret_key is set, which var.captcha_driver's own validation
+# (variables.tf) ties to var.captcha_driver != "" either way. Not generated
+# by Terraform: it is the Turnstile secret key Cloudflare issues to the
+# founder (BETA_RUNBOOK.md, "Alta sin bots").
+resource "aws_secretsmanager_secret" "captcha_secret_key" {
+  count       = var.captcha_secret_key != "" ? 1 : 0
+  name        = "aos-crm/${var.environment}/captcha-secret-key"
+  description = "CAPTCHA_SECRET_KEY for the aos-crm ${var.environment} server task (CRM-042's anti-bot check)."
+
+  tags = {
+    Name = "aos-crm-${var.environment}-captcha-secret-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "captcha_secret_key" {
+  count         = var.captcha_secret_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.captcha_secret_key[0].id
+  secret_string = var.captcha_secret_key
+}
