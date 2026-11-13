@@ -33,30 +33,53 @@ const FULL_GUIDE_HINT = `If you need more detail when you start proposing paths,
 const NEXT_STEP =
   'Reply with firstMessage as your entire answer, translated if the person wrote in another language. Do not list options, menus or features. Then wait for their answer and follow guideSummary.';
 
-const PROFILE_SUMMARY_MAX_LENGTH = 240;
+const PROFILE_SUMMARY_MAX_LENGTH = 160;
+const NAME_MAX_LENGTH = 40;
+const NAME_INPUT_MAX_LENGTH = 100;
+const FINAL_PUNCTUATION = /[.!?…:;]$/;
 
-// LEAN-DEBT: first non-empty line, truncated; a real one-sentence summary
+// LEAN-DEBT: first content line, trimmed; a real one-sentence summary
 // would need a model call inside the tool.
-const summarizeProfileNote = (profileNoteText: string): string => {
-  const firstLine =
-    profileNoteText
-      .split('\n')
-      .map((line) => line.replace(/^[#>*\-\s]+/, '').trim())
-      .find((line) => line.length > 0) ?? '';
+const summarizeProfileNote = (profileNoteText: string): string | null => {
+  const contentLine = profileNoteText
+    .split('\n')
+    .map((line) => line.replace(/^[#>*\-\s]+/, '').trim())
+    .find((line) => line.length > 0 && line !== BETTY_GUIDE_PROFILE_NOTE_TITLE);
 
-  return firstLine.length > PROFILE_SUMMARY_MAX_LENGTH
-    ? `${firstLine.slice(0, PROFILE_SUMMARY_MAX_LENGTH).trimEnd()}…`
-    : firstLine;
+  if (!isDefined(contentLine)) {
+    return null;
+  }
+
+  const trimmed =
+    contentLine.length > PROFILE_SUMMARY_MAX_LENGTH
+      ? contentLine.slice(0, PROFILE_SUMMARY_MAX_LENGTH).trimEnd()
+      : contentLine;
+
+  return FINAL_PUNCTUATION.test(trimmed) ? trimmed : `${trimmed}.`;
+};
+
+const sanitizeName = (name: string | undefined): string | undefined => {
+  const clean = name
+    ?.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+    .trim()
+    .slice(0, NAME_MAX_LENGTH)
+    .trim();
+
+  return clean === undefined || clean.length === 0 ? undefined : clean;
 };
 
 const buildFirstMessage = (
-  name: string | undefined,
+  rawName: string | undefined,
   profileNoteText: string | null,
 ): string => {
+  const name = sanitizeName(rawName);
   const greeting = isDefined(name) ? `¡Hola, ${name}!` : '¡Hola!';
+  const summary = isDefined(profileNoteText)
+    ? summarizeProfileNote(profileNoteText)
+    : null;
 
-  if (isDefined(profileNoteText)) {
-    return `${greeting} Soy Betty. Por lo que tengo guardado de tu trabajo: ${summarizeProfileNote(profileNoteText)} ¿Sigue siendo así o ha cambiado algo?`;
+  if (isDefined(summary)) {
+    return `${greeting} Soy Betty. Por lo que tengo guardado de tu trabajo: ${summary} ¿Sigue siendo así o ha cambiado algo?`;
   }
 
   return `${greeting} ${FIRST_QUESTION_BODY}`;
@@ -65,6 +88,7 @@ const buildFirstMessage = (
 export const startBettyGuideInputSchema = z.object({
   name: z
     .string()
+    .max(NAME_INPUT_MAX_LENGTH)
     .optional()
     .describe(
       'The name the person gave, if any (e.g. "soy Andrés", "I\'m Maria")',

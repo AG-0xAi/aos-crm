@@ -2,6 +2,7 @@ import {
   BETTY_GUIDE_PROFILE_NOTE_TITLE,
   BETTY_GUIDE_SKILL_NAME,
   createStartBettyGuideTool,
+  startBettyGuideInputSchema,
 } from 'src/engine/api/mcp/tools/start-betty-guide.tool';
 import { type RolePermissionConfig } from 'src/engine/twenty-orm/types/role-permission-config.type';
 
@@ -121,6 +122,83 @@ describe('createStartBettyGuideTool', () => {
     expect(result.firstMessage).toContain('Andrés sells software to dentists');
     expect(result.firstMessage).toContain('¿Sigue siendo así');
     expect(result.nextStep).toContain('Reply with firstMessage');
+  });
+
+  describe('profile summary and name in firstMessage', () => {
+    const runWith = async (markdown: string | null, name?: string) => {
+      const tool = createStartBettyGuideTool(
+        buildSkillServiceMock([
+          { name: BETTY_GUIDE_SKILL_NAME, content: 'Guide body' },
+        ]) as never,
+        buildWorkspaceOrmManagerMock(
+          markdown === null ? null : { bodyV2: { markdown } },
+        ) as never,
+        'workspace-a',
+        ROLE_PERMISSION_CONFIG,
+      );
+
+      return (await tool.execute({ name })).firstMessage;
+    };
+
+    it('skips the note title and heading markers', async () => {
+      const message = await runWith(
+        `# ${BETTY_GUIDE_PROFILE_NOTE_TITLE}\n\n\n## Vendo software a dentistas.\nMás detalle`,
+      );
+
+      expect(message).toBe(
+        '¡Hola! Soy Betty. Por lo que tengo guardado de tu trabajo: Vendo software a dentistas. ¿Sigue siendo así o ha cambiado algo?',
+      );
+    });
+
+    it('ends the summary with a period when it has no final punctuation', async () => {
+      const message = await runWith('Vendo software a dentistas');
+
+      expect(message).toContain('dentistas. ¿Sigue siendo así');
+      expect(message).not.toContain('dentistas ¿');
+    });
+
+    it('keeps existing final punctuation and trims to about 160 characters', async () => {
+      const kept = await runWith('¿Qué hago hoy?');
+      const long = await runWith(`${'palabra '.repeat(60)}fin`);
+      const summary = long
+        .replace(
+          '¡Hola! Soy Betty. Por lo que tengo guardado de tu trabajo: ',
+          '',
+        )
+        .replace(' ¿Sigue siendo así o ha cambiado algo?', '');
+
+      expect(kept).toContain('¿Qué hago hoy? ¿Sigue');
+      expect(kept).not.toContain('hoy?.');
+      expect(summary.length).toBeLessThanOrEqual(162);
+      expect(summary).toMatch(/\.$/);
+    });
+
+    it('uses the no-profile message when the note has no content line', async () => {
+      const empty = await runWith('  \n\n');
+      const onlyTitle = await runWith(`# ${BETTY_GUIDE_PROFILE_NOTE_TITLE}\n`);
+
+      expect(empty).toContain('¿a qué te dedicas');
+      expect(onlyTitle).toContain('¿a qué te dedicas');
+    });
+
+    it('trims the name, drops control characters and caps it at 40 characters', async () => {
+      const odd = await runWith(null, `  An\u0000dr\u001bés\n\t  `);
+      const long = await runWith(null, 'x'.repeat(100));
+      const blank = await runWith(null, ' \u0007\n ');
+
+      expect(odd.startsWith('¡Hola, Andrés! Soy Betty')).toBe(true);
+      expect(long.startsWith(`¡Hola, ${'x'.repeat(40)}! Soy`)).toBe(true);
+      expect(blank.startsWith('¡Hola! Soy Betty')).toBe(true);
+    });
+
+    it('rejects names over the cap in the input schema', () => {
+      expect(
+        startBettyGuideInputSchema.safeParse({ name: 'x'.repeat(500) }).success,
+      ).toBe(false);
+      expect(
+        startBettyGuideInputSchema.safeParse({ name: 'x'.repeat(40) }).success,
+      ).toBe(true);
+    });
   });
 
   it('names the person in nextStep when a name was given', async () => {
