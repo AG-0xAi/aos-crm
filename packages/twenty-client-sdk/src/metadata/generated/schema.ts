@@ -1161,6 +1161,7 @@ export interface ClientConfig {
     isCompanyEnrichmentEnabled: Scalars['Boolean']
     isConfigVariablesInDbEnabled: Scalars['Boolean']
     isCookieSessionEnabled: Scalars['Boolean']
+    isDpaGeneratorEnabled: Scalars['Boolean']
     isEmailVerificationRequired: Scalars['Boolean']
     isEmailingDomainInDemoMode: Scalars['Boolean']
     isGoogleCalendarEnabled: Scalars['Boolean']
@@ -5362,6 +5363,7 @@ export interface ClientConfigGenqlSelection{
     isCompanyEnrichmentEnabled?: boolean | number
     isConfigVariablesInDbEnabled?: boolean | number
     isCookieSessionEnabled?: boolean | number
+    isDpaGeneratorEnabled?: boolean | number
     isEmailVerificationRequired?: boolean | number
     isEmailingDomainInDemoMode?: boolean | number
     isGoogleCalendarEnabled?: boolean | number

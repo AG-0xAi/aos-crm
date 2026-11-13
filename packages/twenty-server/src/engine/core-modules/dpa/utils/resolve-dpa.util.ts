@@ -92,7 +92,11 @@ const buildExecutionBlocks = (
 };
 
 export const resolveDpa = (context: DpaResolveContext): ResolvedDpa => {
-  const config = getDpaRegionConfig(context.region);
+  const config = getDpaRegionConfig(
+    context.region,
+    context.processorAddress ?? '',
+    context.processorContact ?? '',
+  );
 
   const bodyBlocks: ResolvedDpaBlock[] = DPA_TEMPLATE_BLOCKS.filter(
     (block) =>

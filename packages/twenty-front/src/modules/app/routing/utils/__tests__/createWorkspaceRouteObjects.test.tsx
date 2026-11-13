@@ -161,4 +161,32 @@ describe('workspace route objects', () => {
       ),
     ).toBe(true);
   });
+
+  describe('DPA generator route gating', () => {
+    const dpaPaths = ['/dpa', '/settings/legal/dpa', '/settings/legal/dpa/new'];
+
+    it.each(dpaPaths)(
+      'does not register %s when the DPA generator flag is off',
+      (path) => {
+        const routeObjects = createWorkspaceRouteObjects({
+          isDpaGeneratorEnabled: false,
+        });
+        const matches = matchRoutes(routeObjects, path);
+
+        expect(matches?.at(-1)?.route.path).toBe(AppPath.NotFoundWildcard);
+      },
+    );
+
+    it.each(dpaPaths)(
+      'registers %s when the DPA generator flag is on',
+      (path) => {
+        const routeObjects = createWorkspaceRouteObjects({
+          isDpaGeneratorEnabled: true,
+        });
+        const matches = matchRoutes(routeObjects, path);
+
+        expect(matches?.at(-1)?.route.path).not.toBe(AppPath.NotFoundWildcard);
+      },
+    );
+  });
 });

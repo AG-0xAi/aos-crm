@@ -71,6 +71,7 @@ const NotFound = lazy(() =>
 
 type CreateWorkspaceRouteObjectsArgs = {
   isAdminPageEnabled?: boolean;
+  isDpaGeneratorEnabled?: boolean;
 };
 
 const MAIN_AND_SIDE_PANEL = ['main', 'side-panel'] as const;
@@ -78,9 +79,11 @@ const SETTINGS_ROOT_PATH = AppPath.SettingsCatchAll.replace('/*', '');
 
 export const createWorkspaceRouteObjects = ({
   isAdminPageEnabled,
+  isDpaGeneratorEnabled,
 }: CreateWorkspaceRouteObjectsArgs): WorkspaceRouteObject[] => {
   const settingsRouteObjects = createSettingsRouteObjects({
     isAdminPageEnabled,
+    isDpaGeneratorEnabled,
   });
 
   return [
@@ -174,10 +177,14 @@ export const createWorkspaceRouteObjects = ({
       element: <SettingsRouteOutlet />,
       children: settingsRouteObjects,
     },
-    {
-      path: AppPath.Dpa,
-      element: null,
-    },
+    ...(isDpaGeneratorEnabled
+      ? [
+          {
+            path: AppPath.Dpa,
+            element: null,
+          },
+        ]
+      : []),
     {
       path: AppPath.NotFoundWildcard,
       element: (

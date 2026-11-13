@@ -788,6 +788,7 @@ const SettingsRoleAddObjectLevel = lazy(() =>
 
 type CreateSettingsRouteObjectsArgs = {
   isAdminPageEnabled?: boolean;
+  isDpaGeneratorEnabled?: boolean;
 };
 
 type SettingsRouteHandle = WorkspaceRouteHandle;
@@ -815,6 +816,7 @@ const MEMBERS_LIST_SETTINGS_ROUTE_HANDLE: SettingsRouteHandle = {
 
 const createSettingsRouteElements = ({
   isAdminPageEnabled,
+  isDpaGeneratorEnabled,
 }: CreateSettingsRouteObjectsArgs) => (
   <>
     <Route path={SettingsPath.ProfilePage} element={<SettingsProfile />} />
@@ -944,11 +946,15 @@ const createSettingsRouteElements = ({
         path={SettingsPath.ApplicationPublicDomainDetail}
         element={<SettingPublicDomain />}
       />
-      <Route path={SettingsPath.LegalDpa} element={<SettingsLegalDpa />} />
-      <Route
-        path={SettingsPath.LegalDpaNew}
-        element={<SettingsLegalDpaNew />}
-      />
+      {isDpaGeneratorEnabled && (
+        <>
+          <Route path={SettingsPath.LegalDpa} element={<SettingsLegalDpa />} />
+          <Route
+            path={SettingsPath.LegalDpaNew}
+            element={<SettingsLegalDpaNew />}
+          />
+        </>
+      )}
     </Route>
     <Route
       element={

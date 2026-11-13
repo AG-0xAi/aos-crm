@@ -3,44 +3,53 @@ import { type DpaRegionConfig } from 'src/engine/core-modules/dpa/types/dpa.type
 
 export const DEFAULT_DPA_REGION: DpaRegion = DpaRegion.EU;
 
-const DPA_COMMON_VALUES = {
-  PROCESSOR_ENTITY: 'Twenty.com PBC',
+// Processor name is fixed; address and privacy contact come from deployment
+// config (DPA_PROCESSOR_ADDRESS / DPA_PROCESSOR_CONTACT) with empty defaults —
+// the generator refuses to run while they are unset. The rest of this DPA
+// template (EU Affiliate, governing law, and prose outside these merge
+// fields) is still Twenty's and needs lawyer review before this is used for
+// AOS Holding. See docs/aos/product/BETA_RUNBOOK.md.
+export const DPA_PROCESSOR_ENTITY_NAME = 'AOS Holding';
+
+const buildDpaCommonValues = (
+  processorAddress: string,
+  processorContact: string,
+) => ({
+  PROCESSOR_ENTITY: DPA_PROCESSOR_ENTITY_NAME,
   PROCESSOR_LEGAL_FORM:
     'a public benefit corporation under the laws of Delaware, USA',
-  // The Delaware registered office and the SF notices address must stay distinct.
-  PROCESSOR_ADDRESS:
-    'c/o National Registered Agents, Inc., 1209 Orange Street, Wilmington, Delaware 19801, USA. For notices: 2261 Market Street #5275, San Francisco, California 94114, USA',
+  PROCESSOR_ADDRESS: processorAddress,
   EU_AFFILIATE_ENTITY: 'Twenty.com SAS',
   EU_AFFILIATE_LEGAL_FORM:
     'a société par actions simplifiée under the laws of France',
   EU_AFFILIATE_ADDRESS: '9 Rue des Colonnes, 75002 Paris, France',
   GOVERNING_LAW: 'the State of Delaware, USA',
-  DPO_NAME_AND_CONTACT: 'Stéphanie Joly, privacy@twenty.com',
-};
-
-export const DPA_REGION_CONFIGS: Record<DpaRegion, DpaRegionConfig> = {
-  [DpaRegion.EU]: {
-    region: DpaRegion.EU,
-    sccSectionActive: true,
-    values: {
-      ...DPA_COMMON_VALUES,
-      HOSTING_REGION: 'EU (Frankfurt, Germany)',
-    },
-  },
-  [DpaRegion.US]: {
-    region: DpaRegion.US,
-    sccSectionActive: true,
-    values: {
-      ...DPA_COMMON_VALUES,
-      HOSTING_REGION: 'United States',
-    },
-  },
-};
+  DPO_NAME_AND_CONTACT: processorContact,
+});
 
 export const TWENTY_PRESIGNED_SIGNATORY = {
   name: 'Félix Malfait',
   title: 'Chief Executive Officer',
 };
 
-export const getDpaRegionConfig = (region: DpaRegion): DpaRegionConfig =>
-  DPA_REGION_CONFIGS[region] ?? DPA_REGION_CONFIGS[DEFAULT_DPA_REGION];
+export const getDpaRegionConfig = (
+  region: DpaRegion,
+  processorAddress: string,
+  processorContact: string,
+): DpaRegionConfig => {
+  const resolvedRegion =
+    region === DpaRegion.US ? DpaRegion.US : DEFAULT_DPA_REGION;
+  const values = buildDpaCommonValues(processorAddress, processorContact);
+
+  return {
+    region: resolvedRegion,
+    sccSectionActive: true,
+    values: {
+      ...values,
+      HOSTING_REGION:
+        resolvedRegion === DpaRegion.US
+          ? 'United States'
+          : 'EU (Frankfurt, Germany)',
+    },
+  };
+};
