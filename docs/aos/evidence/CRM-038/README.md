@@ -77,8 +77,33 @@ surface.
 
 ## Running locally
 
-Against the integration setup (Postgres and Redis via Docker, as `.github/workflows/ci-server.yaml`
-does): see that workflow for the exact service containers and env. This track's suites were run
-against that stack from this worktree; see the worker report for the exact commands and exit codes
-for this run. If a run could not bring up the stack, the PR's CI (`server-integration-test` shards)
-is the source of truth and must be green before merge.
+Run against the real integration setup from this worktree (Postgres 18, Redis and ClickHouse via
+Docker, matching `.github/workflows/ci-server.yaml`'s `server-integration-test` job):
+
+```
+cd packages/twenty-server
+NODE_ENV=test NODE_OPTIONS="--max-old-space-size=6144" \
+  npx jest --config ./jest-integration.config.ts test/integration/isolation/
+```
+
+All 8 suites, 29 tests, pass together (`Test Suites: 8 passed, 8 total`, `Tests: 29 passed, 29 total`).
+Running each suite against this stack caught three issues the prior checkpoint's claim of a
+"records suite green" did not surface, fixed in this run (see the worker report for commits):
+
+- `search.integration-spec.ts` only waited for one of the three markers to index, and Person's
+  last name was hyphen-joined with the marker, which Postgres's text search parser tokenizes
+  differently from the marker alone -- so Person never matched a search for the marker by itself.
+- `files.integration-spec.ts` uploaded into `FileFolder.FilesField` without the `fieldMetadataId`
+  that folder requires (`file-upload.service.ts`'s `resolveUploadLocation`), and the record export
+  test needed `FeatureFlagKey.IS_ASYNC_CSV_EXPORT_ENABLED` enabled for Apple's workspace, both
+  silently assumed rather than verified in the prior checkpoint.
+- `workflows.integration-spec.ts`'s `deleteCoreWorkflows` on a foreign id answers with an empty
+  list, not a GraphQL error (a no-op is isolation too); the test asserted an error unconditionally
+  and failed on a safe response shape it had never actually run against the server to check.
+- `mcp.integration-spec.ts`'s workflow fixture needed a step before `activateCoreWorkflowVersion`
+  would accept it; its `beforeAll` never exercised the real activation path before this run.
+
+`oxfmt --check` and `oxlint --type-aware` are clean on every touched file; `corepack yarn nx
+affected -t typecheck --base=origin/betty/factory` reports zero `error TS` lines. The PR's CI
+(`server-integration-test` shards) remains the source of truth for the fork and must be green
+before merge.
