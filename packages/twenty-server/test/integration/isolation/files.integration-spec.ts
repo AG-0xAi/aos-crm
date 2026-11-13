@@ -112,7 +112,10 @@ describe('cross-workspace isolation: files', () => {
 
     for (const [, headers] of [
       ['no credential', {}],
-      ['YCombinator access token', { Authorization: `Bearer ${ycAccessToken}` }],
+      [
+        'YCombinator access token',
+        { Authorization: `Bearer ${ycAccessToken}` },
+      ],
       ['YCombinator API key', { Authorization: `Bearer ${ycApiKeyToken}` }],
     ] as const) {
       const response = await request(global.app.getHttpServer())
@@ -123,7 +126,7 @@ describe('cross-workspace isolation: files', () => {
     }
   });
 
-  it("a YCombinator-signed upload token cannot be used to overwrite Apple's file id", async () => {
+  it("YCombinator's real upload attempt into Apple's folder, through the upload controller, is refused and Apple's file is unchanged", async () => {
     const ycUpload = await uploadFileWithDirectUpload({
       filename: `yc-isolation-${MARKER}.txt`,
       content: Buffer.from('ycombinator content'),
@@ -283,7 +286,9 @@ describe('cross-workspace isolation: files', () => {
 
       companyObjectMetadataId = companyObject.id;
       exportFieldIds = companyObject.fieldsList
-        .filter((field: { name: string }) => ['id', 'name'].includes(field.name))
+        .filter((field: { name: string }) =>
+          ['id', 'name'].includes(field.name),
+        )
         .map((field: { id: string }) => field.id);
     });
 
@@ -344,7 +349,8 @@ describe('cross-workspace isolation: files', () => {
           if (isDefined(event.value.data?.exportRecords.errorMessage)) {
             throw new Error(event.value.data.exportRecords.errorMessage!);
           }
-          downloadPath = event.value.data?.exportRecords.downloadPath ?? undefined;
+          downloadPath =
+            event.value.data?.exportRecords.downloadPath ?? undefined;
         }
       } finally {
         connection.dispose();

@@ -190,7 +190,9 @@ describe('cross-workspace isolation: workflows', () => {
       expect(deleted.errors).toBeDefined();
     }
 
-    const stillActive = await findCoreWorkflowVersion({ coreWorkflowVersionId });
+    const stillActive = await findCoreWorkflowVersion({
+      coreWorkflowVersionId,
+    });
 
     expect(stillActive.status).toBe('ACTIVE');
   });

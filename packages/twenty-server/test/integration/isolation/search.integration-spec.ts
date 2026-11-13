@@ -10,9 +10,14 @@ import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/gene
 // credentials, must return none of Apple's records -- while Apple's own
 // token finds its own record by the same marker, so an empty result for
 // YCombinator is isolation and not a search that never returns anything.
+// Covers Company, Person and Note, so the proof isn't specific to one
+// object's indexing path.
 const MARKER = `iso-${randomUUID()}`;
 const COMPANY_NAME = `Isolation Search Co ${MARKER}`;
+const PERSON_LAST_NAME = `Isolation-Search-${MARKER}`;
+const NOTE_TITLE = `Isolation Search Note ${MARKER}`;
 const SEARCH_INDEX_TIMEOUT_MS = 30_000;
+const SEARCH_INDEX_POLL_INTERVAL_MS = 1_000;
 
 const searchQuery = gql`
   query SearchForMarker($q: String!) {
@@ -27,21 +32,49 @@ const searchQuery = gql`
   }
 `;
 
-const searchFor = async (query: string, token?: string) => {
+// Distinguishes "no hits yet" (worth retrying, indexing can lag) from a
+// persistent GraphQL error (never worth retrying for the full timeout).
+const searchForOrThrow = async (
+  query: string,
+  token?: string,
+): Promise<string[]> => {
   const response = await makeGraphqlApiRequest(
     { query: searchQuery, variables: { q: query } },
     token,
   );
 
-  expect(response.body.errors).toBeUndefined();
+  if (response.body.errors) {
+    throw new Error(
+      `Search request failed: ${JSON.stringify(response.body.errors)}`,
+    );
+  }
 
   return (response.body.data?.search?.edges ?? []).map(
     (edge: { node: { recordId: string } }) => edge.node.recordId,
   );
 };
 
+const waitForOwnHit = async (recordId: string): Promise<string[]> => {
+  const deadline = Date.now() + SEARCH_INDEX_TIMEOUT_MS;
+  let hits: string[] = [];
+
+  while (Date.now() < deadline) {
+    hits = await searchForOrThrow(MARKER);
+    if (hits.includes(recordId)) {
+      break;
+    }
+    await new Promise((resolve) =>
+      setTimeout(resolve, SEARCH_INDEX_POLL_INTERVAL_MS),
+    );
+  }
+
+  return hits;
+};
+
 describe('cross-workspace isolation: search', () => {
   let companyId: string;
+  let personId: string;
+  let noteId: string;
   let ycAccessToken: string;
   let ycApiKeyToken: string;
 
@@ -51,7 +84,7 @@ describe('cross-workspace isolation: search', () => {
       generateYCombinatorAdminApiKeyToken(),
     ]);
 
-    const created = await makeGraphqlApiRequest({
+    const createdCompany = await makeGraphqlApiRequest({
       query: gql`
         mutation CreateIsolationSearchCompany($name: String!) {
           createCompany(data: { name: $name }) {
@@ -62,39 +95,73 @@ describe('cross-workspace isolation: search', () => {
       variables: { name: COMPANY_NAME },
     });
 
-    expect(created.body.errors).toBeUndefined();
-    companyId = created.body.data.createCompany.id;
+    expect(createdCompany.body.errors).toBeUndefined();
+    companyId = createdCompany.body.data.createCompany.id;
+
+    const createdPerson = await makeGraphqlApiRequest({
+      query: gql`
+        mutation CreateIsolationSearchPerson($lastName: String!) {
+          createPerson(
+            data: { name: { firstName: "Isolation", lastName: $lastName } }
+          ) {
+            id
+          }
+        }
+      `,
+      variables: { lastName: PERSON_LAST_NAME },
+    });
+
+    expect(createdPerson.body.errors).toBeUndefined();
+    personId = createdPerson.body.data.createPerson.id;
+
+    const createdNote = await makeGraphqlApiRequest({
+      query: gql`
+        mutation CreateIsolationSearchNote($title: String!) {
+          createNote(data: { title: $title }) {
+            id
+          }
+        }
+      `,
+      variables: { title: NOTE_TITLE },
+    });
+
+    expect(createdNote.body.errors).toBeUndefined();
+    noteId = createdNote.body.data.createNote.id;
   });
 
   afterAll(async () => {
     await makeGraphqlApiRequest({
       query: gql`
-        mutation DestroyIsolationSearchCompany($id: UUID!) {
-          destroyCompany(id: $id) {
+        mutation DestroyIsolationSearchRecords(
+          $companyId: UUID!
+          $personId: UUID!
+          $noteId: UUID!
+        ) {
+          destroyCompany(id: $companyId) {
+            id
+          }
+          destroyPerson(id: $personId) {
+            id
+          }
+          destroyNote(id: $noteId) {
             id
           }
         }
       `,
-      variables: { id: companyId },
+      variables: { companyId, personId, noteId },
     });
   });
 
-  it("finds Apple's own record with Apple's token, and none of it with YCombinator's credentials", async () => {
-    const deadline = Date.now() + SEARCH_INDEX_TIMEOUT_MS;
-    let ownHits: string[] = [];
-
-    while (Date.now() < deadline) {
-      ownHits = await searchFor(MARKER);
-      if (ownHits.includes(companyId)) break;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
+  it("finds Apple's own records with Apple's token, and none of it with YCombinator's credentials", async () => {
+    const ownHits = await waitForOwnHit(companyId);
 
     expect(ownHits).toContain(companyId);
+    expect(ownHits).toContain(personId);
+    expect(ownHits).toContain(noteId);
 
     for (const token of [ycAccessToken, ycApiKeyToken]) {
-      const foreignHits = await searchFor(MARKER, token);
+      const foreignHits = await searchForOrThrow(MARKER, token);
 
-      expect(foreignHits).not.toContain(companyId);
       expect(foreignHits).toEqual([]);
     }
   });

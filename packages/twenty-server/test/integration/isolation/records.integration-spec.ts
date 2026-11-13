@@ -5,6 +5,7 @@ import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graph
 import { makeRestApiRequest } from 'test/integration/rest/utils/make-rest-api-request.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 
 // CRM-038: a record created in Apple (the seeded workspace behind
 // APPLE_JANE_ADMIN_ACCESS_TOKEN/API_KEY_ACCESS_TOKEN) must be unreachable
@@ -19,9 +20,12 @@ const PERSON_LAST_NAME = `Isolation-${MARKER}`;
 
 const isRefused = (status: number) => status >= 400 && status < 500;
 
+const NOTE_TITLE = `Isolation Note ${MARKER}`;
+
 describe('cross-workspace isolation: records (REST and GraphQL)', () => {
   let companyId: string;
   let personId: string;
+  let noteId: string;
   let ycAccessToken: string;
   let ycApiKeyToken: string;
 
@@ -64,21 +68,43 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
 
     expect(createdPerson.body.errors).toBeUndefined();
     personId = createdPerson.body.data.createPerson.id;
+
+    const createdNote = await makeGraphqlApiRequest({
+      query: gql`
+        mutation CreateIsolationNote($title: String!) {
+          createNote(data: { title: $title }) {
+            id
+            title
+          }
+        }
+      `,
+      variables: { title: NOTE_TITLE },
+    });
+
+    expect(createdNote.body.errors).toBeUndefined();
+    noteId = createdNote.body.data.createNote.id;
   });
 
   afterAll(async () => {
     await makeGraphqlApiRequest({
       query: gql`
-        mutation DestroyIsolationRecords($companyId: UUID!, $personId: UUID!) {
+        mutation DestroyIsolationRecords(
+          $companyId: UUID!
+          $personId: UUID!
+          $noteId: UUID!
+        ) {
           destroyCompany(id: $companyId) {
             id
           }
           destroyPerson(id: $personId) {
             id
           }
+          destroyNote(id: $noteId) {
+            id
+          }
         }
       `,
-      variables: { companyId, personId },
+      variables: { companyId, personId, noteId },
     });
   });
 
@@ -99,7 +125,11 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
       });
 
       expect(isRefused(foreign.status)).toBe(true);
-      expect(JSON.stringify(foreign.body)).not.toContain(COMPANY_NAME);
+      expectNoLeak(foreign.body, {
+        id: companyId,
+        name: COMPANY_NAME,
+        marker: MARKER,
+      });
     }
   });
 
@@ -189,7 +219,11 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
       );
 
       expect(foreignRead.body.data?.company ?? null).toBeNull();
-      expect(JSON.stringify(foreignRead.body)).not.toContain(COMPANY_NAME);
+      expectNoLeak(foreignRead.body, {
+        id: companyId,
+        name: COMPANY_NAME,
+        marker: MARKER,
+      });
 
       for (const [operation, mutation] of [
         [
@@ -272,5 +306,94 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
       expect(result.body.errors).toBeUndefined();
       expect(result.body.data.companies.edges).toEqual([]);
     }
+  });
+
+  it("GraphQL: YCombinator's credentials cannot read, update or delete Apple's note, which stays intact", async () => {
+    const own = await makeGraphqlApiRequest({
+      query: gql`
+        query FindIsolationNote($id: UUID!) {
+          note(filter: { id: { eq: $id } }) {
+            id
+            title
+          }
+        }
+      `,
+      variables: { id: noteId },
+    });
+
+    expect(own.body.errors).toBeUndefined();
+    expect(own.body.data.note?.title).toBe(NOTE_TITLE);
+
+    for (const token of [ycAccessToken, ycApiKeyToken]) {
+      const foreignRead = await makeGraphqlApiRequest(
+        {
+          query: gql`
+            query FindIsolationNote($id: UUID!) {
+              note(filter: { id: { eq: $id } }) {
+                id
+                title
+              }
+            }
+          `,
+          variables: { id: noteId },
+        },
+        token,
+      );
+
+      expect(foreignRead.body.data?.note ?? null).toBeNull();
+      expectNoLeak(foreignRead.body, {
+        id: noteId,
+        name: NOTE_TITLE,
+        marker: MARKER,
+      });
+
+      const updated = await makeGraphqlApiRequest(
+        {
+          query: gql`
+            mutation ($id: UUID!) {
+              updateNote(id: $id, data: { title: "tampered" }) {
+                id
+              }
+            }
+          `,
+          variables: { id: noteId },
+        },
+        token,
+      );
+
+      expect(updated.body.errors).toBeDefined();
+
+      const destroyed = await makeGraphqlApiRequest(
+        {
+          query: gql`
+            mutation ($id: UUID!) {
+              destroyNote(id: $id) {
+                id
+              }
+            }
+          `,
+          variables: { id: noteId },
+        },
+        token,
+      );
+
+      expect(destroyed.body.errors).toBeDefined();
+    }
+
+    const stillOwned = await makeGraphqlApiRequest({
+      query: gql`
+        query FindIsolationNote($id: UUID!) {
+          note(filter: { id: { eq: $id } }) {
+            id
+            title
+            deletedAt
+          }
+        }
+      `,
+      variables: { id: noteId },
+    });
+
+    expect(stillOwned.body.data.note.title).toBe(NOTE_TITLE);
+    expect(stillOwned.body.data.note.deletedAt).toBeNull();
   });
 });

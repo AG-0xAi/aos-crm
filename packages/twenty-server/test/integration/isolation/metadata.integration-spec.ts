@@ -5,6 +5,7 @@ import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graph
 import { makeMetadataApiRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { ViewType } from 'twenty-shared/types';
 
 // CRM-038: object metadata, views and dashboards each belong to one
@@ -204,7 +205,11 @@ describe('cross-workspace isolation: metadata (objects, views, dashboards)', () 
       );
 
       expect(foreign.body.data?.getView ?? null).toBeNull();
-      expect(JSON.stringify(foreign.body)).not.toContain(viewName);
+      expectNoLeak(foreign.body, {
+        id: viewId,
+        name: viewName,
+        marker: MARKER,
+      });
     }
   });
 
@@ -213,7 +218,10 @@ describe('cross-workspace isolation: metadata (objects, views, dashboards)', () 
       const updated = await makeMetadataApiRequest(
         {
           query: gql`
-            mutation UpdateIsolationView($id: String!, $input: UpdateViewInput!) {
+            mutation UpdateIsolationView(
+              $id: String!
+              $input: UpdateViewInput!
+            ) {
               updateView(id: $id, input: $input) {
                 id
               }
@@ -290,7 +298,11 @@ describe('cross-workspace isolation: metadata (objects, views, dashboards)', () 
       );
 
       expect(foreignRead.body.data?.dashboard ?? null).toBeNull();
-      expect(JSON.stringify(foreignRead.body)).not.toContain(dashboardTitle);
+      expectNoLeak(foreignRead.body, {
+        id: dashboardId,
+        name: dashboardTitle,
+        marker: MARKER,
+      });
 
       const updated = await makeGraphqlApiRequest(
         {
