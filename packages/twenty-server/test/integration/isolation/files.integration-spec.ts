@@ -6,9 +6,15 @@ import request from 'supertest';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
 import { uploadFileWithDirectUpload } from 'test/integration/graphql/utils/upload-file-with-direct-upload.util';
 import { makeMetadataApiRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
+import { updateFeatureFlag } from 'test/integration/metadata/suites/utils/update-feature-flag.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import { getAppProviderByClassName } from 'test/integration/utils/get-app-provider-by-class-name.util';
+import { FeatureFlagKey } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
+
+import { type FeatureFlagService } from 'src/engine/core-modules/feature-flag/services/feature-flag.service';
+import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder/core/constants/seeder-workspaces.constant';
 
 // CRM-038: files (attachments and record exports) are addressed by a
 // signed, workspace-bound token rather than by a bearer credential alone
@@ -20,6 +26,43 @@ const MARKER = `iso-${randomUUID()}`;
 
 const isRefused = (status: number) => status >= 400 && status < 500;
 
+// Uploading into FileFolder.FilesField requires a real fieldMetadataId
+// pointing at a Files-type field (file-upload.service.ts's
+// resolveUploadLocation); the attachment's own "file" field is that field.
+const findAttachmentFileFieldMetadataId = async (
+  token?: string,
+): Promise<string> => {
+  const objects = await makeMetadataApiRequest(
+    {
+      query: gql`
+        query {
+          objects(paging: { first: 200 }) {
+            edges {
+              node {
+                nameSingular
+                fieldsList {
+                  id
+                  name
+                }
+              }
+            }
+          }
+        }
+      `,
+    },
+    token,
+  );
+
+  const attachmentObject = objects.body.data.objects.edges.find(
+    (edge: { node: { nameSingular: string } }) =>
+      edge.node.nameSingular === 'attachment',
+  ).node;
+
+  return attachmentObject.fieldsList.find(
+    (field: { name: string }) => field.name === 'file',
+  ).id;
+};
+
 describe('cross-workspace isolation: files', () => {
   let ycAccessToken: string;
   let ycApiKeyToken: string;
@@ -28,12 +71,20 @@ describe('cross-workspace isolation: files', () => {
   let fileId: string;
   let fileFolder: string;
   let fileUrlPath: string;
+  let attachmentFileFieldMetadataId: string;
+  let ycAttachmentFileFieldMetadataId: string;
 
   beforeAll(async () => {
     [ycAccessToken, ycApiKeyToken] = await Promise.all([
       generateYCombinatorAdminAccessToken(),
       generateYCombinatorAdminApiKeyToken(),
     ]);
+
+    [attachmentFileFieldMetadataId, ycAttachmentFileFieldMetadataId] =
+      await Promise.all([
+        findAttachmentFileFieldMetadataId(),
+        findAttachmentFileFieldMetadataId(ycAccessToken),
+      ]);
 
     const createdNote = await makeGraphqlApiRequest({
       query: gql`
@@ -53,6 +104,7 @@ describe('cross-workspace isolation: files', () => {
       filename: `isolation-${MARKER}.txt`,
       content: Buffer.from(`attachment content ${MARKER}`),
       fileFolder: 'FilesField',
+      fieldMetadataId: attachmentFileFieldMetadataId,
     });
     fileId = uploadedFile.id;
 
@@ -131,6 +183,7 @@ describe('cross-workspace isolation: files', () => {
       filename: `yc-isolation-${MARKER}.txt`,
       content: Buffer.from('ycombinator content'),
       fileFolder: 'FilesField',
+      fieldMetadataId: ycAttachmentFileFieldMetadataId,
       token: ycAccessToken,
     });
 
@@ -143,11 +196,13 @@ describe('cross-workspace isolation: files', () => {
             $filename: String!
             $size: Float!
             $fileFolder: FileFolder!
+            $fieldMetadataId: String!
           ) {
             createFileUpload(
               filename: $filename
               size: $size
               fileFolder: $fileFolder
+              fieldMetadataId: $fieldMetadataId
             ) {
               fileId
               uploadUrl
@@ -159,6 +214,7 @@ describe('cross-workspace isolation: files', () => {
           filename: `yc-hijack-${MARKER}.txt`,
           size: 7,
           fileFolder: 'FilesField',
+          fieldMetadataId: ycAttachmentFileFieldMetadataId,
         },
       },
       ycAccessToken,
@@ -244,8 +300,22 @@ describe('cross-workspace isolation: files', () => {
     let companyId: string;
     let exportFieldIds: string[];
     let companyObjectMetadataId: string;
+    let wasAsyncCsvExportEnabled: boolean;
 
     beforeAll(async () => {
+      const featureFlagService =
+        getAppProviderByClassName<FeatureFlagService>('FeatureFlagService');
+
+      wasAsyncCsvExportEnabled = await featureFlagService.isFeatureEnabled(
+        FeatureFlagKey.IS_ASYNC_CSV_EXPORT_ENABLED,
+        SEED_APPLE_WORKSPACE_ID,
+      );
+      await updateFeatureFlag({
+        featureFlag: FeatureFlagKey.IS_ASYNC_CSV_EXPORT_ENABLED,
+        value: true,
+        expectToFail: false,
+      });
+
       const created = await makeGraphqlApiRequest({
         query: gql`
           mutation CreateIsolationExportCompany($name: String!) {
@@ -302,6 +372,12 @@ describe('cross-workspace isolation: files', () => {
           }
         `,
         variables: { id: companyId },
+      });
+
+      await updateFeatureFlag({
+        featureFlag: FeatureFlagKey.IS_ASYNC_CSV_EXPORT_ENABLED,
+        value: wasAsyncCsvExportEnabled,
+        expectToFail: false,
       });
     });
 
