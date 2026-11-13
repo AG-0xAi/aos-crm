@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty e-mail"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr "Erősítsd meg az új e-mail címed"
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Csatlakozás a Bettyhez"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Szia {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Ha a Betty beválik Önnek, minden rendben van, nincs teendője. Ha nem megfelelő, addig egyetlen kattintással lemondhatja, és nem számlázunk Önnek semmit."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Ha nem teszel semmit, szüneteltetjük a munkaterületedet, és az adata
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Ha valaha újra esélyt adna a Bettynek, percek alatt indíthat új munkaterületet. Örülnénk, ha visszatérne."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "Az adatai törlésre kerültek, és többé nem állíthatók vissza."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Csatlakozzon csapatához a Bettyben"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Teszt e-mail"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Köszönjük, hogy regisztrált a Bettybe! Mielőtt elkezdenénk, meg kell erősítenünk, hogy Ön az. Kattintson alább az e-mail-címe megerősítéséhez."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Mi sem szeretjük a váratlan levonásokat, ezért küldjük ezt a bará
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Kérést kaptunk a Betty-fiókjához tartozó e-mail-cím módosítására. Kattintson alább a módosítás megerősítéséhez."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Mi az a Betty?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Munkaterület logó"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Meghívták a Bettybe"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "A munkaterületed törlésre került"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "A munkaterületed szüneteltetve van"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Üdvözöljük a Bettyben!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Azért kapja ezt az e-mailt, mert meghívták, hogy csatlakozzon egy munkaterülethez a Bettyben."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Azért kapja ezt az e-mailt, mert valaki meghívta, hogy hozza létre saját munkaterületét a Bettyben."

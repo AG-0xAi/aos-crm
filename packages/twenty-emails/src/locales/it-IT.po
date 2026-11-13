@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "E-mail di Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Connettiti a Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Ciao {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Se Betty fa per te, è tutto a posto: non devi fare nulla. Se non è la scelta giusta, puoi annullare con un clic prima di allora e non ti verrà addebitato nulla."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Se non fai nulla, metteremo in pausa il tuo spazio di lavoro e manterrem
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Se un giorno vorrai dare un'altra possibilità a Betty, puoi creare un nuovo spazio di lavoro in pochi minuti. Saremo felici di riaverti con noi."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "I suoi dati sono stati rimossi e non possono più essere recuperati."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Unisciti al tuo team su Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Email di prova"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Grazie per esserti registrato su Betty! Prima di iniziare, dobbiamo solo confermare che sei tu. Fai clic qui sotto per verificare il tuo indirizzo e-mail."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Non ci piacciono gli addebiti a sorpresa, quindi ecco un promemoria amic
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Abbiamo ricevuto una richiesta di modifica dell'indirizzo e-mail associato al tuo account Betty. Fai clic qui sotto per confermare questa modifica."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Che cos'è Betty?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Logo dello spazio di lavoro"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Sei stato invitato su Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "Il tuo spazio di lavoro è stato eliminato"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Il tuo spazio di lavoro è in pausa"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Benvenuto in Betty!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Ricevi questa e-mail perché sei stato invitato a unirti a uno spazio di lavoro su Betty."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Ricevi questa e-mail perché qualcuno ti ha invitato a creare il tuo spazio di lavoro su Betty."

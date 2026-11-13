@@ -16902,3 +16902,7 @@ msgstr "Váš pracovní prostor byl aktualizován novým datovým modelem. Pros�
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Váš pracovní prostor je pozastaven — znovu jej aktivujte, abyste si zachovali svá data"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Byli jste pozváni do Betty"

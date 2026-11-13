@@ -1554,6 +1554,11 @@ msgstr "Quyền truy cập vào {objectLabelPlural} được thiết lập theo 
 msgid "Access your Twenty workspace through MCP"
 msgstr "Truy cập không gian làm việc Twenty của bạn qua MCP"
 
+#. js-lingui-id: rkbqAv
+#: src/modules/settings/mcp/utils/mcpSetup.ts
+msgid "Access your Betty workspace through MCP"
+msgstr "Truy cập không gian làm việc Betty của bạn qua MCP"
+
 #. js-lingui-id: CrjDqe
 #: src/pages/auth/Authorize.tsx
 msgid "Access your workspace data"
@@ -2300,6 +2305,41 @@ msgstr "Thêm máy chủ từ xa Twenty bằng đường dẫn cài đặt của
 msgid "Add these records at your DNS provider. Twenty checks them automatically."
 msgstr "Thêm các bản ghi này tại nhà cung cấp DNS của bạn. Twenty tự động kiểm tra chúng."
 
+#. js-lingui-id: FKGcEL
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server as a remote context server in Zed."
+msgstr "Thêm máy chủ Betty MCP làm máy chủ ngữ cảnh từ xa trong Zed."
+
+#. js-lingui-id: iA2nHX
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server from Augment Code settings."
+msgstr "Thêm máy chủ Betty MCP trong phần cài đặt Augment Code."
+
+#. js-lingui-id: l+NzAk
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server from Raycast's MCP commands or settings."
+msgstr "Thêm máy chủ Betty MCP từ lệnh hoặc cài đặt MCP của Raycast."
+
+#. js-lingui-id: j6G/yI
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server in Gemini CLI settings."
+msgstr "Thêm máy chủ Betty MCP trong phần cài đặt Gemini CLI."
+
+#. js-lingui-id: /OyhlM
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server to your LibreChat configuration file."
+msgstr "Thêm máy chủ Betty MCP vào tệp cấu hình LibreChat của bạn."
+
+#. js-lingui-id: K0DXoj
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty remote server with LM Studio's install link."
+msgstr "Thêm máy chủ từ xa Betty bằng đường dẫn cài đặt của LM Studio."
+
+#. js-lingui-id: BTFMKE
+#: src/pages/settings/communications/SettingsWorkspaceCommunicationGroupChannelDetail.tsx
+msgid "Add these records at your DNS provider. Betty checks them automatically."
+msgstr "Thêm các bản ghi này tại nhà cung cấp DNS của bạn. Betty tự động kiểm tra chúng."
+
 #. js-lingui-id: 5+ttxv
 #: src/modules/settings/accounts/components/SettingsAccountsBlocklistInput.tsx
 msgid "Add to blocklist"
@@ -2325,6 +2365,11 @@ msgstr "Thêm chủ đề"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Add Twenty as a Streamable HTTP extension in Goose."
 msgstr "Thêm Twenty làm tiện ích mở rộng Streamable HTTP trong Goose."
+
+#. js-lingui-id: 4D/zWv
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add Betty as a Streamable HTTP extension in Goose."
+msgstr "Thêm Betty làm tiện ích mở rộng Streamable HTTP trong Goose."
 
 #. js-lingui-id: XnwceV
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationRedirectURIsInput.tsx
@@ -4229,6 +4274,11 @@ msgstr "Tự động cài đặt ứng dụng này trên mọi không gian làm 
 msgid "Automatically selected by Twenty for this mode."
 msgstr "Được Twenty tự động chọn cho chế độ này."
 
+#. js-lingui-id: MHsVk5
+#: src/pages/settings/ai/components/SettingsAiModelTiersPreview.tsx
+msgid "Automatically selected by Betty for this mode."
+msgstr "Được Betty tự động chọn cho chế độ này."
+
 #. js-lingui-id: XFGV21
 #: src/pages/settings/applications/tabs/SettingsApplicationAutoUpdateSection.tsx
 msgid "Automatically upgrade this application when a new version is published"
@@ -4463,6 +4513,11 @@ msgstr "Chu kỳ thanh toán"
 #: src/modules/settings/billing/hooks/useBillingPortalSession.ts
 msgid "Billing portal session error. Please retry or contact Twenty team"
 msgstr "Lỗi phiên cổng thanh toán. Vui lòng thử lại hoặc liên hệ nhóm Twenty"
+
+#. js-lingui-id: xF/NXI
+#: src/modules/settings/billing/hooks/useBillingPortalSession.ts
+msgid "Billing portal session error. Please retry or contact Betty team"
+msgstr "Lỗi phiên cổng thanh toán. Vui lòng thử lại hoặc liên hệ nhóm Betty"
 
 #. js-lingui-id: H++SIW
 #: src/modules/settings/billing/hooks/useBillingSubscriptionChangeWording.ts
@@ -4744,6 +4799,11 @@ msgstr "bởi {trimmedAuthor}"
 #: src/modules/auth/sign-in-up/components/FooterNote.tsx
 msgid "By using Twenty, you agree to the"
 msgstr "Bằng việc sử dụng Twenty, bạn đồng ý với"
+
+#. js-lingui-id: 8Pfllj
+#: src/modules/auth/sign-in-up/components/FooterNote.tsx
+msgid "By using Betty, you agree to the"
+msgstr "Bằng việc sử dụng Betty, bạn đồng ý với"
 
 #. js-lingui-id: 7l+dLC
 #: src/modules/marketplace/constants/PermissionFlagSummaryConfigs.ts
@@ -5425,6 +5485,12 @@ msgstr "Chỉ được kiểm tra khi bản ghi chứa quy tắc này được l
 #: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
 msgid "Checkout session error. Please retry or contact Twenty team"
 msgstr "Lỗi phiên thanh toán. Vui lòng thử lại hoặc liên hệ nhóm Twenty"
+
+#. js-lingui-id: SxwQE8
+#: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
+#: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
+msgid "Checkout session error. Please retry or contact Betty team"
+msgstr "Lỗi phiên thanh toán. Vui lòng thử lại hoặc liên hệ nhóm Betty"
 
 #. js-lingui-id: SviKkE
 #: src/modules/localization/hooks/useLocaleOptions.ts
@@ -6339,6 +6405,16 @@ msgstr "Cấu hình thủ công máy chủ MCP của Twenty trong Cascade."
 msgid "Configure the Twenty MCP server manually in Cline."
 msgstr "Cấu hình thủ công máy chủ MCP của Twenty trong Cline."
 
+#. js-lingui-id: g1/8jH
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Betty MCP server manually in Cascade."
+msgstr "Cấu hình thủ công máy chủ MCP của Betty trong Cascade."
+
+#. js-lingui-id: XiyvRh
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Betty MCP server manually in Cline."
+msgstr "Cấu hình thủ công máy chủ MCP của Betty trong Cline."
+
 #. js-lingui-id: qA9AGQ
 #: src/modules/settings/domains/components/SettingsDomainRecords.tsx
 msgid "Configure these DNS records with your domain provider"
@@ -7106,6 +7182,11 @@ msgstr "Đếm theo"
 #: src/modules/settings/workspace/components/ClickTrackingSwitch.tsx
 msgid "Count clicks by routing campaign links through Twenty before the original page."
 msgstr "Đếm lượt nhấp bằng cách định tuyến các liên kết chiến dịch qua Twenty trước khi đến trang gốc."
+
+#. js-lingui-id: EEqRLn
+#: src/modules/settings/workspace/components/ClickTrackingSwitch.tsx
+msgid "Count clicks by routing campaign links through Betty before the original page."
+msgstr "Đếm lượt nhấp bằng cách định tuyến các liên kết chiến dịch qua Betty trước khi đến trang gốc."
 
 #. js-lingui-id: vQJINq
 #: src/modules/object-record/record-board/record-board-column/utils/getAggregateOperationLabel.ts
@@ -10695,6 +10776,11 @@ msgstr "Lỗi khi hủy chuyển đổi kế hoạch."
 msgid "Error while ending trial period. Please contact Twenty team."
 msgstr "Lỗi khi kết thúc giai đoạn dùng thử. Vui lòng liên hệ nhóm Twenty."
 
+#. js-lingui-id: QmR+2U
+#: src/modules/settings/billing/hooks/useEndSubscriptionTrialPeriod.ts
+msgid "Error while ending trial period. Please contact Betty team."
+msgstr "Lỗi khi kết thúc giai đoạn dùng thử. Vui lòng liên hệ nhóm Betty."
+
 #. js-lingui-id: 5g78zo
 #: src/pages/settings/members/SettingsWorkspaceMember.tsx
 msgid "Error while saving the name"
@@ -10868,6 +10954,30 @@ msgstr ""
 "\n"
 "**Miễn phí**: không có credit, không tính phí theo mức sử dụng."
 
+#. js-lingui-id: SpXUci
+#: src/modules/applications/utils/getStandardApplicationReadme.ts
+msgid ""
+"Every Betty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.\n"
+"\n"
+"## ✨ What you get\n"
+"\n"
+"- **People & Companies**: your contacts and the accounts they belong to\n"
+"- **Opportunities**: your sales pipeline, stage by stage\n"
+"- **Notes & Tasks**: activity and follow-ups attached to any record\n"
+"- **Emails & Calendar events**: synced from your connected accounts and linked to the right records\n"
+"- **Workflows & Dashboards**: automation and reporting on top of your data\n"
+"\n"
+"## 📌 Good to know\n"
+"\n"
+"- Installed on every workspace and maintained by Betty\n"
+"- Cannot be uninstalled: the rest of the workspace is built on it\n"
+"- Your own objects, fields and layouts live in the **Custom** app\n"
+"\n"
+"## 💳 Billing\n"
+"\n"
+"**Free**: no credits, no metering."
+msgstr "Mọi không gian làm việc Betty đều bắt đầu với ứng dụng này. Ứng dụng này xác định cấu trúc CRM của bạn: các đối tượng cốt lõi, cách chúng liên kết với nhau và các chế độ xem cũng như trang bản ghi mà nhóm của bạn làm việc. Các ứng dụng Marketplace, tác nhân AI và các tùy chỉnh riêng của bạn đều được xây dựng trên nền tảng này.\n\n## ✨ Những gì bạn nhận được\n\n- **Cá nhân & Công ty**: các liên hệ của bạn và các tài khoản mà họ thuộc về\n- **Cơ hội**: quy trình bán hàng của bạn, theo từng giai đoạn\n- **Ghi chú & Nhiệm vụ**: hoạt động và các lần theo dõi được đính kèm với bất kỳ bản ghi nào\n- **Email & Sự kiện lịch**: được đồng bộ từ các tài khoản đã kết nối của bạn và liên kết với đúng bản ghi\n- **Quy trình công việc & Bảng điều khiển**: tự động hóa và báo cáo dựa trên dữ liệu của bạn\n\n## 📌 Thông tin cần biết\n\n- Được cài đặt trên mọi không gian làm việc và do Betty duy trì\n- Không thể gỡ cài đặt: phần còn lại của không gian làm việc được xây dựng dựa trên ứng dụng này\n- Các đối tượng, trường và bố cục riêng của bạn nằm trong ứng dụng **Tùy chỉnh**\n\n## 💳 Thanh toán\n\n**Miễn phí**: không có credit, không tính phí theo mức sử dụng."
+
 #. js-lingui-id: PsQmAw
 #: src/modules/object-core/workflows/constants/CoreWorkflowVisibilityOptions.ts
 #: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownVisibilityContent.tsx
@@ -10925,6 +11035,28 @@ msgstr ""
 "## 💳 Thanh toán\n"
 "\n"
 "**Miễn phí**: không có credit, không đo lường mức sử dụng."
+
+#. js-lingui-id: BnV3Mw
+#: src/modules/applications/utils/getCustomApplicationReadme.ts
+msgid ""
+"Everything you build directly in this workspace lives here. Every object, field, view or automation you add on top of the Standard app is grouped under Custom, so your schema changes, interface changes and workspace-specific logic stay in one place.\n"
+"\n"
+"## ✨ What you get\n"
+"\n"
+"- **Custom objects and fields**: your own data model, next to the standard objects\n"
+"- **Views, navigation items and record layouts**: the screens that shape how your team works\n"
+"- **Logic functions, front components and agents**: automation and extensions specific to this workspace\n"
+"\n"
+"## 📌 Good to know\n"
+"\n"
+"- Created with your workspace and unique to it\n"
+"- Cannot be uninstalled: it holds your workspace's customizations\n"
+"- Customizations you make from the Betty interface are saved here automatically\n"
+"\n"
+"## 💳 Billing\n"
+"\n"
+"**Free**: no credits, no metering."
+msgstr "Mọi thứ bạn xây dựng trực tiếp trong không gian làm việc này đều nằm ở đây. Mọi đối tượng, trường, chế độ xem hoặc tự động hóa bạn thêm vào ứng dụng Standard đều được nhóm trong Custom, để các thay đổi về schema, thay đổi giao diện và logic dành riêng cho không gian làm việc của bạn ở cùng một nơi.\n\n## ✨ Những gì bạn nhận được\n\n- **Đối tượng và trường Custom**: mô hình dữ liệu riêng của bạn, bên cạnh các đối tượng tiêu chuẩn\n- **Chế độ xem, mục điều hướng và bố cục bản ghi**: các màn hình định hình cách nhóm của bạn làm việc\n- **Hàm logic, thành phần front và tác nhân**: tự động hóa và phần mở rộng dành riêng cho không gian làm việc này\n\n## 📌 Điều cần biết\n\n- Được tạo cùng với không gian làm việc của bạn và chỉ dành riêng cho không gian đó\n- Không thể gỡ cài đặt: đây là nơi chứa các tùy chỉnh của không gian làm việc\n- Các tùy chỉnh bạn thực hiện từ giao diện Betty sẽ được tự động lưu ở đây\n\n## 💳 Thanh toán\n\n**Miễn phí**: không có credit, không đo lường mức sử dụng."
 
 #. js-lingui-id: LG6l5T
 #: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/UserTableColumn.tsx
@@ -12740,6 +12872,11 @@ msgstr "Nhận khóa Tổ chức"
 msgid "Get the most out of your workspace by inviting your team."
 msgstr "Tối ưu hóa không gian làm việc của bạn bằng cách mời team của bạn tham gia."
 
+#. js-lingui-id: pdrR95
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "Get the most out of Betty by inviting your team. You can also do this later from Settings."
+msgstr "Hãy mời nhóm của bạn để tận dụng tối đa Betty. Bạn cũng có thể làm việc này sau trong Cài đặt."
+
 #. js-lingui-id: 7SwUXR
 #: src/modules/object-record/record-sharing/utils/getRecordShareRoleAccessNote.ts
 msgid "Gets this record only: their role can't access {objectLabelPlural}"
@@ -13251,6 +13388,11 @@ msgstr "Trích dẫn nổi bật"
 #: src/pages/settings/community/SettingsCommunity.tsx
 msgid "Hire a partner to help you implement and customize Twenty."
 msgstr "Thuê một đối tác để giúp bạn triển khai và tùy chỉnh Twenty."
+
+#. js-lingui-id: 1ETc0T
+#: src/pages/settings/community/SettingsCommunity.tsx
+msgid "Hire a partner to help you implement and customize Betty."
+msgstr "Thuê một đối tác để giúp bạn triển khai và tùy chỉnh Betty."
 
 #. js-lingui-id: i0qMbr
 #: src/modules/ai/components/AiChatNewThreadPageActions.tsx
@@ -14280,6 +14422,12 @@ msgstr "Mời qua Đường Dẫn"
 #: src/modules/onboarding/hooks/useInviteTeam.ts
 msgid "Invite link sent to email addresses"
 msgstr "Đã gửi đường dẫn mời tới địa chỉ email"
+
+#. js-lingui-id: l+/rog
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/pages/settings/invite-to-betty/SettingsInviteToBetty.tsx
+msgid "Invite someone to Betty"
+msgstr "Mời ai đó vào Betty"
 
 #. js-lingui-id: x1m5RZ
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
@@ -16397,6 +16545,11 @@ msgstr "Mô hình là bắt buộc"
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
 msgid "Model used when you chat with Twenty"
 msgstr "Mô hình được sử dụng khi bạn trò chuyện với Twenty"
+
+#. js-lingui-id: iaurWj
+#: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
+msgid "Model used when you chat with Betty"
+msgstr "Mô hình được sử dụng khi bạn trò chuyện với Betty"
 
 #. js-lingui-id: //nm2/
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
@@ -18638,6 +18791,11 @@ msgstr "Một cho mỗi lần chạy"
 msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Twenty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
 msgstr "Mỗi gói đăng ký cung cấp một khóa Tổ chức để vận hành một môi trường sản xuất và một môi trường dàn dựng hoặc thử nghiệm tiềm năng. Để chạy môi trường dàn dựng hoặc thử nghiệm, hãy cài đặt Twenty trên máy chủ thứ hai, kích hoạt bằng cùng khóa Tổ chức này, sau đó đăng ký máy chủ đó là một môi trường phát triển. Các môi trường phát triển mở khóa các tính năng cao cấp mà không phát sinh thêm chi phí và không được tính vào số suất môi trường sản xuất của bạn."
 
+#. js-lingui-id: 1WZTTl
+#: src/pages/settings/enterprise/SettingsEnterprise.tsx
+msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Betty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
+msgstr "Mỗi gói đăng ký cung cấp một khóa Tổ chức để vận hành một môi trường sản xuất và một môi trường dàn dựng hoặc thử nghiệm tiềm năng. Để chạy môi trường dàn dựng hoặc thử nghiệm, hãy cài đặt Betty trên máy chủ thứ hai, kích hoạt bằng cùng khóa Tổ chức này, sau đó đăng ký máy chủ đó là một môi trường phát triển. Các môi trường phát triển mở khóa các tính năng cao cấp mà không phát sinh thêm chi phí và không được tính vào số suất môi trường sản xuất của bạn."
+
 #. js-lingui-id: JzXn58
 #: src/pages/settings/applications/utils/getClaimErrorContent.ts
 msgid "Only applications published to npm can be claimed this way."
@@ -18784,6 +18942,11 @@ msgstr "Mở cuộc trò chuyện trong"
 msgid "Open Claude with the Twenty connector name and MCP URL prefilled."
 msgstr "Mở Claude với tên connector Twenty và MCP URL được điền sẵn."
 
+#. js-lingui-id: n0vVgf
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Claude with the Betty connector name and MCP URL prefilled."
+msgstr "Mở Claude với tên connector Betty và MCP URL được điền sẵn."
+
 #. js-lingui-id: uIKeEf
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowRunStepAiAgentConversationButton.tsx
 msgid "Open conversation"
@@ -18793,6 +18956,11 @@ msgstr "Mở cuộc trò chuyện"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Open Cursor's MCP installer with the Twenty remote server config."
 msgstr "Mở trình cài đặt MCP của Cursor với cấu hình máy chủ từ xa Twenty."
+
+#. js-lingui-id: +n2jpB
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Cursor's MCP installer with the Betty remote server config."
+msgstr "Mở trình cài đặt MCP của Cursor với cấu hình máy chủ từ xa Betty."
 
 #. js-lingui-id: pZZH4Q
 #: src/modules/auth/sign-in-up/components/EmailVerificationSent.tsx
@@ -18875,6 +19043,11 @@ msgstr "Mở bản ghi trên một trang riêng"
 msgid "Open Replit with the Twenty remote server config."
 msgstr "Mở Replit với cấu hình máy chủ từ xa Twenty."
 
+#. js-lingui-id: q170S2
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Replit with the Betty remote server config."
+msgstr "Mở Replit với cấu hình máy chủ từ xa Betty."
+
 #. js-lingui-id: d8DZWS
 #: src/modules/keyboard-shortcut-menu/constants/KeyboardShortcutsGeneral.ts
 msgid "Open search"
@@ -18899,6 +19072,11 @@ msgstr "Mở ngăn bên"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Open Twenty's official ChatGPT integration for your workspace."
 msgstr "Mở tích hợp ChatGPT chính thức của Twenty cho không gian làm việc của bạn."
+
+#. js-lingui-id: sBd/cl
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Betty's official ChatGPT integration for your workspace."
+msgstr "Mở tích hợp ChatGPT chính thức của Betty cho không gian làm việc của bạn."
 
 #. js-lingui-id: tirDue
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -19357,6 +19535,11 @@ msgstr "Tên trang"
 #: src/pages/not-found/NotFound.tsx
 msgid "Page Not Found | Twenty"
 msgstr "Không tìm thấy trang | Twenty"
+
+#. js-lingui-id: NRvxzv
+#: src/pages/not-found/NotFound.tsx
+msgid "Page Not Found | Betty"
+msgstr "Không tìm thấy trang | Betty"
 
 #. js-lingui-id: QbrUIo
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -24632,6 +24815,14 @@ msgstr "Đã kích hoạt đăng ký."
 msgid "Subscription error. Please retry or contact Twenty team"
 msgstr "Lỗi đăng ký. Vui lòng thử lại hoặc liên hệ nhóm Twenty"
 
+#. js-lingui-id: 0okvpx
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+#: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
+#: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
+msgid "Subscription error. Please retry or contact Betty team"
+msgstr "Lỗi đăng ký. Vui lòng thử lại hoặc liên hệ nhóm Betty"
+
 #. js-lingui-id: kSY/ji
 #: src/modules/settings/billing/hooks/useApplyBillingSubscriptionChange.ts
 msgid "Subscription has been moved to the new {planLabel} plan."
@@ -25182,6 +25373,11 @@ msgstr "Khu vực AWS cho Bedrock"
 msgid "The base data model every Twenty workspace runs on."
 msgstr "Mô hình dữ liệu cơ sở mà mọi không gian làm việc Twenty đều vận hành trên đó."
 
+#. js-lingui-id: bEyeZg
+#: src/modules/applications/utils/getStandardApplicationDescription.ts
+msgid "The base data model every Betty workspace runs on."
+msgstr "Mô hình dữ liệu cơ sở mà mọi không gian làm việc Betty đều vận hành trên đó."
+
 #. js-lingui-id: 832YJ9
 #: src/modules/validation-rules/constants/ValidationRuleKeywords.ts
 msgid "The boolean value false."
@@ -25364,6 +25560,11 @@ msgstr "Trang mà bạn đang tìm kiếm hoặc không còn tồn tại hoặc 
 msgid "The PDF is pre-signed by Twenty and executed with your legal entity and authorized signatory."
 msgstr "PDF được Twenty ký trước và được thực hiện với pháp nhân và người ký được ủy quyền của bạn."
 
+#. js-lingui-id: Ya1wb4
+#: src/pages/settings/legal/SettingsLegalDpaNew.tsx
+msgid "The PDF is pre-signed by Betty and executed with your legal entity and authorized signatory."
+msgstr "PDF được Betty ký trước và được thực hiện với pháp nhân và người ký được ủy quyền của bạn."
+
 #. js-lingui-id: Ir4tSJ
 #: src/modules/page-layout/widgets/call-recording/utils/getCallRecordingStatusDisplayConfiguration.ts
 msgid "The recorder is joining the call…"
@@ -25496,6 +25697,11 @@ msgstr "Không có hoạt động nào liên kết với bản ghi này."
 #: src/pages/auth/PasswordReset.tsx
 msgid "There was an error while updating password."
 msgstr "Đã có lỗi xảy ra trong quá trình cập nhật mật khẩu."
+
+#. js-lingui-id: NaZquI
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They create their own Betty account and workspace"
+msgstr "Họ tạo tài khoản Betty và không gian làm việc của riêng mình"
 
 #. js-lingui-id: 5Ml5Nr
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
@@ -25656,6 +25862,12 @@ msgstr "Ứng dụng này chưa được cài đặt trong không gian làm vi�
 #: src/pages/settings/applications/SettingsAvailableApplicationDetails.tsx
 msgid "This application is not vetted by Twenty. Use at your own risk."
 msgstr "Ứng dụng này chưa được Twenty thẩm định. Tự chịu rủi ro khi sử dụng."
+
+#. js-lingui-id: 5j3WfU
+#: src/modules/marketplace/components/SettingsApplicationInstallPermissionValidationModal.tsx
+#: src/pages/settings/applications/SettingsAvailableApplicationDetails.tsx
+msgid "This application is not vetted by Betty. Use at your own risk."
+msgstr "Ứng dụng này chưa được Betty thẩm định. Tự chịu rủi ro khi sử dụng."
 
 #. js-lingui-id: X7w5n6
 #: src/pages/settings/applications/tabs/SettingsApplicationRegistrationDistributionTab.tsx
@@ -26665,6 +26877,26 @@ msgstr "Twenty điền vào mỗi cấp mô hình tốt nhất đáp ứng yêu 
 #: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
 msgid "Twenty works better with your team"
 msgstr "Twenty hoạt động hiệu quả hơn cùng nhóm của bạn"
+
+#. js-lingui-id: 8pmRvi
+#: src/pages/onboarding/SyncEmails.tsx
+msgid "Betty adds the people you email and meet, and keeps them up to date without manual data entry."
+msgstr "Betty thêm những người bạn gửi email và gặp gỡ, đồng thời tự động cập nhật họ mà không cần nhập dữ liệu thủ công."
+
+#. js-lingui-id: JnaRPe
+#: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/ColumnGrid.tsx
+msgid "Betty fields"
+msgstr "Các trường của Betty"
+
+#. js-lingui-id: pNo8xt
+#: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
+msgid "Betty fills each level with the best model that meets your requirements"
+msgstr "Betty điền vào mỗi cấp mô hình tốt nhất đáp ứng yêu cầu của bạn"
+
+#. js-lingui-id: qUadjH
+#: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
+msgid "Betty works better with your team"
+msgstr "Betty hoạt động hiệu quả hơn cùng nhóm của bạn"
 
 #. js-lingui-id: YIjS4q
 #: src/modules/ai/components/SettingsAgentModelCapabilities.tsx
@@ -28737,6 +28969,11 @@ msgstr ""
 msgid "Welcome to Twenty"
 msgstr "Chào mừng đến với Twenty"
 
+#. js-lingui-id: nTuObL
+#: src/pages/auth/SignInUp.tsx
+msgid "Welcome to Betty"
+msgstr "Chào mừng đến với Betty"
+
 #. js-lingui-id: t8ZvkC
 #: src/modules/onboarding/constants/WelcomeTitleMessage.ts
 #: src/pages/auth/SignInUp.tsx
@@ -29736,3 +29973,46 @@ msgstr "Phóng to"
 #: src/modules/settings/data-model/graph-overview/components/SettingsDataModelOverview.tsx
 msgid "Zoom out"
 msgstr "Thu nhỏ"
+
+msgid "Ask Betty about your contacts and conversations from Claude or ChatGPT. You can also do this later from Settings."
+msgstr "Hỏi Betty về danh bạ và các cuộc trò chuyện của bạn từ Claude hoặc ChatGPT. Bạn cũng có thể làm việc này sau trong Cài đặt."
+
+msgid "Opens Claude with the connector named Betty and this workspace's MCP URL already filled in."
+msgstr "Mở Claude với trình kết nối tên Betty và URL MCP của không gian làm việc này đã được điền sẵn."
+
+msgid "Name it Betty."
+msgstr "Đặt tên là Betty."
+
+msgid "Install the plugin, then call it in a chat by typing @ and picking Betty."
+msgstr "Cài đặt plugin, sau đó gọi nó trong cuộc trò chuyện bằng cách nhập @ và chọn Betty."
+
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "About Betty"
+msgstr "Giới thiệu về Betty"
+
+#. js-lingui-id: M4Y0Jr
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is a product of AOS Holding. Its CRM is built on Twenty, an open-source project licensed under the GNU AGPL-3.0. The changes we make to that CRM are published under the same license."
+msgstr "Betty là sản phẩm của AOS Holding. CRM của Betty được xây dựng trên Twenty, một dự án mã nguồn mở theo giấy phép GNU AGPL-3.0. Những thay đổi chúng tôi thực hiện với CRM đó được công bố theo cùng giấy phép."
+
+#. js-lingui-id: 8ERqKa
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding."
+msgstr "Các dịch vụ của Betty không thuộc CRM, như trợ lý, thanh toán và tích hợp, là phần mềm độc quyền của AOS Holding."
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Phiên bản Betty"
+
+#. js-lingui-id: om8roM
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
+msgstr "Trong Claude, mở Settings › Connectors: nếu \"Betty\" được liệt kê cùng \"Connect\", hãy nhấn vào đó; nếu không có, hãy nhấn lại \"Open Claude\" ở trên."
+
+#. js-lingui-id: esKwv8
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Inside a chat, turn Betty on from the tools menu."
+msgstr "Trong cuộc trò chuyện, bật Betty từ menu công cụ."

@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty imejl"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr "Potvrdite novu adresu e-pošte"
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Povežite se sa Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Zdravo {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Ako Betty radi za vas, sve je gotovo i ne treba ništa da radite. Ako nije prava opcija, možete da otkažete jednim klikom pre toga i neće vam biti naplaćeno."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Ako ne uradite ništa, pauziraćemo vaš radni prostor i čuvaćemo vaš
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Ako ikada poželite da date Betty-ju još jednu šansu, novi radni prostor možete započeti za nekoliko minuta. Rado ćemo vas ponovo dočekati."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "Njegovi podaci su uklonjeni i više se ne mogu povratiti."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Pridružite se svom timu u Betty-ju"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Test imejl"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Hvala što ste se registrovali u Betty-ju! Pre nego što počnemo, samo treba da potvrdimo da ste to vi. Kliknite ispod da potvrdite svoju imejl adresu."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Ne volimo neočekivane naplate, zato vam šaljemo prijateljsku najavu."
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Primili smo zahtev za promenu imejl adrese povezane sa vašim Betty nalogom. Kliknite ispod da potvrdite ovu promenu."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Šta je Betty?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Logotip radnog prostora"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Pozvani ste u Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "Vaš radni prostor je obrisan"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Vaš radni prostor je pauziran"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Dobrodošli u Betty!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Primate ovu imejl poruku jer ste pozvani da se pridružite radnom prostoru u Betty-ju."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Primate ovu imejl poruku jer vas je neko pozvao da napravite sopstveni radni prostor u Betty-ju."

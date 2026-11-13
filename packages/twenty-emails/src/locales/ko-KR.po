@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty 이메일"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Betty에 연결"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "{userName}님, 안녕하세요."
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Betty가 마음에 드신다면 아무것도 하실 필요가 없습니다. 맞지 않으시면 그 전에 한 번의 클릭으로 취소할 수 있으며 요금이 청구되지 않습니다."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "아무 작업도 하지 않으시면, 워크스페이스를 일시 중�
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "언젠가 Betty에게 다시 기회를 주고 싶으시다면 몇 분 만에 새 워크스페이스를 시작할 수 있습니다. 다시 만나 뵙기를 기다리겠습니다."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "해당 데이터는 삭제되었으며 더 이상 복구할 수 없습�
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Betty에서 팀에 참여하세요"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "테스트 이메일"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Betty에 가입해 주셔서 감사합니다! 시작하기 전에 본인이 맞는지 확인해야 합니다. 아래를 클릭하여 이메일 주소를 인증하세요."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "예상치 못한 결제가 발생하는 것을 좋아하지 않기에, �
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Betty 계정에 연결된 이메일 주소를 변경해 달라는 요청을 받았습니다. 아래를 클릭하여 이 변경을 확인하세요."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Betty란?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "워크스페이스 로고"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Betty에 초대되었습니다"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "워크스페이스가 삭제되었습니다"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "워크스페이스가 일시 중지되었습니다"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Betty에 오신 것을 환영합니다!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Betty의 워크스페이스에 참여하도록 초대받아 이 이메일을 받으셨습니다."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "누군가 Betty에서 자신만의 워크스페이스를 만들도록 초대하여 이 이메일을 받으셨습니다."

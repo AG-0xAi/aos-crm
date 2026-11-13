@@ -16902,3 +16902,7 @@ msgstr "Ish makoningiz yangi ma’lumotlar modeli bilan yangilandi. Iltimos, sah
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Ish maydoningiz pauza qilingan — ma’lumotlaringizni saqlab qolish uchun uni qayta faollashtiring"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Siz Betty'ga taklif qilindingiz"

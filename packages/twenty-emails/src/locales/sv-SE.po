@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty-e-post"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Anslut till Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Hej {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Om Betty fungerar för dig är allt klart och du behöver inte göra något. Om det inte passar kan du avsluta med ett klick före dess och du debiteras inte."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Om du inte gör någonting pausar vi din arbetsyta och håller dina data
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Om du någon gång vill ge Betty en ny chans kan du starta en ny arbetsyta på några minuter. Vi välkomnar dig gärna tillbaka."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "Dess data har tagits bort och kan inte längre återställas."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Gå med i ditt team på Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Test e-post"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Tack för att du registrerade dig på Betty! Innan vi sätter igång behöver vi bara bekräfta att det är du. Klicka nedan för att verifiera din e-postadress."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Vi gillar inte oväntade avgifter, så här kommer en vänlig förvarnin
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Vi har fått en begäran om att ändra e-postadressen som är kopplad till ditt Betty-konto. Klicka nedan för att bekräfta ändringen."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Vad är Betty?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Arbetsytans logotyp"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Du har blivit inbjuden till Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "Din arbetsyta har raderats"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Din arbetsyta är pausad"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Välkommen till Betty!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Du får det här e-postmeddelandet eftersom du har blivit inbjuden att gå med i en arbetsyta på Betty."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Du får det här e-postmeddelandet eftersom någon har bjudit in dig att skapa din egen arbetsyta på Betty."

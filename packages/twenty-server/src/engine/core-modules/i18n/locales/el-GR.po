@@ -16902,3 +16902,7 @@ msgstr "Ο χώρος εργασίας σας έχει ενημερωθεί με
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Ο χώρος εργασίας σας έχει τεθεί σε παύση — επανενεργοποιήστε τον για να διατηρήσετε τα δεδομένα σας"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Έχετε προσκληθεί στο Betty"

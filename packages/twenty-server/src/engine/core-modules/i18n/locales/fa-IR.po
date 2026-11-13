@@ -16902,3 +16902,7 @@ msgstr "فضای کاری شما با یک مدل داده جدید به‌رو�
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "فضای کاری شما متوقف شده است — برای حفظ داده‌هایتان آن را دوباره فعال کنید"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "شما به Betty دعوت شده‌اید"

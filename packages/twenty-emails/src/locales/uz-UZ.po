@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty elektron xati"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr "Yangi elektron pochta manzilingizni tasdiqlang"
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Betty'ga ulanish"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Salom, {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Agar Betty sizga to'g'ri kelsa, hammasi tayyor, hech narsa qilishingiz shart emas. Agar mos kelmasa, o'sha vaqtgacha bir bosishda bekor qilishingiz mumkin va pul yechilmaydi."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Hech narsa qilmasangiz, biz ish maydoningizni pauza holatiga oʻtkazamiz
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Agar qachondir Betty'ga yana bir imkoniyat bermoqchi bo'lsangiz, bir necha daqiqada yangi ish maydonini boshlashingiz mumkin. Sizni yana ko'rishdan xursand bo'lamiz."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "Uning maʼlumotlari olib tashlangan va endi qayta tiklab boʻlmaydi."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Betty'da jamoangizga qo'shiling"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Sinov xati"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Betty'da ro'yxatdan o'tganingiz uchun rahmat! Boshlashdan oldin bu siz ekanligingizni tasdiqlashimiz kerak. Elektron pochta manzilingizni tasdiqlash uchun quyida bosing."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Kutilmagan toʻlovlarni yoqtirmaymiz, shuning uchun sizni doʻstona tarz
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Betty hisobingizga bog'langan elektron pochta manzilini o'zgartirish bo'yicha so'rov oldik. Ushbu o'zgarishni tasdiqlash uchun quyida bosing."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Betty nima?"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Ish maydoni logotipi"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Siz Betty'ga taklif qilindingiz"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "Ish maydoningiz oʻchirib tashlandi"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Ish maydoningiz vaqtincha to‘xtatilgan"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Betty'ga xush kelibsiz!"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Siz ushbu xatni Betty'dagi ish maydoniga qo'shilishga taklif qilinganingiz uchun olyapsiz."
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Siz ushbu xatni kimdir sizni Betty'da o'z ish maydoningizni yaratishga taklif qilgani uchun olyapsiz."

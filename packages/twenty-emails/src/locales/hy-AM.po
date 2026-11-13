@@ -71,7 +71,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Betty-ի էլ. նամակ"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -91,7 +91,7 @@ msgstr "Հաստատեք ձեր նոր էլփոստի հասցեն"
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Միանալ Betty-ին"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -145,7 +145,7 @@ msgstr "Ողջույն, {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Եթե Betty-ն ձեզ համար աշխատում է, ամեն ինչ պատրաստ է, և ոչինչ անելու կարիք չկա։ Եթե այն հարմար չէ, մինչ այդ կարող եք չեղարկել մեկ սեղմումով, և գումար չի գանձվի։"
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -175,7 +175,7 @@ msgstr "Եթե ոչինչ չանեք, մենք կդադարեցնենք ձեր w
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Եթե երբևէ ցանկանաք Betty-ին մեկ այլ հնարավորություն տալ, մի քանի րոպեում կարող եք սկսել նոր աշխատանքային տարածք։ Սիրով կընդունենք ձեզ նորից։"
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -190,7 +190,7 @@ msgstr "Դրա տվյալները հեռացվել են և այլևս չեն կ�
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Միացեք ձեր թիմին Betty-ում"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -271,7 +271,7 @@ msgstr "Թեստային նամակ"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "Շնորհակալություն Betty-ում գրանցվելու համար։ Նախքան սկսելը մենք պետք է հաստատենք, որ դա դուք եք։ Սեղմեք ներքևում՝ ձեր էլ. փոստի հասցեն հաստատելու համար։"
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -322,12 +322,12 @@ msgstr "Մենք չենք սիրում անսպասելի գանձումներ, 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Մենք ստացել ենք ձեր Betty հաշվին կապված էլ. փոստի հասցեն փոխելու հարցում։ Սեղմեք ներքևում՝ այս փոփոխությունը հաստատելու համար։"
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
 msgid "What is Betty?"
-msgstr ""
+msgstr "Ի՞նչ է Betty-ն"
 
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
@@ -338,7 +338,7 @@ msgstr "Workspace-ի լոգո"
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
 msgid "You have been invited to Betty"
-msgstr ""
+msgstr "Ձեզ հրավիրել են Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -384,3 +384,18 @@ msgstr "Ձեր workspace-ը ջնջվել է"
 #: src/emails/warn-suspended-workspace.email.tsx
 msgid "Your workspace is paused"
 msgstr "Ձեր workspace-ը դադարեցված է"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "Welcome to Betty!"
+msgstr "Բարի գալուստ Betty։"
+
+#. js-lingui-explicit-id
+#: src/emails/send-invite-link.email.tsx
+msgid "You're receiving this email because you were invited to join a workspace on Betty."
+msgstr "Դուք ստանում եք այս նամակը, քանի որ ձեզ հրավիրել են միանալու Betty-ի աշխատանքային տարածքին։"
+
+#. js-lingui-explicit-id
+#: src/emails/sign-up-invite-link.email.tsx
+msgid "You're receiving this email because someone invited you to create your own workspace on Betty."
+msgstr "Դուք ստանում եք այս նամակը, քանի որ ինչ-որ մեկը ձեզ հրավիրել է ստեղծելու ձեր սեփական աշխատանքային տարածքը Betty-ում։"

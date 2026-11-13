@@ -1554,6 +1554,11 @@ msgstr "Toegang tot {objectLabelPlural} wordt ingesteld via rollen, niet per rec
 msgid "Access your Twenty workspace through MCP"
 msgstr "Toegang tot je Twenty-werkruimte via MCP"
 
+#. js-lingui-id: rkbqAv
+#: src/modules/settings/mcp/utils/mcpSetup.ts
+msgid "Access your Betty workspace through MCP"
+msgstr "Toegang tot je Betty-werkruimte via MCP"
+
 #. js-lingui-id: CrjDqe
 #: src/pages/auth/Authorize.tsx
 msgid "Access your workspace data"
@@ -2300,6 +2305,41 @@ msgstr "Voeg de Twenty externe server toe met de installatielink van LM Studio."
 msgid "Add these records at your DNS provider. Twenty checks them automatically."
 msgstr "Voeg deze records toe bij je DNS-provider. Twenty controleert ze automatisch."
 
+#. js-lingui-id: FKGcEL
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server as a remote context server in Zed."
+msgstr "Voeg de Betty MCP-server toe als externe contextserver in Zed."
+
+#. js-lingui-id: iA2nHX
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server from Augment Code settings."
+msgstr "Voeg de Betty MCP-server toe via de Augment Code-instellingen."
+
+#. js-lingui-id: l+NzAk
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server from Raycast's MCP commands or settings."
+msgstr "Voeg de Betty MCP-server toe via de MCP-opdrachten of -instellingen van Raycast."
+
+#. js-lingui-id: j6G/yI
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server in Gemini CLI settings."
+msgstr "Voeg de Betty MCP-server toe in de instellingen van Gemini CLI."
+
+#. js-lingui-id: /OyhlM
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty MCP server to your LibreChat configuration file."
+msgstr "Voeg de Betty MCP-server toe aan uw LibreChat-configuratiebestand."
+
+#. js-lingui-id: K0DXoj
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add the Betty remote server with LM Studio's install link."
+msgstr "Voeg de Betty externe server toe met de installatielink van LM Studio."
+
+#. js-lingui-id: BTFMKE
+#: src/pages/settings/communications/SettingsWorkspaceCommunicationGroupChannelDetail.tsx
+msgid "Add these records at your DNS provider. Betty checks them automatically."
+msgstr "Voeg deze records toe bij je DNS-provider. Betty controleert ze automatisch."
+
 #. js-lingui-id: 5+ttxv
 #: src/modules/settings/accounts/components/SettingsAccountsBlocklistInput.tsx
 msgid "Add to blocklist"
@@ -2325,6 +2365,11 @@ msgstr "Onderwerp toevoegen"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Add Twenty as a Streamable HTTP extension in Goose."
 msgstr "Voeg Twenty toe als Streamable HTTP-extensie in Goose."
+
+#. js-lingui-id: 4D/zWv
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Add Betty as a Streamable HTTP extension in Goose."
+msgstr "Voeg Betty toe als Streamable HTTP-extensie in Goose."
 
 #. js-lingui-id: XnwceV
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationRedirectURIsInput.tsx
@@ -4229,6 +4274,11 @@ msgstr "Installeer deze app automatisch op iedere nieuw aangemaakte werkruimte"
 msgid "Automatically selected by Twenty for this mode."
 msgstr "Automatisch geselecteerd door Twenty voor deze modus."
 
+#. js-lingui-id: MHsVk5
+#: src/pages/settings/ai/components/SettingsAiModelTiersPreview.tsx
+msgid "Automatically selected by Betty for this mode."
+msgstr "Automatisch geselecteerd door Betty voor deze modus."
+
 #. js-lingui-id: XFGV21
 #: src/pages/settings/applications/tabs/SettingsApplicationAutoUpdateSection.tsx
 msgid "Automatically upgrade this application when a new version is published"
@@ -4463,6 +4513,11 @@ msgstr "Facturatieperiode"
 #: src/modules/settings/billing/hooks/useBillingPortalSession.ts
 msgid "Billing portal session error. Please retry or contact Twenty team"
 msgstr "Fout in sessie van facturatieportaal. Probeer het opnieuw of neem contact op met het Twenty-team"
+
+#. js-lingui-id: xF/NXI
+#: src/modules/settings/billing/hooks/useBillingPortalSession.ts
+msgid "Billing portal session error. Please retry or contact Betty team"
+msgstr "Fout in sessie van facturatieportaal. Probeer het opnieuw of neem contact op met het Betty-team"
 
 #. js-lingui-id: H++SIW
 #: src/modules/settings/billing/hooks/useBillingSubscriptionChangeWording.ts
@@ -4744,6 +4799,11 @@ msgstr "door {trimmedAuthor}"
 #: src/modules/auth/sign-in-up/components/FooterNote.tsx
 msgid "By using Twenty, you agree to the"
 msgstr "Door gebruik te maken van Twenty, gaat u akkoord met de"
+
+#. js-lingui-id: 8Pfllj
+#: src/modules/auth/sign-in-up/components/FooterNote.tsx
+msgid "By using Betty, you agree to the"
+msgstr "Door gebruik te maken van Betty, gaat u akkoord met de"
 
 #. js-lingui-id: 7l+dLC
 #: src/modules/marketplace/constants/PermissionFlagSummaryConfigs.ts
@@ -5425,6 +5485,12 @@ msgstr "Alleen gecontroleerd wanneer het record waartoe deze regel behoort wordt
 #: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
 msgid "Checkout session error. Please retry or contact Twenty team"
 msgstr "Checkout-sessie fout. Probeer het opnieuw of neem contact op met het Twenty-team"
+
+#. js-lingui-id: SxwQE8
+#: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
+#: src/modules/settings/billing/hooks/useHandleCheckoutSession.ts
+msgid "Checkout session error. Please retry or contact Betty team"
+msgstr "Checkout-sessie fout. Probeer het opnieuw of neem contact op met het Betty-team"
 
 #. js-lingui-id: SviKkE
 #: src/modules/localization/hooks/useLocaleOptions.ts
@@ -6339,6 +6405,16 @@ msgstr "Configureer de Twenty MCP-server handmatig in Cascade."
 msgid "Configure the Twenty MCP server manually in Cline."
 msgstr "Configureer de Twenty MCP-server handmatig in Cline."
 
+#. js-lingui-id: g1/8jH
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Betty MCP server manually in Cascade."
+msgstr "Configureer de Betty MCP-server handmatig in Cascade."
+
+#. js-lingui-id: XiyvRh
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Configure the Betty MCP server manually in Cline."
+msgstr "Configureer de Betty MCP-server handmatig in Cline."
+
 #. js-lingui-id: qA9AGQ
 #: src/modules/settings/domains/components/SettingsDomainRecords.tsx
 msgid "Configure these DNS records with your domain provider"
@@ -7106,6 +7182,11 @@ msgstr "Tel op basis van"
 #: src/modules/settings/workspace/components/ClickTrackingSwitch.tsx
 msgid "Count clicks by routing campaign links through Twenty before the original page."
 msgstr "Tel klikken door campagnelinks via Twenty om te leiden voordat de oorspronkelijke pagina wordt geopend."
+
+#. js-lingui-id: EEqRLn
+#: src/modules/settings/workspace/components/ClickTrackingSwitch.tsx
+msgid "Count clicks by routing campaign links through Betty before the original page."
+msgstr "Tel klikken door campagnelinks via Betty om te leiden voordat de oorspronkelijke pagina wordt geopend."
 
 #. js-lingui-id: vQJINq
 #: src/modules/object-record/record-board/record-board-column/utils/getAggregateOperationLabel.ts
@@ -10695,6 +10776,11 @@ msgstr "Fout bij het annuleren van planwisseling."
 msgid "Error while ending trial period. Please contact Twenty team."
 msgstr "Fout tijdens het beëindigen van de proefperiode. Neem contact op met het Twenty-team."
 
+#. js-lingui-id: QmR+2U
+#: src/modules/settings/billing/hooks/useEndSubscriptionTrialPeriod.ts
+msgid "Error while ending trial period. Please contact Betty team."
+msgstr "Fout tijdens het beëindigen van de proefperiode. Neem contact op met het Betty-team."
+
 #. js-lingui-id: 5g78zo
 #: src/pages/settings/members/SettingsWorkspaceMember.tsx
 msgid "Error while saving the name"
@@ -10868,6 +10954,30 @@ msgstr ""
 "\n"
 "**Gratis**: geen credits, geen verbruiksmeting."
 
+#. js-lingui-id: SpXUci
+#: src/modules/applications/utils/getStandardApplicationReadme.ts
+msgid ""
+"Every Betty workspace starts with this app. It defines the shape of your CRM: the core objects, how they relate to each other, and the views and record pages your team works in. Marketplace apps, AI agents and your own customizations all build on top of it.\n"
+"\n"
+"## ✨ What you get\n"
+"\n"
+"- **People & Companies**: your contacts and the accounts they belong to\n"
+"- **Opportunities**: your sales pipeline, stage by stage\n"
+"- **Notes & Tasks**: activity and follow-ups attached to any record\n"
+"- **Emails & Calendar events**: synced from your connected accounts and linked to the right records\n"
+"- **Workflows & Dashboards**: automation and reporting on top of your data\n"
+"\n"
+"## 📌 Good to know\n"
+"\n"
+"- Installed on every workspace and maintained by Betty\n"
+"- Cannot be uninstalled: the rest of the workspace is built on it\n"
+"- Your own objects, fields and layouts live in the **Custom** app\n"
+"\n"
+"## 💳 Billing\n"
+"\n"
+"**Free**: no credits, no metering."
+msgstr "Elke Betty-werkruimte begint met deze app. Deze bepaalt de structuur van je CRM: de kernobjecten, hoe ze met elkaar verbonden zijn en de weergaven en recordpagina's waarin je team werkt. Marketplace-apps, AI-agents en je eigen aanpassingen bouwen hier allemaal op voort.\n\n## ✨ Wat je krijgt\n\n- **Personen en bedrijven**: je contacten en de accounts waartoe ze behoren\n- **Verkoopkansen**: je verkooppijplijn, fase voor fase\n- **Notities en taken**: activiteiten en opvolgacties die aan elk record zijn gekoppeld\n- **E-mails en agenda-afspraken**: gesynchroniseerd vanuit je gekoppelde accounts en gekoppeld aan de juiste records\n- **Workflows en dashboards**: automatisering en rapportage boven op je gegevens\n\n## 📌 Goed om te weten\n\n- Geïnstalleerd in elke werkruimte en onderhouden door Betty\n- Kan niet worden verwijderd: de rest van de werkruimte is hierop gebouwd\n- Je eigen objecten, velden en lay-outs bevinden zich in de app **Custom**\n\n## 💳 Facturering\n\n**Gratis**: geen credits, geen verbruiksmeting."
+
 #. js-lingui-id: PsQmAw
 #: src/modules/object-core/workflows/constants/CoreWorkflowVisibilityOptions.ts
 #: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownVisibilityContent.tsx
@@ -10925,6 +11035,28 @@ msgstr ""
 "## 💳 Facturering\n"
 "\n"
 "**Gratis**: geen tegoeden, geen verbruiksmeting."
+
+#. js-lingui-id: BnV3Mw
+#: src/modules/applications/utils/getCustomApplicationReadme.ts
+msgid ""
+"Everything you build directly in this workspace lives here. Every object, field, view or automation you add on top of the Standard app is grouped under Custom, so your schema changes, interface changes and workspace-specific logic stay in one place.\n"
+"\n"
+"## ✨ What you get\n"
+"\n"
+"- **Custom objects and fields**: your own data model, next to the standard objects\n"
+"- **Views, navigation items and record layouts**: the screens that shape how your team works\n"
+"- **Logic functions, front components and agents**: automation and extensions specific to this workspace\n"
+"\n"
+"## 📌 Good to know\n"
+"\n"
+"- Created with your workspace and unique to it\n"
+"- Cannot be uninstalled: it holds your workspace's customizations\n"
+"- Customizations you make from the Betty interface are saved here automatically\n"
+"\n"
+"## 💳 Billing\n"
+"\n"
+"**Free**: no credits, no metering."
+msgstr "Alles wat je rechtstreeks in deze werkruimte bouwt, staat hier. Elk object, veld, elke weergave of automatisering die je boven op de Standard-app toevoegt, wordt gegroepeerd onder Custom, zodat je schemawijzigingen, interfacewijzigingen en werkruimtespecifieke logica op één plek blijven.\n\n## ✨ Wat je krijgt\n\n- **Aangepaste objecten en velden**: je eigen gegevensmodel, naast de standaardobjecten\n- **Weergaven, navigatie-items en recordindelingen**: de schermen die bepalen hoe je team werkt\n- **Logicafuncties, frontendcomponenten en agents**: automatisering en uitbreidingen die specifiek zijn voor deze werkruimte\n\n## 📌 Goed om te weten\n\n- Gemaakt met je werkruimte en uniek voor deze werkruimte\n- Kan niet worden verwijderd: bevat de aanpassingen van je werkruimte\n- Aanpassingen die je vanuit de Betty-interface maakt, worden hier automatisch opgeslagen\n\n## 💳 Facturering\n\n**Gratis**: geen tegoeden, geen verbruiksmeting."
 
 #. js-lingui-id: LG6l5T
 #: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/UserTableColumn.tsx
@@ -12740,6 +12872,11 @@ msgstr "Organisatie-sleutel verkrijgen"
 msgid "Get the most out of your workspace by inviting your team."
 msgstr "Haal het meeste uit je werkruimte door je team uit te nodigen."
 
+#. js-lingui-id: pdrR95
+#: src/modules/onboarding/components/InviteYourTeamStepContent.tsx
+msgid "Get the most out of Betty by inviting your team. You can also do this later from Settings."
+msgstr "Haal het beste uit Betty door je team uit te nodigen. Je kunt dit ook later doen via Instellingen."
+
 #. js-lingui-id: 7SwUXR
 #: src/modules/object-record/record-sharing/utils/getRecordShareRoleAccessNote.ts
 msgid "Gets this record only: their role can't access {objectLabelPlural}"
@@ -13251,6 +13388,11 @@ msgstr "Gemarkeerd citaat"
 #: src/pages/settings/community/SettingsCommunity.tsx
 msgid "Hire a partner to help you implement and customize Twenty."
 msgstr "Huur een partner in om je te helpen Twenty te implementeren en aan te passen."
+
+#. js-lingui-id: 1ETc0T
+#: src/pages/settings/community/SettingsCommunity.tsx
+msgid "Hire a partner to help you implement and customize Betty."
+msgstr "Huur een partner in om je te helpen Betty te implementeren en aan te passen."
 
 #. js-lingui-id: i0qMbr
 #: src/modules/ai/components/AiChatNewThreadPageActions.tsx
@@ -14280,6 +14422,12 @@ msgstr "Uitnodigen per link"
 #: src/modules/onboarding/hooks/useInviteTeam.ts
 msgid "Invite link sent to email addresses"
 msgstr "Uitnodigingslink verstuurd naar e-mailadressen"
+
+#. js-lingui-id: l+/rog
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+#: src/pages/settings/invite-to-betty/SettingsInviteToBetty.tsx
+msgid "Invite someone to Betty"
+msgstr "Nodig iemand uit voor Betty"
 
 #. js-lingui-id: x1m5RZ
 #: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
@@ -16397,6 +16545,11 @@ msgstr "Model is vereist"
 #: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
 msgid "Model used when you chat with Twenty"
 msgstr "Model dat wordt gebruikt wanneer je met Twenty chat"
+
+#. js-lingui-id: iaurWj
+#: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
+msgid "Model used when you chat with Betty"
+msgstr "Model dat wordt gebruikt wanneer je met Betty chat"
 
 #. js-lingui-id: //nm2/
 #: src/pages/settings/admin-panel/SettingsAdminAiProviderDetail.tsx
@@ -18638,6 +18791,11 @@ msgstr "Eén per uitvoering"
 msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Twenty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
 msgstr "Eén abonnement levert één Organisatie-sleutel die één productie-instantie en één mogelijke staging- of testinstantie aanstuurt. Om een staging- of testomgeving te draaien, installeert u Twenty op een tweede server, activeert u deze met dezelfde Organisatie-sleutel en registreert u die server vervolgens als ontwikkelinstantie. Ontwikkelinstanties ontgrendelen premiumfuncties zonder extra facturatie en tellen niet mee voor uw productieplaatsen."
 
+#. js-lingui-id: 1WZTTl
+#: src/pages/settings/enterprise/SettingsEnterprise.tsx
+msgid "One subscription provides one Organization key that powers one production instance and one potential staging or test instance. To run a staging or test environment, install Betty on a second server, activate it with this same Organization key, then register that server as a development instance. Development instances unlock premium features without extra billing and do not count toward your production seats."
+msgstr "Eén abonnement levert één Organisatie-sleutel die één productie-instantie en één mogelijke staging- of testinstantie aanstuurt. Om een staging- of testomgeving te draaien, installeert u Betty op een tweede server, activeert u deze met dezelfde Organisatie-sleutel en registreert u die server vervolgens als ontwikkelinstantie. Ontwikkelinstanties ontgrendelen premiumfuncties zonder extra facturatie en tellen niet mee voor uw productieplaatsen."
+
 #. js-lingui-id: JzXn58
 #: src/pages/settings/applications/utils/getClaimErrorContent.ts
 msgid "Only applications published to npm can be claimed this way."
@@ -18784,6 +18942,11 @@ msgstr "Chats openen in"
 msgid "Open Claude with the Twenty connector name and MCP URL prefilled."
 msgstr "Open Claude met de naam van de Twenty-connector en MCP-URL vooraf ingevuld."
 
+#. js-lingui-id: n0vVgf
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Claude with the Betty connector name and MCP URL prefilled."
+msgstr "Open Claude met de naam van de Betty-connector en MCP-URL vooraf ingevuld."
+
 #. js-lingui-id: uIKeEf
 #: src/modules/workflow/workflow-steps/workflow-actions/ai-agent-action/components/WorkflowRunStepAiAgentConversationButton.tsx
 msgid "Open conversation"
@@ -18793,6 +18956,11 @@ msgstr "Gesprek openen"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Open Cursor's MCP installer with the Twenty remote server config."
 msgstr "Open de MCP-installer van Cursor met de Twenty-configuratie voor externe server."
+
+#. js-lingui-id: +n2jpB
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Cursor's MCP installer with the Betty remote server config."
+msgstr "Open de MCP-installer van Cursor met de Betty-configuratie voor externe server."
 
 #. js-lingui-id: pZZH4Q
 #: src/modules/auth/sign-in-up/components/EmailVerificationSent.tsx
@@ -18875,6 +19043,11 @@ msgstr "Open records op een speciale pagina"
 msgid "Open Replit with the Twenty remote server config."
 msgstr "Open Replit met de Twenty-configuratie voor externe server."
 
+#. js-lingui-id: q170S2
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Replit with the Betty remote server config."
+msgstr "Open Replit met de Betty-configuratie voor externe server."
+
 #. js-lingui-id: d8DZWS
 #: src/modules/keyboard-shortcut-menu/constants/KeyboardShortcutsGeneral.ts
 msgid "Open search"
@@ -18899,6 +19072,11 @@ msgstr "Zijpaneel openen"
 #: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
 msgid "Open Twenty's official ChatGPT integration for your workspace."
 msgstr "Open de officiële ChatGPT-integratie van Twenty voor uw werkruimte."
+
+#. js-lingui-id: sBd/cl
+#: src/modules/settings/mcp/utils/buildMcpSetupCategories.tsx
+msgid "Open Betty's official ChatGPT integration for your workspace."
+msgstr "Open de officiële ChatGPT-integratie van Betty voor uw werkruimte."
 
 #. js-lingui-id: tirDue
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -19357,6 +19535,11 @@ msgstr "Paginanaam"
 #: src/pages/not-found/NotFound.tsx
 msgid "Page Not Found | Twenty"
 msgstr "Pagina niet gevonden | Twenty"
+
+#. js-lingui-id: NRvxzv
+#: src/pages/not-found/NotFound.tsx
+msgid "Page Not Found | Betty"
+msgstr "Pagina niet gevonden | Betty"
 
 #. js-lingui-id: QbrUIo
 #: src/modules/log-console/constants/LogConsoleSources.tsx
@@ -24632,6 +24815,14 @@ msgstr "Abonnement geactiveerd."
 msgid "Subscription error. Please retry or contact Twenty team"
 msgstr "Abonnementsfout. Probeer het opnieuw of neem contact op met het Twenty-team"
 
+#. js-lingui-id: 0okvpx
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+#: src/modules/settings/billing/components/AddPaymentMethodForm.tsx
+#: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
+#: src/modules/settings/billing/hooks/useSubmitSubscriptionPayment.ts
+msgid "Subscription error. Please retry or contact Betty team"
+msgstr "Abonnementsfout. Probeer het opnieuw of neem contact op met het Betty-team"
+
 #. js-lingui-id: kSY/ji
 #: src/modules/settings/billing/hooks/useApplyBillingSubscriptionChange.ts
 msgid "Subscription has been moved to the new {planLabel} plan."
@@ -25182,6 +25373,11 @@ msgstr "De AWS-regio voor Bedrock"
 msgid "The base data model every Twenty workspace runs on."
 msgstr "Het basisgegevensmodel waarop elke Twenty-werkruimte draait."
 
+#. js-lingui-id: bEyeZg
+#: src/modules/applications/utils/getStandardApplicationDescription.ts
+msgid "The base data model every Betty workspace runs on."
+msgstr "Het basisgegevensmodel waarop elke Betty-werkruimte draait."
+
 #. js-lingui-id: 832YJ9
 #: src/modules/validation-rules/constants/ValidationRuleKeywords.ts
 msgid "The boolean value false."
@@ -25364,6 +25560,11 @@ msgstr "De pagina die u zoekt is verdwenen of heeft nooit bestaan. Laten we u te
 msgid "The PDF is pre-signed by Twenty and executed with your legal entity and authorized signatory."
 msgstr "De PDF is vooraf ondertekend door Twenty en wordt namens jouw rechtspersoon door de bevoegde ondertekenaar ondertekend."
 
+#. js-lingui-id: Ya1wb4
+#: src/pages/settings/legal/SettingsLegalDpaNew.tsx
+msgid "The PDF is pre-signed by Betty and executed with your legal entity and authorized signatory."
+msgstr "De PDF is vooraf ondertekend door Betty en wordt namens jouw rechtspersoon door de bevoegde ondertekenaar ondertekend."
+
 #. js-lingui-id: Ir4tSJ
 #: src/modules/page-layout/widgets/call-recording/utils/getCallRecordingStatusDisplayConfiguration.ts
 msgid "The recorder is joining the call…"
@@ -25496,6 +25697,11 @@ msgstr "Er is geen activiteit gekoppeld aan dit record."
 #: src/pages/auth/PasswordReset.tsx
 msgid "There was an error while updating password."
 msgstr "Er was een fout bij het bijwerken van het wachtwoord."
+
+#. js-lingui-id: NaZquI
+#: src/modules/navigation/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx
+msgid "They create their own Betty account and workspace"
+msgstr "Ze maken hun eigen Betty-account en werkruimte aan"
 
 #. js-lingui-id: 5Ml5Nr
 #: src/modules/advanced-text-editor/constants/AdvancedTextEditorBlockCatalog.ts
@@ -25658,6 +25864,12 @@ msgstr "Deze toepassing is niet geïnstalleerd in deze werkruimte. Mogelijk is d
 #: src/pages/settings/applications/SettingsAvailableApplicationDetails.tsx
 msgid "This application is not vetted by Twenty. Use at your own risk."
 msgstr "Deze toepassing is niet gecontroleerd door Twenty. Gebruik op eigen risico."
+
+#. js-lingui-id: 5j3WfU
+#: src/modules/marketplace/components/SettingsApplicationInstallPermissionValidationModal.tsx
+#: src/pages/settings/applications/SettingsAvailableApplicationDetails.tsx
+msgid "This application is not vetted by Betty. Use at your own risk."
+msgstr "Deze toepassing is niet gecontroleerd door Betty. Gebruik op eigen risico."
 
 #. js-lingui-id: X7w5n6
 #: src/pages/settings/applications/tabs/SettingsApplicationRegistrationDistributionTab.tsx
@@ -26667,6 +26879,26 @@ msgstr "Twenty vult elk niveau met het beste model dat aan je vereisten voldoet"
 #: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
 msgid "Twenty works better with your team"
 msgstr "Twenty werkt beter met je team"
+
+#. js-lingui-id: 8pmRvi
+#: src/pages/onboarding/SyncEmails.tsx
+msgid "Betty adds the people you email and meet, and keeps them up to date without manual data entry."
+msgstr "Betty voegt de mensen toe die je e-mailt en ontmoet, en houdt hun gegevens actueel zonder handmatige gegevensinvoer."
+
+#. js-lingui-id: JnaRPe
+#: src/modules/spreadsheet-import/steps/components/MatchColumnsStep/components/ColumnGrid.tsx
+msgid "Betty fields"
+msgstr "Betty-velden"
+
+#. js-lingui-id: pNo8xt
+#: src/pages/settings/ai/components/SettingsAiModelsTab.tsx
+msgid "Betty fills each level with the best model that meets your requirements"
+msgstr "Betty vult elk niveau met het beste model dat aan je vereisten voldoet"
+
+#. js-lingui-id: qUadjH
+#: src/modules/onboarding/components/OnboardingInviteTeamSkipDialog.tsx
+msgid "Betty works better with your team"
+msgstr "Betty werkt beter met je team"
 
 #. js-lingui-id: YIjS4q
 #: src/modules/ai/components/SettingsAgentModelCapabilities.tsx
@@ -28739,6 +28971,11 @@ msgstr ""
 msgid "Welcome to Twenty"
 msgstr "Welkom bij Twenty"
 
+#. js-lingui-id: nTuObL
+#: src/pages/auth/SignInUp.tsx
+msgid "Welcome to Betty"
+msgstr "Welkom bij Betty"
+
 #. js-lingui-id: t8ZvkC
 #: src/modules/onboarding/constants/WelcomeTitleMessage.ts
 #: src/pages/auth/SignInUp.tsx
@@ -29738,3 +29975,46 @@ msgstr "Inzoomen"
 #: src/modules/settings/data-model/graph-overview/components/SettingsDataModelOverview.tsx
 msgid "Zoom out"
 msgstr "Uitzoomen"
+
+msgid "Ask Betty about your contacts and conversations from Claude or ChatGPT. You can also do this later from Settings."
+msgstr "Vraag Betty naar je contacten en gesprekken vanuit Claude of ChatGPT. Je kunt dit ook later doen via Instellingen."
+
+msgid "Opens Claude with the connector named Betty and this workspace's MCP URL already filled in."
+msgstr "Opent Claude met de connector Betty en de MCP-URL van deze werkruimte al ingevuld."
+
+msgid "Name it Betty."
+msgstr "Noem het Betty."
+
+msgid "Install the plugin, then call it in a chat by typing @ and picking Betty."
+msgstr "Installeer de plug-in en roep hem in een chat aan door @ te typen en Betty te kiezen."
+
+#: src/modules/settings/hooks/useSettingsNavigationItems.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "About Betty"
+msgstr "Over Betty"
+
+#. js-lingui-id: M4Y0Jr
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty is a product of AOS Holding. Its CRM is built on Twenty, an open-source project licensed under the GNU AGPL-3.0. The changes we make to that CRM are published under the same license."
+msgstr "Betty is een product van AOS Holding. De CRM is gebouwd op Twenty, een opensourceproject onder de GNU AGPL-3.0-licentie. De wijzigingen die we in die CRM aanbrengen, worden onder dezelfde licentie gepubliceerd."
+
+#. js-lingui-id: 8ERqKa
+#: src/pages/settings/about/SettingsAbout.tsx
+msgid "Betty's services that are not part of the CRM, such as the assistant, billing and integrations, are proprietary software of AOS Holding."
+msgstr "De diensten van Betty die geen deel uitmaken van de CRM, zoals de assistent, facturatie en integraties, zijn bedrijfseigen software van AOS Holding."
+
+#. js-lingui-id: Y+V5Ym
+#: src/modules/settings/admin-panel/components/SettingsAdminVersionContainer.tsx
+msgid "Betty version"
+msgstr "Betty-versie"
+
+#. js-lingui-id: om8roM
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "In Claude, open Settings › Connectors: if \"Betty\" is listed with \"Connect\", press it; if it is not listed, press \"Open Claude\" above again."
+msgstr "Open in Claude Settings › Connectors: als \"Betty\" met \"Connect\" in de lijst staat, druk er dan op; staat het er niet, druk dan hierboven opnieuw op \"Open Claude\"."
+
+#. js-lingui-id: esKwv8
+#: src/pages/settings/mcp-connect/SettingsConnectAssistant.tsx
+msgid "Inside a chat, turn Betty on from the tools menu."
+msgstr "Schakel Betty in een chat in via het gereedschapsmenu."
