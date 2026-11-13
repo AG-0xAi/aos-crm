@@ -40,7 +40,10 @@ export type ConnectionFormData = {
   handle: string;
 } & ImapSmtpCaldavAccountInput;
 
-const DEFAULT_PROTOCOL_VALUES: Record<string, ConnectionParametersInput> = {
+export const DEFAULT_PROTOCOL_VALUES: Record<
+  string,
+  ConnectionParametersInput
+> = {
   IMAP: {
     host: '',
     port: 993,

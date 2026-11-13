@@ -9,7 +9,7 @@ import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 import { useNavigateSettings } from '~/hooks/useNavigateSettings';
 
-import { SettingsAccountsConnectionForm } from '@/settings/accounts/components/SettingsAccountsConnectionForm';
+import { SettingsAccountsNewConnectionFlow } from '@/settings/accounts/components/SettingsAccountsNewConnectionFlow';
 import { useImapSmtpCaldavConnectionForm } from '@/settings/accounts/hooks/useImapSmtpCaldavConnectionForm';
 
 export const SettingsAccountsNewImapSmtpCaldavConnection = () => {
@@ -24,8 +24,6 @@ export const SettingsAccountsNewImapSmtpCaldavConnection = () => {
     isSubmitting,
     loading,
   } = useImapSmtpCaldavConnectionForm({});
-
-  const { control } = formMethods;
 
   return (
     // oxlint-disable-next-line react/jsx-props-no-spreading
@@ -54,7 +52,7 @@ export const SettingsAccountsNewImapSmtpCaldavConnection = () => {
         }
       >
         <SettingsPageContainer>
-          <SettingsAccountsConnectionForm control={control} isEditing={false} />
+          <SettingsAccountsNewConnectionFlow formMethods={formMethods} />
         </SettingsPageContainer>
       </SettingsPageLayout>
     </FormProvider>
