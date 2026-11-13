@@ -7,6 +7,7 @@ import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graph
 import {
   activateCoreWorkflowVersion,
   createCoreWorkflow,
+  createCoreWorkflowVersionStep,
   findCoreWorkflowVersion,
   updateCoreWorkflowVersionTrigger,
 } from 'test/integration/graphql/suites/workflow/utils/core-workflow.util';
@@ -104,6 +105,11 @@ describe('cross-workspace isolation: MCP tools', () => {
         nextStepIds: [],
         position: { x: 0, y: 0 },
       },
+    });
+
+    await createCoreWorkflowVersionStep({
+      coreWorkflowVersionId,
+      stepType: 'SEND_EMAIL',
     });
 
     await activateCoreWorkflowVersion({ coreWorkflowVersionId });
