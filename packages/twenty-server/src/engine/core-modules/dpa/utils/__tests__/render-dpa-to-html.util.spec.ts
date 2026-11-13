@@ -103,6 +103,8 @@ describe('renderDpaToHtml', () => {
         signatory: { name: 'Jane Doe', title: 'Head of Legal' },
         executedAt: '2026-06-27T00:00:00.000Z',
         isSelfHosted: false,
+        processorAddress: '1 Example Street, Testville, TE 00000',
+        processorContact: 'privacy@aos-holding.example',
       }),
     );
 
@@ -118,7 +120,7 @@ describe('renderDpaToHtml', () => {
       expect(html).not.toContain(forbidden);
     }
 
-    expect(html).toContain('Stéphanie Joly');
+    expect(html).toContain('privacy@aos-holding.example');
     expect(
       html.match(/7\.1 Data Hosting and Localization:/g) ?? [],
     ).toHaveLength(1);

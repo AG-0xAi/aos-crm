@@ -52,6 +52,11 @@ export type DpaResolveContext = {
   // Twenty is not the Processor for self-hosted deployments, so the resolved
   // document carries a prominent "not a valid agreement" notice.
   isSelfHosted?: boolean;
+  // Deployment-configured Processor address / privacy contact (DPA_PROCESSOR_ADDRESS,
+  // DPA_PROCESSOR_CONTACT). Defaults to '' here; the caller (DpaService) is
+  // responsible for refusing to generate while either is empty.
+  processorAddress?: string;
+  processorContact?: string;
 };
 
 export type ResolvedDpaBlock = {

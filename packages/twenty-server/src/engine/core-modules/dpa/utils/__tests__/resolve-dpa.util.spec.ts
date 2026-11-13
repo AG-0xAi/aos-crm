@@ -1,7 +1,4 @@
-import {
-  DEFAULT_DPA_REGION,
-  DPA_REGION_CONFIGS,
-} from 'src/engine/core-modules/dpa/config/dpa-region-config.constant';
+import { DEFAULT_DPA_REGION } from 'src/engine/core-modules/dpa/config/dpa-region-config.constant';
 import { DPA_TEMPLATE_VERSION } from 'src/engine/core-modules/dpa/constants/dpa-template-version.constant';
 import subprocessorsData from 'src/engine/core-modules/dpa/constants/subprocessors.json';
 import { DpaRegion } from 'src/engine/core-modules/dpa/enums/dpa-region.enum';
@@ -11,15 +8,21 @@ import {
   resolveDpa,
 } from 'src/engine/core-modules/dpa/utils/resolve-dpa.util';
 
+const TEST_PROCESSOR_ADDRESS = '1 Example Street, Testville, TE 00000';
+const TEST_PROCESSOR_CONTACT = 'privacy@aos-holding.example';
+
 describe('resolveDpa', () => {
   it('defaults to EU hosting without changing the Processor entity or governing law', () => {
     const resolved = resolveDpa({
       region: DEFAULT_DPA_REGION,
       mode: 'preview',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
     });
 
     expect(resolved.region).toBe('EU');
-    expect(resolved.values.PROCESSOR_ENTITY).toBe('Twenty.com PBC');
+    expect(resolved.values.PROCESSOR_ENTITY).toBe('AOS Holding');
+    expect(resolved.values.PROCESSOR_ADDRESS).toBe(TEST_PROCESSOR_ADDRESS);
     expect(resolved.values.PROCESSOR_LEGAL_FORM).toContain('Delaware');
     expect(resolved.values.EU_AFFILIATE_ENTITY).toBe('Twenty.com SAS');
     expect(resolved.values.EU_AFFILIATE_LEGAL_FORM).toContain('France');
@@ -30,10 +33,15 @@ describe('resolveDpa', () => {
   });
 
   it('resolves US hosting with the same Processor and EU Affiliate', () => {
-    const resolved = resolveDpa({ region: DpaRegion.US, mode: 'preview' });
+    const resolved = resolveDpa({
+      region: DpaRegion.US,
+      mode: 'preview',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
+    });
 
     expect(resolved.region).toBe('US');
-    expect(resolved.values.PROCESSOR_ENTITY).toBe('Twenty.com PBC');
+    expect(resolved.values.PROCESSOR_ENTITY).toBe('AOS Holding');
     expect(resolved.values.PROCESSOR_LEGAL_FORM).toContain('Delaware');
     expect(resolved.values.EU_AFFILIATE_ENTITY).toBe('Twenty.com SAS');
     expect(resolved.values.HOSTING_REGION).toBe('United States');
@@ -41,11 +49,21 @@ describe('resolveDpa', () => {
   });
 
   it('keeps both Twenty entities and their roles independent of hosting region', () => {
-    const eu = resolveDpa({ region: DpaRegion.EU, mode: 'preview' });
-    const us = resolveDpa({ region: DpaRegion.US, mode: 'preview' });
+    const eu = resolveDpa({
+      region: DpaRegion.EU,
+      mode: 'preview',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
+    });
+    const us = resolveDpa({
+      region: DpaRegion.US,
+      mode: 'preview',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
+    });
 
     for (const resolved of [eu, us]) {
-      expect(resolved.blocks[0].text).toContain('between Twenty.com PBC (');
+      expect(resolved.blocks[0].text).toContain('between AOS Holding (');
       expect(resolved.blocks[0].text).toContain(
         'Twenty.com SAS (“Twenty SAS” or “EU Affiliate”) joins this DPA',
       );
@@ -76,8 +94,13 @@ describe('resolveDpa', () => {
   });
 
   it('leaves no unresolved {{ }} merge fields for any region', () => {
-    for (const region of Object.keys(DPA_REGION_CONFIGS) as DpaRegion[]) {
-      const resolved = resolveDpa({ region, mode: 'signed' });
+    for (const region of Object.values(DpaRegion)) {
+      const resolved = resolveDpa({
+        region,
+        mode: 'signed',
+        processorAddress: TEST_PROCESSOR_ADDRESS,
+        processorContact: TEST_PROCESSOR_CONTACT,
+      });
 
       expect(findUnresolvedMergeFields(resolved)).toEqual([]);
     }
@@ -91,6 +114,8 @@ describe('resolveDpa', () => {
       customerLegalEntityName: 'Acme GmbH',
       signatory: { name: 'Jane Doe', title: 'CEO' },
       executedAt: '2026-06-26T00:00:00.000Z',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
     });
 
     expect(preview.blocks.some((b) => b.kind === 'signatureField')).toBe(false);
@@ -110,7 +135,7 @@ describe('resolveDpa', () => {
 
     const processorField = signed.blocks.find(
       (b) =>
-        b.kind === 'signatureField' && b.label === 'Processor — Twenty.com PBC',
+        b.kind === 'signatureField' && b.label === 'Processor — AOS Holding',
     );
     const euAffiliateField = signed.blocks.find(
       (b) =>
@@ -118,9 +143,7 @@ describe('resolveDpa', () => {
         b.label === 'EU Affiliate — Twenty.com SAS',
     );
 
-    expect(processorField?.value).toContain(
-      'Signed on behalf of Twenty.com PBC',
-    );
+    expect(processorField?.value).toContain('Signed on behalf of AOS Holding');
     expect(euAffiliateField?.value).toContain(
       'Signed on behalf of Twenty.com SAS',
     );
@@ -155,6 +178,8 @@ describe('resolveDpa', () => {
       customerLegalEntityName: 'Acme GmbH',
       signatory: { name: 'Jane Doe', title: 'Head of Legal' },
       executedAt: '2026-06-27T00:00:00.000Z',
+      processorAddress: TEST_PROCESSOR_ADDRESS,
+      processorContact: TEST_PROCESSOR_CONTACT,
     })
       .blocks.map((b) => `${b.text}\n${b.label ?? ''}\n${b.value ?? ''}`)
       .join('\n');
@@ -196,11 +221,10 @@ describe('resolveDpa', () => {
     }
   });
 
-  it('renders the DPO name and contact', () => {
+  it('renders the configured Processor contact', () => {
     const text = resolvedText(DpaRegion.EU, 'signed');
 
-    expect(text).toContain('Stéphanie Joly');
-    expect(text).toContain('privacy@twenty.com');
+    expect(text).toContain(TEST_PROCESSOR_CONTACT);
   });
 
   it('states the §7.1 hosting location per region without contradicting the deployment', () => {
@@ -225,14 +249,14 @@ describe('resolveDpa', () => {
     );
   });
 
-  it('identifies PBC as Processor and data importer and SAS as EU Affiliate in Annex A', () => {
+  it('identifies AOS Holding as Processor and data importer and SAS as EU Affiliate in Annex A', () => {
     for (const region of [DpaRegion.EU, DpaRegion.US]) {
       const text = resolvedText(region, 'signed');
 
-      expect(text).toContain('Data Importer (Processor): Twenty.com PBC');
+      expect(text).toContain('Data Importer (Processor): AOS Holding');
       expect(text).toContain('EU Affiliate: Twenty.com SAS');
       expect(text).toContain(
-        'without replacing Twenty.com PBC as Processor or data importer',
+        'without replacing AOS Holding as Processor or data importer',
       );
     }
   });

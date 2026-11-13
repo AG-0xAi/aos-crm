@@ -68,6 +68,7 @@ describe('ClientConfigController', () => {
         },
         signInPrefilled: false,
         isMultiWorkspaceEnabled: true,
+        isDpaGeneratorEnabled: false,
         isEmailVerificationRequired: false,
         defaultSubdomain: 'app',
         frontDomain: 'localhost',
