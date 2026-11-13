@@ -1275,6 +1275,7 @@ type ClientConfig {
   isCompanyEnrichmentEnabled: Boolean!
   isConfigVariablesInDbEnabled: Boolean!
   isCookieSessionEnabled: Boolean!
+  isDpaGeneratorEnabled: Boolean!
   isEmailVerificationRequired: Boolean!
   isEmailingDomainInDemoMode: Boolean!
   isGoogleCalendarEnabled: Boolean!

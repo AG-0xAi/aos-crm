@@ -2758,6 +2758,9 @@ export default {
             "isCookieSessionEnabled": [
                 4
             ],
+            "isDpaGeneratorEnabled": [
+                4
+            ],
             "isEmailVerificationRequired": [
                 4
             ],
