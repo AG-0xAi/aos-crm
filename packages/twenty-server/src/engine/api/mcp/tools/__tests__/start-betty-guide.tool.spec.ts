@@ -191,6 +191,13 @@ describe('createStartBettyGuideTool', () => {
       expect(blank.startsWith('¡Hola! Soy Betty')).toBe(true);
     });
 
+    it('never splits an emoji at the cap boundary', async () => {
+      const name = `${'x'.repeat(39)}😀tail`;
+      const message = await runWith(null, name);
+
+      expect(message.startsWith(`¡Hola, ${'x'.repeat(39)}😀! Soy`)).toBe(true);
+    });
+
     it('rejects names over the cap in the input schema', () => {
       expect(
         startBettyGuideInputSchema.safeParse({ name: 'x'.repeat(500) }).success,

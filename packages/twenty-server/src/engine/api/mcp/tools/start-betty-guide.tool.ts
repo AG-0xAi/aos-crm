@@ -58,14 +58,20 @@ const summarizeProfileNote = (profileNoteText: string): string | null => {
   return FINAL_PUNCTUATION.test(trimmed) ? trimmed : `${trimmed}.`;
 };
 
-const sanitizeName = (name: string | undefined): string | undefined => {
-  const clean = name
-    ?.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
-    .trim()
-    .slice(0, NAME_MAX_LENGTH)
-    .trim();
+const isControlCodePoint = (char: string): boolean => {
+  const code = char.codePointAt(0) ?? 0;
 
-  return clean === undefined || clean.length === 0 ? undefined : clean;
+  return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+};
+
+const sanitizeName = (name: string | undefined): string | undefined => {
+  const clean = Array.from(name ?? '')
+    .filter((char) => !isControlCodePoint(char))
+    .join('')
+    .trim();
+  const capped = Array.from(clean).slice(0, NAME_MAX_LENGTH).join('').trim();
+
+  return capped.length === 0 ? undefined : capped;
 };
 
 const buildFirstMessage = (
