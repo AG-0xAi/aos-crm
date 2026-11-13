@@ -34,29 +34,51 @@ const NEXT_STEP =
   'Reply with firstMessage as your entire answer, translated if the person wrote in another language. Do not list options, menus or features. Then wait for their answer and follow guideSummary.';
 
 const PROFILE_SUMMARY_MAX_LENGTH = 240;
+const NAME_MAX_LENGTH = 40;
 
-// LEAN-DEBT: first non-empty line, truncated; a real one-sentence summary
-// would need a model call inside the tool.
+const sanitizeName = (name: string | undefined): string | undefined => {
+  const cleaned = (name ?? '')
+    .replace(/[\p{Cc}<>[\]{}`]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NAME_MAX_LENGTH)
+    .trim();
+
+  return cleaned.length > 0 ? cleaned : undefined;
+};
+
+// LEAN-DEBT: first non-empty body line (skipping headings and the note title),
+// truncated; a real one-sentence summary would need a model call inside the tool.
 const summarizeProfileNote = (profileNoteText: string): string => {
   const firstLine =
     profileNoteText
       .split('\n')
-      .map((line) => line.replace(/^[#>*\-\s]+/, '').trim())
-      .find((line) => line.length > 0) ?? '';
+      .filter((line) => !/^\s*#/.test(line))
+      .map((line) => line.replace(/^[>*\-\s]+/, '').trim())
+      .find(
+        (line) => line.length > 0 && line !== BETTY_GUIDE_PROFILE_NOTE_TITLE,
+      ) ?? '';
 
-  return firstLine.length > PROFILE_SUMMARY_MAX_LENGTH
-    ? `${firstLine.slice(0, PROFILE_SUMMARY_MAX_LENGTH).trimEnd()}…`
-    : firstLine;
+  const truncated =
+    firstLine.length > PROFILE_SUMMARY_MAX_LENGTH
+      ? `${firstLine.slice(0, PROFILE_SUMMARY_MAX_LENGTH).trimEnd()}…`
+      : firstLine;
+
+  return /[.!?…]$/.test(truncated) ? truncated : `${truncated}.`;
 };
 
 const buildFirstMessage = (
-  name: string | undefined,
+  rawName: string | undefined,
   profileNoteText: string | null,
 ): string => {
+  const name = sanitizeName(rawName);
   const greeting = isDefined(name) ? `¡Hola, ${name}!` : '¡Hola!';
+  const summary = isDefined(profileNoteText)
+    ? summarizeProfileNote(profileNoteText)
+    : '';
 
-  if (isDefined(profileNoteText)) {
-    return `${greeting} Soy Betty. Por lo que tengo guardado de tu trabajo: ${summarizeProfileNote(profileNoteText)} ¿Sigue siendo así o ha cambiado algo?`;
+  if (summary.length > 1) {
+    return `${greeting} Soy Betty. Por lo que tengo guardado de tu trabajo: ${summary} ¿Sigue siendo así o ha cambiado algo?`;
   }
 
   return `${greeting} ${FIRST_QUESTION_BODY}`;
