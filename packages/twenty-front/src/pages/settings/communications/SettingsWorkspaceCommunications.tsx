@@ -87,8 +87,6 @@ export const SettingsWorkspaceCommunications = () => {
           <SettingsDiscoveryHeroCard
             lightSrc={coverLight}
             darkSrc={coverDark}
-            instanceIdPrefix="settings-communications-hero"
-            tabs={[]}
           />
         </Section.Root>
         <SettingsWorkspaceEmailGroupSection />

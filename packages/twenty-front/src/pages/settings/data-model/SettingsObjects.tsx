@@ -12,27 +12,15 @@ import { useLingui } from '@lingui/react/macro';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 import { Section } from 'twenty-ui/components/layout';
-import { IconEye, IconPlus, IconSparkle2 } from 'twenty-ui/icon';
+import { IconEye, IconPlus } from 'twenty-ui/icon';
 import { Button } from 'twenty-ui/primitives/input';
 import { SettingsObjectTable } from '~/pages/settings/data-model/SettingsObjectTable';
-
-const SETTINGS_DATA_MODEL_HERO_INSTANCE_ID_PREFIX = 'settings-data-model-hero';
 
 export const SettingsObjects = () => {
   const { t } = useLingui();
 
   const { objectMetadataItems } = useFilteredObjectMetadataItems();
   const isDDLLocked = useAtomStateValue(isDDLLockedState);
-
-  const heroTabs = [
-    {
-      id: 'data_model_walkthrough',
-      title: t`Walkthrough`,
-      Icon: IconSparkle2,
-      vimeoId: '1217964359',
-      hasSound: true,
-    },
-  ];
 
   return (
     <SettingsPageLayout
@@ -69,9 +57,6 @@ export const SettingsObjects = () => {
           <SettingsDiscoveryHeroCard
             lightSrc={LightCoverImage}
             darkSrc={DarkCoverImage}
-            instanceIdPrefix={SETTINGS_DATA_MODEL_HERO_INSTANCE_ID_PREFIX}
-            tabs={heroTabs}
-            playButtonAriaLabel={t`Watch data model demo`}
           />
         </Section.Root>
         <Section.Root>

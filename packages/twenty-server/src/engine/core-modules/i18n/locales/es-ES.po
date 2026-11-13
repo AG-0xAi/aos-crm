@@ -9970,10 +9970,10 @@ msgstr "Por favor, selecciona una fecha y hora de finalización posteriores a la
 msgid "Please confirm your updated email"
 msgstr "Por favor, confirma tu correo electrónico actualizado"
 
-#. js-lingui-id: Zm9s4F
+#. js-lingui-id: 6FZR/z
 #: src/engine/api/common/common-args-processors/data-arg-processor/validator-utils/validate-links-field-or-throw.util.ts
-msgid "Please enter a domain name, like twenty.com"
-msgstr "Introduce un nombre de dominio, como twenty.com"
+msgid "Please enter a domain name, like example.com"
+msgstr "Introduce un nombre de dominio, como example.com"
 
 #. js-lingui-id: qgasuj
 #: src/engine/core-modules/imap-smtp-caldav-connection/services/imap-smtp-caldav-connection-validator.service.ts

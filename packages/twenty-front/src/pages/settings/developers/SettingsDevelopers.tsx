@@ -23,7 +23,6 @@ import {
   IconApi,
   IconApps,
   IconPlus,
-  IconSparkle2,
   IconTerminal2,
   IconWebhook,
 } from 'twenty-ui/icon';
@@ -37,8 +36,6 @@ import { SettingsDevelopersCliTab } from '~/pages/settings/developers/tabs/Setti
 
 type TabKey =
   (typeof SETTINGS_DEVELOPERS_TABS.TABS_IDS)[keyof typeof SETTINGS_DEVELOPERS_TABS.TABS_IDS];
-
-const SETTINGS_DEVELOPERS_HERO_INSTANCE_ID_PREFIX = 'settings-developers-hero';
 
 const StyledButtonContainer = styled.div`
   display: flex;
@@ -143,21 +140,6 @@ export const SettingsDevelopers = () => {
           <SettingsDiscoveryHeroCard
             lightSrc={isAppsTab ? AppsCoverLight : PlaygroundCoverLight}
             darkSrc={isAppsTab ? AppsCoverDark : PlaygroundCoverDark}
-            instanceIdPrefix={SETTINGS_DEVELOPERS_HERO_INSTANCE_ID_PREFIX}
-            tabs={
-              isAppsTab || isCliTab
-                ? []
-                : [
-                    {
-                      id: 'api_webhook_walkthrough',
-                      title: t`Walkthrough`,
-                      Icon: IconSparkle2,
-                      vimeoId: '1217967646',
-                      hasSound: true,
-                    },
-                  ]
-            }
-            playButtonAriaLabel={t`Watch API demo`}
           />
         </Section.Root>
 

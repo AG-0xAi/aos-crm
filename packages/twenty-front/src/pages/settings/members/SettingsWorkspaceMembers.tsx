@@ -2,12 +2,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 import { Section } from 'twenty-ui/components/layout';
-import {
-  IconLock,
-  IconSparkle2,
-  IconUserPlus,
-  IconUsers,
-} from 'twenty-ui/icon';
+import { IconLock, IconUserPlus, IconUsers } from 'twenty-ui/icon';
 
 import { SettingsDiscoveryHeroCard } from '@/settings/components/SettingsDiscoveryHeroCard';
 import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
@@ -27,8 +22,6 @@ const MEMBERS_TAB_LIST_ID = 'members-tab-list';
 const MEMBERS_TAB_TEAM_ID = 'team';
 const MEMBERS_TAB_INVITE_ID = 'invite';
 const MEMBERS_TAB_ROLES_ID = 'roles';
-
-const SETTINGS_MEMBERS_HERO_INSTANCE_ID_PREFIX = 'settings-members-hero';
 
 export const SettingsWorkspaceMembers = () => {
   const { t } = useLingui();
@@ -86,17 +79,6 @@ export const SettingsWorkspaceMembers = () => {
           <SettingsDiscoveryHeroCard
             lightSrc={coverLight}
             darkSrc={coverDark}
-            instanceIdPrefix={SETTINGS_MEMBERS_HERO_INSTANCE_ID_PREFIX}
-            tabs={[
-              {
-                id: 'members_walkthrough',
-                title: t`Walkthrough`,
-                Icon: IconSparkle2,
-                vimeoId: '1217964364',
-                hasSound: true,
-              },
-            ]}
-            playButtonAriaLabel={t`Watch members demo`}
           />
         </Section.Root>
         {renderActiveTabContent()}
