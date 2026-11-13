@@ -2,7 +2,6 @@ import { createManyOperationFactory } from 'test/integration/graphql/utils/creat
 import { deleteManyOperationFactory } from 'test/integration/graphql/utils/delete-many-operation-factory.util';
 import { destroyManyOperationFactory } from 'test/integration/graphql/utils/destroy-many-operation-factory.util';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
-import { expectEventually } from 'test/integration/utils/expect-eventually.util';
 import { getAppProviderByClassName } from 'test/integration/utils/get-app-provider-by-class-name.util';
 import { getCoreRepository } from 'test/integration/utils/get-core-repository.util';
 
@@ -97,14 +96,6 @@ describe('Record stock limit', () => {
     return Number(row.quantity);
   };
 
-  const waitForRecordCount = (expected: number) =>
-    expectEventually(
-      async () => {
-        expect(await countRecords()).toBe(expected);
-      },
-      { timeoutMs: STATS_FLUSH_TIMEOUT_MS },
-    );
-
   const waitForStatsToSettle = async (): Promise<number> => {
     let previous = await countRecords();
 
@@ -181,7 +172,14 @@ describe('Record stock limit', () => {
   });
 
   beforeEach(async () => {
-    await waitForRecordCount(baselineRecordCount);
+    // Other suites share the seeded workspace and may leave records behind, so
+    // the limit is rebased on the settled count instead of a one-off baseline.
+    baselineRecordCount = await waitForStatsToSettle();
+    await usageLimitRepository.update(
+      { id: usageLimitId },
+      { limitValue: baselineRecordCount + HEADROOM },
+    );
+    await refreshUsageLimitsCache();
     await dropStockCounter();
   }, STATS_FLUSH_TIMEOUT_MS + 5_000);
 

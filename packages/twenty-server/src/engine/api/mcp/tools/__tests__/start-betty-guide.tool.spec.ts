@@ -235,4 +235,31 @@ describe('createStartBettyGuideTool', () => {
     expect(resultB.profileNote).toBe("B's profile");
     expect(resultB.profileNote).not.toBe(resultA.profileNote);
   });
+
+  it('skips the note title, separates sentences and sanitizes the name', async () => {
+    const tool = createStartBettyGuideTool(
+      buildSkillServiceMock([
+        { name: BETTY_GUIDE_SKILL_NAME, content: 'x' },
+      ]) as never,
+      buildWorkspaceOrmManagerMock({
+        bodyV2: {
+          markdown: `# ${BETTY_GUIDE_PROFILE_NOTE_TITLE}\n\nVende software a dentistas`,
+        },
+      }) as never,
+      'workspace-a',
+      ROLE_PERMISSION_CONFIG,
+    );
+
+    const result = await tool.execute({
+      name: `  <b>${'A'.repeat(100)}</b>\n`,
+    });
+
+    expect(result.firstMessage).toContain(
+      'de tu trabajo: Vende software a dentistas. ¿Sigue',
+    );
+    expect(result.firstMessage).not.toContain('Mi perfil');
+    expect(result.firstMessage).not.toContain('<');
+    expect(result.firstMessage.startsWith(`¡Hola, b A`)).toBe(true);
+    expect(result.firstMessage.indexOf('!')).toBeLessThan(60);
+  });
 });
