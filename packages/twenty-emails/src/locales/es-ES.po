@@ -76,7 +76,7 @@ msgstr "Un asistente para tus relaciones comerciales: mantiene tus contactos y c
 #. js-lingui-explicit-id
 #: src/components/BaseHead.tsx
 msgid "Betty email"
-msgstr ""
+msgstr "Correo de Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
@@ -96,7 +96,7 @@ msgstr "Confirma tu nueva dirección de correo electrónico"
 #. js-lingui-explicit-id
 #: src/emails/password-update-notify.email.tsx
 msgid "Connect to Betty"
-msgstr ""
+msgstr "Conéctate a Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/sign-up-invite-link.email.tsx
@@ -150,7 +150,7 @@ msgstr "Hola {userName},"
 #. js-lingui-explicit-id
 #: src/emails/billing-trial-converting.email.tsx
 msgid "If Betty is working for you, you're all set — there's nothing to do. If it's not the right fit, you can cancel in one click before then and you won't be charged."
-msgstr ""
+msgstr "Si Betty te funciona, ya está todo listo: no tienes que hacer nada. Si no es lo que necesitas, puedes cancelar con un clic antes de esa fecha y no se te cobrará."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-reset.email.tsx
@@ -180,7 +180,7 @@ msgstr "Si no haces nada, pondremos tu espacio de trabajo en pausa y mantendremo
 #. js-lingui-explicit-id
 #: src/emails/clean-suspended-workspace.email.tsx
 msgid "If you'd ever like to give Betty another try, you can start a fresh workspace in minutes — we'd love to have you back."
-msgstr ""
+msgstr "Si algún día quieres darle otra oportunidad a Betty, puedes crear un espacio de trabajo nuevo en pocos minutos. Nos encantaría volver a verte."
 
 #. js-lingui-explicit-id
 #: src/emails/server-admin-access-changed.email.tsx
@@ -195,7 +195,7 @@ msgstr "Sus datos se han eliminado y ya no se pueden recuperar."
 #. js-lingui-explicit-id
 #: src/emails/send-invite-link.email.tsx
 msgid "Join your team on Betty"
-msgstr ""
+msgstr "Únete a tu equipo en Betty"
 
 #. js-lingui-explicit-id
 #: src/emails/billing-subscription-renewing.email.tsx
@@ -276,7 +276,7 @@ msgstr "Correo de prueba"
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "Thanks for registering for an account on Betty! Before we get started, we just need to confirm that this is you. Click below to verify your email address."
-msgstr ""
+msgstr "¡Gracias por registrarte en Betty! Antes de empezar, solo necesitamos confirmar que eres tú. Haz clic abajo para verificar tu dirección de correo electrónico."
 
 #. js-lingui-explicit-id
 #: src/emails/two-factor-authentication-recovery-code-issued.email.tsx
@@ -327,7 +327,7 @@ msgstr "No nos gustan los cobros por sorpresa, así que aquí tienes un recordat
 #. js-lingui-explicit-id
 #: src/emails/send-email-verification-link.email.tsx
 msgid "We received a request to change the email address associated with your Betty account. Click below to confirm this change."
-msgstr ""
+msgstr "Recibimos una solicitud para cambiar la dirección de correo electrónico asociada a tu cuenta de Betty. Haz clic abajo para confirmar este cambio."
 
 #. js-lingui-explicit-id
 #: src/components/WhatIsTwenty.tsx
