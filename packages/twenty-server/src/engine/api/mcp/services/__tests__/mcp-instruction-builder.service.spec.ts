@@ -93,10 +93,13 @@ describe('McpInstructionBuilderService', () => {
   });
 
   it('builds instructions from the requested workspace only', async () => {
-    skillService.findAllFlatSkills.mockImplementation(async (workspaceId) =>
-      (workspaceId === 'workspace-a'
-        ? [buildSkill('workspace-a-custom-skill', 'Only for workspace A')]
-        : [buildSkill('workspace-b-custom-skill', 'Only for workspace B')]) as never,
+    skillService.findAllFlatSkills.mockImplementation(
+      async (workspaceId) =>
+        (workspaceId === 'workspace-a'
+          ? [buildSkill('workspace-a-custom-skill', 'Only for workspace A')]
+          : [
+              buildSkill('workspace-b-custom-skill', 'Only for workspace B'),
+            ]) as never,
     );
     codeInterpreterService.isEnabled.mockReturnValue(true);
 
@@ -106,9 +109,7 @@ describe('McpInstructionBuilderService', () => {
       isDirectMode: false,
     });
 
-    expect(skillService.findAllFlatSkills).toHaveBeenCalledWith(
-      'workspace-a',
-    );
+    expect(skillService.findAllFlatSkills).toHaveBeenCalledWith('workspace-a');
     expect(instructionsForA).toContain('workspace-a-custom-skill');
     expect(instructionsForA).not.toContain('workspace-b-custom-skill');
   });

@@ -64,10 +64,11 @@ describe('McpPromptBuilderService', () => {
     });
 
     it('only lists the requested workspace skills', async () => {
-      skillService.findAllFlatSkills.mockImplementation(async (workspaceId) =>
-        (workspaceId === 'workspace-a'
-          ? [buildSkill('workspace-a-custom-skill')]
-          : [buildSkill('workspace-b-custom-skill')]) as never,
+      skillService.findAllFlatSkills.mockImplementation(
+        async (workspaceId) =>
+          (workspaceId === 'workspace-a'
+            ? [buildSkill('workspace-a-custom-skill')]
+            : [buildSkill('workspace-b-custom-skill')]) as never,
       );
       codeInterpreterService.isEnabled.mockReturnValue(true);
 
