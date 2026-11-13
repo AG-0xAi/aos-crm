@@ -151,13 +151,7 @@ export const ALLOWLIST = [
     file: 'packages/twenty-server/src/engine/core-modules/dpa/config/dpa-region-config.constant.ts',
     match: 'Twenty.com',
     reason:
-      "Twenty Inc.'s legal entities (Twenty.com PBC and Twenty.com SAS) as the DPA's processor. A legal entity name is a fact, not branding.",
-  },
-  {
-    file: 'packages/twenty-server/src/engine/core-modules/dpa/config/dpa-region-config.constant.ts',
-    match: 'privacy@twenty.com',
-    reason:
-      "Twenty Inc.'s own Data Protection Officer contact address in its legal DPA. Same reason as the legal entity names above.",
+      "Twenty Inc.'s EU affiliate legal entity (Twenty.com SAS), still named by the DPA template. The Processor name/address/contact are configurable (DPA_PROCESSOR_ADDRESS, DPA_PROCESSOR_CONTACT) but the EU affiliate, DPO signatory, and surrounding prose are still Twenty's and need lawyer review before IS_DPA_GENERATOR_ENABLED is turned on.",
   },
   {
     file: 'packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template.constant.ts',
@@ -188,12 +182,6 @@ export const ALLOWLIST = [
     match: 'This Twenty instance is self-hosted',
     reason:
       'The invalid-agreement banner, stating correctly that Twenty Inc. is not the processor of a self-hosted deployment.',
-  },
-  {
-    file: 'packages/twenty-server/src/engine/core-modules/twenty-config/config-variables.ts',
-    match: 'The Processor entity (Twenty.com PBC)',
-    reason:
-      'Describes which legal entity the DPA names per region. Same reason as the DPA module.',
   },
   {
     file: 'packages/twenty-server/src/engine/workspace-manager/dev-seeder/data/constants/person-data-seeds.constant.ts',

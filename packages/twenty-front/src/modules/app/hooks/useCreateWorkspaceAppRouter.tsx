@@ -95,13 +95,16 @@ const preloadOnboardingPages = () => {
 
 type CreateWorkspaceAppRouterArgs = {
   isAdminPageEnabled?: boolean;
+  isDpaGeneratorEnabled?: boolean;
 };
 
 const createWorkspaceAppRouter = ({
   isAdminPageEnabled,
+  isDpaGeneratorEnabled,
 }: CreateWorkspaceAppRouterArgs) => {
   const workspaceRouteObjects = createWorkspaceRouteObjects({
     isAdminPageEnabled,
+    isDpaGeneratorEnabled,
   });
 
   return createBrowserRouter([
@@ -258,8 +261,10 @@ const createWorkspaceAppRouter = ({
 
 export const useCreateWorkspaceAppRouter = ({
   isAdminPageEnabled,
+  isDpaGeneratorEnabled,
 }: CreateWorkspaceAppRouterArgs) =>
   useMemo(
-    () => createWorkspaceAppRouter({ isAdminPageEnabled }),
-    [isAdminPageEnabled],
+    () =>
+      createWorkspaceAppRouter({ isAdminPageEnabled, isDpaGeneratorEnabled }),
+    [isAdminPageEnabled, isDpaGeneratorEnabled],
   );

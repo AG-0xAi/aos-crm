@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
+import { isNonEmptyString } from '@sniptt/guards';
 import { FileFolder } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
 import { Repository } from 'typeorm';
@@ -66,9 +67,33 @@ export class DpaService {
     return this.twentyConfigService.get('IS_MULTIWORKSPACE_ENABLED') !== true;
   }
 
+  // Off by default: large parts of the DPA template still name Twenty.com
+  // PBC/SAS outside of the merge fields this deployment controls. Generation
+  // refuses until the feature is explicitly enabled and the Processor
+  // address/contact are configured — see docs/aos/product/BETA_RUNBOOK.md.
+  private assertDpaGenerationAllowed(): { address: string; contact: string } {
+    if (this.twentyConfigService.get('IS_DPA_GENERATOR_ENABLED') !== true) {
+      throw new BadRequestException(
+        'The Data Processing Agreement generator is disabled for this deployment.',
+      );
+    }
+
+    const address = this.twentyConfigService.get('DPA_PROCESSOR_ADDRESS');
+    const contact = this.twentyConfigService.get('DPA_PROCESSOR_CONTACT');
+
+    if (!isNonEmptyString(address) || !isNonEmptyString(contact)) {
+      throw new BadRequestException(
+        'DPA_PROCESSOR_ADDRESS and DPA_PROCESSOR_CONTACT must be configured before a Data Processing Agreement can be generated.',
+      );
+    }
+
+    return { address, contact };
+  }
+
   getPreviewForWorkspace(
     workspace: Pick<WorkspaceEntity, 'id'>,
   ): DpaDocumentDTO {
+    const { address, contact } = this.assertDpaGenerationAllowed();
     const region = this.dpaRegionService.getRegionForWorkspace(workspace);
 
     return toDocumentDto(
@@ -76,6 +101,8 @@ export class DpaService {
         region,
         mode: 'preview',
         isSelfHosted: this.isSelfHosted(),
+        processorAddress: address,
+        processorContact: contact,
       }),
     );
   }
@@ -119,6 +146,7 @@ export class DpaService {
       );
     }
 
+    const { address, contact } = this.assertDpaGenerationAllowed();
     const region = this.dpaRegionService.getRegionForWorkspace(workspace);
     const executedAt = new Date();
 
@@ -129,6 +157,8 @@ export class DpaService {
       signatory: { name: input.signatoryName, title: input.signatoryTitle },
       executedAt: executedAt.toISOString(),
       isSelfHosted: this.isSelfHosted(),
+      processorAddress: address,
+      processorContact: contact,
     });
 
     const fileId = v4();

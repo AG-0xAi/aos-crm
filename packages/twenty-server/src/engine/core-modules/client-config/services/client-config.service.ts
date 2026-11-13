@@ -199,6 +199,9 @@ export class ClientConfigService {
       isMultiWorkspaceEnabled: this.twentyConfigService.get(
         'IS_MULTIWORKSPACE_ENABLED',
       ),
+      isDpaGeneratorEnabled: this.twentyConfigService.get(
+        'IS_DPA_GENERATOR_ENABLED',
+      ),
       isEmailVerificationRequired: this.twentyConfigService.get(
         'IS_EMAIL_VERIFICATION_REQUIRED',
       ),

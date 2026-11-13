@@ -29,6 +29,7 @@ import { isImapSmtpCaldavEnabledState } from '@/client-config/states/isImapSmtpC
 import { maintenanceModeState } from '@/client-config/states/maintenanceModeState';
 import { isMicrosoftCalendarEnabledState } from '@/client-config/states/isMicrosoftCalendarEnabledState';
 import { isMicrosoftMessagingEnabledState } from '@/client-config/states/isMicrosoftMessagingEnabledState';
+import { isDpaGeneratorEnabledState } from '@/client-config/states/isDpaGeneratorEnabledState';
 import { isMultiWorkspaceEnabledState } from '@/client-config/states/isMultiWorkspaceEnabledState';
 import { isOnboardingAiChatEnabledState } from '@/client-config/states/isOnboardingAiChatEnabledState';
 import { labPublicFeatureFlagsState } from '@/client-config/states/labPublicFeatureFlagsState';
@@ -68,6 +69,7 @@ export const useClientConfig = (): UseClientConfigResult => {
   const setIsMultiWorkspaceEnabled = useSetAtomState(
     isMultiWorkspaceEnabledState,
   );
+  const setIsDpaGeneratorEnabled = useSetAtomState(isDpaGeneratorEnabledState);
   const setIsEmailVerificationRequired = useSetAtomState(
     isEmailVerificationRequiredState,
   );
@@ -195,6 +197,7 @@ export const useClientConfig = (): UseClientConfigResult => {
         setIsAnalyticsEnabled(clientConfig.analyticsEnabled);
         setIsDeveloperDefaultSignInPrefilled(clientConfig.signInPrefilled);
         setIsMultiWorkspaceEnabled(clientConfig.isMultiWorkspaceEnabled);
+        setIsDpaGeneratorEnabled(clientConfig.isDpaGeneratorEnabled);
         setIsEmailVerificationRequired(
           clientConfig.isEmailVerificationRequired,
         );
@@ -308,6 +311,7 @@ export const useClientConfig = (): UseClientConfigResult => {
       setIsEmailVerificationRequired,
       setIsImapSmtpCaldavEnabled,
       setIsMultiWorkspaceEnabled,
+      setIsDpaGeneratorEnabled,
       setIsEmailingDomainInDemoMode,
       setIsClickHouseConfigured,
       setIsCloudflareIntegrationEnabled,

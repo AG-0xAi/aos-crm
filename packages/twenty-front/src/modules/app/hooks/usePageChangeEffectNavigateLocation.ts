@@ -5,6 +5,7 @@ import { useIsLogged } from '@/auth/hooks/useIsLogged';
 import { currentWorkspaceState } from '@/auth/states/currentWorkspaceState';
 import { returnToPathState } from '@/auth/states/returnToPathState';
 import { billingState } from '@/client-config/states/billingState';
+import { isDpaGeneratorEnabledState } from '@/client-config/states/isDpaGeneratorEnabledState';
 import { useIsCurrentLocationOnAWorkspace } from '@/domain-manager/hooks/useIsCurrentLocationOnAWorkspace';
 import { isMinimalMetadataReadyState } from '@/metadata-store/states/isMinimalMetadataReadyState';
 import { useDefaultHomePagePath } from '@/navigation/hooks/useDefaultHomePagePath';
@@ -45,6 +46,7 @@ export const usePageChangeEffectNavigateLocation = () => {
   const location = useLocation();
   const billing = useAtomStateValue(billingState);
   const isBillingEnabled = billing?.isBillingEnabled ?? false;
+  const isDpaGeneratorEnabled = useAtomStateValue(isDpaGeneratorEnabledState);
 
   const someMatchingLocationOf = (appPaths: AppPath[]): boolean =>
     appPaths.some((appPath) => isMatchingLocation(location, appPath));
@@ -194,6 +196,16 @@ export const usePageChangeEffectNavigateLocation = () => {
 
   if (isMatchingLocation(location, AppPath.Index) && isLogged) {
     return resolvedReturnToPath ?? defaultHomePagePath;
+  }
+
+  if (
+    !isDpaGeneratorEnabled &&
+    (isMatchingLocation(location, AppPath.Dpa) ||
+      [SettingsPath.LegalDpa, SettingsPath.LegalDpaNew].some((settingsPath) =>
+        isMatchingLocation(location, getSettingsPath(settingsPath)),
+      ))
+  ) {
+    return AppPath.NotFound;
   }
 
   if (isMatchingLocation(location, AppPath.Dpa)) {

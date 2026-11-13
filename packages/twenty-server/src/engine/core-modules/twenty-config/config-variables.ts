@@ -631,7 +631,7 @@ export class ConfigVariables {
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.SERVER_CONFIG,
     description:
-      'Deployment region that determines the DPA hosting location shown to customers. The Processor entity (Twenty.com PBC) and governing law (Delaware, USA) are the same for all regions. EU (default) = Frankfurt, Germany; US = United States. Must match where Customer Personal Data actually lives.',
+      'Deployment region that determines the DPA hosting location shown to customers. The Processor entity (AOS Holding) and governing law are the same for all regions. EU (default) = Frankfurt, Germany; US = United States. Must match where Customer Personal Data actually lives.',
     isHiddenInAdminPanel: true,
     type: ConfigVariableType.ENUM,
     options: Object.values(DpaRegion),
@@ -641,6 +641,36 @@ export class ConfigVariables {
   @IsOptional()
   @IsEnum(DpaRegion)
   DPA_DEPLOYMENT_REGION: DpaRegion = DpaRegion.EU;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.SERVER_CONFIG,
+    description:
+      'Enables the Data Processing Agreement generator under Settings > Legal. Off by default: large parts of the DPA template still name the upstream Processor and its EU affiliate outside of the merge fields this deployment controls (see docs/aos/product/BETA_RUNBOOK.md). A lawyer must review and approve the template for this deployment before this is turned on.',
+    isHiddenInAdminPanel: true,
+    type: ConfigVariableType.BOOLEAN,
+  })
+  @IsOptional()
+  IS_DPA_GENERATOR_ENABLED = false;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.SERVER_CONFIG,
+    description:
+      'Registered address of the Processor (AOS Holding) shown in the generated Data Processing Agreement. The generator refuses to produce a document while this is unset.',
+    isHiddenInAdminPanel: true,
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  DPA_PROCESSOR_ADDRESS?: string;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.SERVER_CONFIG,
+    description:
+      'Privacy / Data Protection Officer contact of the Processor (AOS Holding) shown in the generated Data Processing Agreement. The generator refuses to produce a document while this is unset.',
+    isHiddenInAdminPanel: true,
+    type: ConfigVariableType.STRING,
+  })
+  @IsOptional()
+  DPA_PROCESSOR_CONTACT?: string;
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.STORAGE_CONFIG,

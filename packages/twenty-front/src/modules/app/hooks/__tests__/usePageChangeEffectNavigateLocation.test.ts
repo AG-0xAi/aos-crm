@@ -105,11 +105,13 @@ const setupMockState = (
   isBillingEnabled: boolean = true,
   isMinimalMetadataReady: boolean = true,
   isOnboardingCheckoutPending: boolean = false,
+  isDpaGeneratorEnabled: boolean = false,
 ) => {
   jest
     .mocked(useAtomStateValue)
     .mockReturnValueOnce(currentWorkspace)
     .mockReturnValueOnce({ isBillingEnabled })
+    .mockReturnValueOnce(isDpaGeneratorEnabled)
     .mockReturnValueOnce([{ namePlural: objectNamePlural ?? '' }])
     .mockReturnValueOnce(isMinimalMetadataReady)
     .mockReturnValueOnce(verifyEmailRedirectPath)
@@ -134,6 +136,7 @@ const testCases: {
   isBillingEnabled?: boolean;
   isMinimalMetadataReady?: boolean;
   isOnboardingCheckoutPending?: boolean;
+  isDpaGeneratorEnabled?: boolean;
 }[] = [
   { loc: AppPath.Verify, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.PLAN_REQUIRED, res: AppPath.PlanRequired },
   { loc: AppPath.Verify, isLogged: true, isWorkspaceSuspended: true, onboardingStatus: OnboardingStatus.COMPLETED, res: getSettingsPath(SettingsPath.Billing) },
@@ -284,7 +287,7 @@ const testCases: {
   { loc: AppPath.Dpa, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.SYNC_EMAIL, res: AppPath.SyncEmails },
   { loc: AppPath.Dpa, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.INVITE_TEAM, res: AppPath.InviteTeam },
   { loc: AppPath.Dpa, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.BOOK_CALL, res: AppPath.BookCall },
-  { loc: AppPath.Dpa, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.COMPLETED, res: getSettingsPath(SettingsPath.LegalDpa) },
+  { loc: AppPath.Dpa, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.COMPLETED, res: AppPath.NotFound },
 
   { loc: AppPath.AiChat, isLogged: true, isWorkspaceSuspended: false, onboardingStatus: OnboardingStatus.PLAN_REQUIRED, res: AppPath.PlanRequired },
   { loc: AppPath.AiChat, isLogged: true, isWorkspaceSuspended: true, onboardingStatus: OnboardingStatus.COMPLETED, res: getSettingsPath(SettingsPath.Billing) },
@@ -474,6 +477,7 @@ describe('usePageChangeEffectNavigateLocation', () => {
       isBillingEnabled,
       isMinimalMetadataReady,
       isOnboardingCheckoutPending,
+      isDpaGeneratorEnabled,
       res,
     }) => {
       setupMockIsMatchingLocation(loc);
@@ -492,6 +496,7 @@ describe('usePageChangeEffectNavigateLocation', () => {
         isBillingEnabled ?? true,
         isMinimalMetadataReady ?? true,
         isOnboardingCheckoutPending ?? false,
+        isDpaGeneratorEnabled ?? false,
       );
 
       expect(usePageChangeEffectNavigateLocation()).toEqual(res);
@@ -570,4 +575,58 @@ describe('usePageChangeEffectNavigateLocation — suspended workspace settings p
 
     expect(usePageChangeEffectNavigateLocation()).toEqual(res);
   });
+});
+
+describe('usePageChangeEffectNavigateLocation — DPA generator gating', () => {
+  it.each([
+    { loc: AppPath.Dpa, isDpaGeneratorEnabled: false, res: AppPath.NotFound },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpa),
+      isDpaGeneratorEnabled: false,
+      res: AppPath.NotFound,
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpaNew),
+      isDpaGeneratorEnabled: false,
+      res: AppPath.NotFound,
+    },
+    {
+      loc: AppPath.Dpa,
+      isDpaGeneratorEnabled: true,
+      res: getSettingsPath(SettingsPath.LegalDpa),
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpa),
+      isDpaGeneratorEnabled: true,
+      res: undefined,
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpaNew),
+      isDpaGeneratorEnabled: true,
+      res: undefined,
+    },
+  ])(
+    'with flag $isDpaGeneratorEnabled returns $res from $loc',
+    ({ loc, isDpaGeneratorEnabled, res }) => {
+      setupMockIsMatchingLocation(loc);
+      setupMockOnboardingStatus(OnboardingStatus.COMPLETED);
+      setupMockIsWorkspaceActivationStatusEqualsTo(false);
+      setupMockIsLogged(true);
+      setupMockIsOnAWorkspace(true);
+      setupMockUseQuery();
+      setupMockUseLocation(loc as AppPath);
+      setupMockState(
+        undefined,
+        undefined,
+        undefined,
+        { id: 'mock-workspace-id' },
+        true,
+        true,
+        false,
+        isDpaGeneratorEnabled,
+      );
+
+      expect(usePageChangeEffectNavigateLocation()).toEqual(res);
+    },
+  );
 });
