@@ -16902,3 +16902,7 @@ msgstr "ワークスペースが新しいデータモデルで更新されまし
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "ワークスペースは一時停止中です — データを保持するには再開してください"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Betty に招待されました"

@@ -16902,3 +16902,7 @@ msgstr "Không gian làm việc của bạn đã được cập nhật với mô
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Không gian làm việc của bạn đang bị tạm dừng — hãy kích hoạt lại để giữ dữ liệu của bạn"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Bạn đã được mời vào Betty"

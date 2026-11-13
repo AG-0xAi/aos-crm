@@ -16902,3 +16902,7 @@ msgstr "El vostre espai de treball s'ha actualitzat amb un nou model de dades. S
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "El teu espai de treball està en pausa: reactiva'l per conservar les teves dades"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "T'han convidat a Betty"

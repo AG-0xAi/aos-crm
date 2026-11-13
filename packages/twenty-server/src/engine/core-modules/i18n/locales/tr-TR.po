@@ -16902,3 +16902,7 @@ msgstr "Çalışma alanınız yeni bir veri modeli ile güncellendi. Lütfen say
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Çalışma alanınız duraklatıldı — verilerinizi korumak için yeniden etkinleştirin"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Betty'ye davet edildiniz"

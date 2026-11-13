@@ -16902,3 +16902,7 @@ msgstr "Ваш радни простор је ажуриран новим мод
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "Ваш простор за рад је паузиран — реактивирајте га да бисте задржали своје податке"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Позвани сте у Betty"

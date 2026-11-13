@@ -16902,3 +16902,7 @@ msgstr "Az ön munkaterülete frissítve lett egy új adattípussal. Kérjük, f
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "A munkaterületed szüneteltetve van — az adatok megőrzéséhez aktiváld újra"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Meghívták a Bettybe"

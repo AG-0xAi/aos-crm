@@ -16902,3 +16902,7 @@ msgstr "작업공간이 새로운 데이터 모델로 업데이트되었습니�
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "워크스페이스가 일시 중지되었습니다. 데이터를 유지하려면 다시 활성화하세요."
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "Betty에 초대되었습니다"

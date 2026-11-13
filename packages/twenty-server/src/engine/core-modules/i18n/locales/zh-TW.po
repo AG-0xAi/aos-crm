@@ -16902,3 +16902,7 @@ msgstr "您的工作區已更新了新數據模型。請刷新頁面。"
 #: src/engine/workspace-manager/workspace-cleaner/services/cleaner.workspace-service.ts
 msgid "Your workspace is paused — reactivate to keep your data"
 msgstr "您的工作區已暫停 — 請重新啟用以保留資料"
+
+#: src/engine/core-modules/sign-up-invitation/services/sign-up-invitation.service.ts
+msgid "You have been invited to Betty"
+msgstr "你已受邀加入 Betty"
