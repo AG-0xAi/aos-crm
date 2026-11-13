@@ -2,6 +2,7 @@ import {
   BETTY_LIMITS_TO_STATE,
   BETTY_USE_CASES,
 } from 'src/engine/api/mcp/catalog/betty-use-case-catalog.data';
+import { splitBettySearchWords } from 'src/engine/api/mcp/utils/normalize-betty-search-text.util';
 import { searchBettyUseCases } from 'src/engine/api/mcp/utils/search-betty-use-cases.util';
 
 const search = (
@@ -30,6 +31,15 @@ describe('searchBettyUseCases', () => {
     expect(results.some((useCase) => /lead/.test(text(useCase)))).toBe(true);
     expect(results.some((useCase) => /correo/.test(text(useCase)))).toBe(true);
     expect(results.some((useCase) => /tarea/.test(text(useCase)))).toBe(true);
+  });
+
+  it('ignores Spanish and English stop words in the query', () => {
+    expect(
+      splitBettySearchWords('los leads para el equipo de ventas and the tasks'),
+    ).toEqual(['leads', 'equipo', 'ventas', 'tasks']);
+    expect(search({ query: 'de los para the and' })).toEqual(
+      search({ query: '' }),
+    );
   });
 
   it('filters by connector, returning only cases that list it', () => {
