@@ -160,6 +160,15 @@ locals {
     # encrypted but not verifying RDS's certificate chain. Verifying it
     # would need a core change, out of this spec (AWS_DEPLOYMENT_PLAN.md).
     PG_SSL_ALLOW_SELF_SIGNED = "true"
+    # CRM-042: off by default, unchanged sign-up behaviour. Empty
+    # CAPTCHA_DRIVER makes CaptchaDriverFactory.getCurrentDriver()
+    # (captcha-driver.factory.ts) return null, so CaptchaGuard
+    # (captcha.guard.ts) never refuses a request and no key is read.
+    # CAPTCHA_SITE_KEY is public (Turnstile embeds it in client-side HTML),
+    # so it rides this plain block same as CAPTCHA_DRIVER; the secret key
+    # does not -- see app_secrets below.
+    CAPTCHA_DRIVER   = var.captcha_driver
+    CAPTCHA_SITE_KEY = var.captcha_site_key
   }
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through
@@ -200,6 +209,14 @@ locals {
     # read-signup-webhook-secret) is conditional the same way.
     var.signup_webhook_url != "" ? [
       { name = "SIGNUP_WEBHOOK_URL", valueFrom = aws_secretsmanager_secret.signup_webhook_url[0].arn },
+    ] : [],
+    # CRM-042: same reasoning as SIGNUP_WEBHOOK_URL above -- the secret
+    # itself only exists when var.captcha_secret_key is set (secrets.tf),
+    # so this stays [] rather than pointing at a secret that was never
+    # created. The execution role's read grant (iam.tf's
+    # read-captcha-secret) is conditional the same way.
+    var.captcha_secret_key != "" ? [
+      { name = "CAPTCHA_SECRET_KEY", valueFrom = aws_secretsmanager_secret.captcha_secret_key[0].arn },
     ] : []
   )
 }

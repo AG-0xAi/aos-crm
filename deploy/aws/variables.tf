@@ -478,6 +478,65 @@ variable "signup_webhook_url" {
   sensitive   = true
 }
 
+variable "captcha_driver" {
+  description = <<-EOT
+    CAPTCHA_DRIVER for the server (ecs.tf), CRM-042's anti-bot check on
+    sign-up, sign-in and the other endpoints captcha.guard.ts protects.
+    Empty (default) is what this stack runs today and keeps today's
+    sign-up behaviour unchanged: CaptchaDriverFactory.getCurrentDriver()
+    (captcha-driver.factory.ts) returns null for an empty driver and
+    CaptchaService.validate then short-circuits to { success: true }
+    without ever calling out, so no request is refused and no key is
+    read. "TURNSTILE" is the only value this stack accepts (Cloudflare
+    Turnstile; "GOOGLE_RECAPTCHA" is a valid upstream driver but not one
+    the founder has asked to wire). Turning it on needs a Turnstile site
+    from the founder (BETA_RUNBOOK.md, "Alta sin bots") and is a separate
+    step from applying this file.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "TURNSTILE"], var.captcha_driver)
+    error_message = "captcha_driver must be \"\" (off) or \"TURNSTILE\"."
+  }
+
+  validation {
+    condition     = var.captcha_driver == "" || (var.captcha_site_key != "" && var.captcha_secret_key != "")
+    error_message = "captcha_driver = \"TURNSTILE\" needs both captcha_site_key and captcha_secret_key set: CaptchaDriverFactory.createDriver() throws at startup otherwise (captcha-driver.factory.ts)."
+  }
+}
+
+variable "captcha_site_key" {
+  description = <<-EOT
+    CAPTCHA_SITE_KEY for the server (ecs.tf) and, through
+    client-config.service.ts's captcha.siteKey, the front end's widget.
+    Public by design -- Turnstile's own docs call the site key
+    embeddable in client-side HTML -- so it rides the plain environment,
+    not Secrets Manager. Empty (default) changes nothing while
+    var.captcha_driver stays empty.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "captcha_secret_key" {
+  description = <<-EOT
+    CAPTCHA_SECRET_KEY the server uses server-side to verify a Turnstile
+    token against Cloudflare's siteverify endpoint (turnstile.driver.ts).
+    Unlike captcha_site_key, this one authenticates the stack to
+    Cloudflare, so it is sensitive and, when set, lands in Secrets
+    Manager (secrets.tf's aos-crm/<environment>/captcha-secret-key) and
+    the server's `secrets` block (ecs.tf), never the plain environment --
+    same reasoning as var.signup_webhook_url (CRM-036). Empty (default)
+    creates no secret and no secret version (secrets.tf) and adds no
+    `secrets` entry (ecs.tf).
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "logic_function_type" {
   description = <<-EOT
     LOGIC_FUNCTION_TYPE for the server/worker tasks (ecs.tf). "DISABLED"

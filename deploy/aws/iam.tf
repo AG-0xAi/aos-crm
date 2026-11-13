@@ -96,6 +96,28 @@ resource "aws_iam_role_policy" "ecs_task_execution_signup_webhook_secret" {
   policy = data.aws_iam_policy_document.ecs_task_execution_signup_webhook_secret[0].json
 }
 
+# CRM-042: same reasoning as read-signup-webhook-secret above -- its own
+# resource so a `plan` that sets var.captcha_secret_key shows exactly one
+# new role-policy add, and the same two-step apply order (founder applies
+# this statement with -target, then the platform applies the rest with
+# TF_VAR_captcha_secret_key). Scoped to the exact ARN, never a wildcard.
+data "aws_iam_policy_document" "ecs_task_execution_captcha_secret" {
+  count = var.captcha_secret_key != "" ? 1 : 0
+
+  statement {
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.captcha_secret_key[0].arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_task_execution_captcha_secret" {
+  count  = var.captcha_secret_key != "" ? 1 : 0
+  name   = "read-captcha-secret"
+  role   = aws_iam_role.ecs_task_execution.id
+  policy = data.aws_iam_policy_document.ecs_task_execution_captcha_secret[0].json
+}
+
 resource "aws_iam_role" "ecs_task_server" {
   name                 = "aos-crm-${var.environment}-ecs-task-server"
   assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume_role.json

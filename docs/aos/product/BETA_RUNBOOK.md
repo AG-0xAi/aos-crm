@@ -792,3 +792,77 @@ ingeniería. Antes de poner `IS_DPA_GENERATOR_ENABLED=true` en cualquier entorno
 founder tiene que revisar y aprobar la plantilla completa para AOS Holding (incluida la lista de
 sub-procesadores de `subprocessors.json`, que hoy describe los proveedores de Twenty). Solo entonces
 se configuran `DPA_PROCESSOR_ADDRESS` y `DPA_PROCESSOR_CONTACT` y se enciende la variable.
+
+## 15. Alta sin bots (CRM-042) — apagado hasta que el founder dé las claves de Turnstile
+
+Pregunta del founder (07/11/2026): cómo mantener a los bots fuera del alta y de los formularios.
+Twenty ya trae el mecanismo (`CaptchaGuard`, `captcha.guard.ts`) protegiendo `signUp`,
+`signUpInWorkspace`, `signIn`, `checkUserExists`, el restablecimiento de contraseña y los dos pasos
+de OTP/2FA — cubre también el alta por invitación de §1 (CRM-016), porque esa invitación viaja como
+un campo más (`signUpInvitationToken`) de la misma mutación `signUp`, no por un camino aparte. El
+front ya pide el token al widget y lo manda en cada una de esas llamadas
+(`useSignInUp.ts`, `useReadCaptchaToken`). Lo único que faltaba era encenderlo en AWS; eso es lo que
+trae CRM-042, y **por defecto sigue apagado**: `captcha_driver = ""` hace que
+`CaptchaDriverFactory.getCurrentDriver()` devuelva `null` y `CaptchaGuard` nunca rechace nada, así
+que aplicar este cambio solo no mueve el alta de hoy ni un bit.
+
+### Lo que tiene que crear el founder
+
+1. En Cloudflare, un sitio de **Turnstile** para `app.<dominio>` y `*.<dominio>` (el alta ocurre en
+   el subdominio `app`, pero cada espacio vive en `<workspace>.<dominio>`, así que el widget necesita
+   cubrir ambos).
+2. De ese sitio, la **site key** (pública, va al HTML) y la **secret key** (autentica al servidor
+   contra Cloudflare — nunca al repo, ni a un ticket, ni a un chat, igual que la URL del webhook de
+   §10).
+
+### Encenderlo: el mismo orden en dos pasos que el webhook de §10
+
+La secret key vive en Secrets Manager (`aos-crm/<entorno>/captcha-secret-key`), no en el entorno en
+claro de la tarea — mismo motivo que `SIGNUP_WEBHOOK_URL`: una variable de entorno plana del task
+definition la lee cualquiera con permiso de `DescribeTaskDefinition`. Eso vuelve a añadir un cambio
+de IAM, así que:
+
+1. **El founder aplica el secreto y el cambio de IAM** — el único que este track toca: el statement
+   `read-captcha-secret` del rol de ejecución de ECS (`iam.tf`), que le da permiso de leer ese
+   secreto en concreto (ARN exacto, nunca un wildcard):
+   ```
+   terraform apply \
+     -target='aws_secretsmanager_secret.captcha_secret_key[0]' \
+     -target='aws_secretsmanager_secret_version.captcha_secret_key[0]' \
+     -target='aws_iam_role_policy.ecs_task_execution_captcha_secret[0]' \
+     -var='captcha_driver=TURNSTILE' -var='captcha_site_key=<site key>' \
+     -var='captcha_secret_key=<secret key>'
+   ```
+   Desde su propio PC (o la sesión de infraestructura, con su OK) — **nunca** `deploy-beta.yaml`:
+   ese workflow ya se niega a aplicar un `plan` que toque cualquier rol de ECS (§12).
+2. **La plataforma aplica el resto** con `captcha_driver`, `captcha_site_key` y `captcha_secret_key`
+   puestas — tres líneas en `terraform.tfvars` igual que las etapas de correo (§9), o pasadas como
+   `TF_VAR_captcha_*` desde el gestor de secretos al `plan` de `deploy-beta.yaml`. Esto hace aparecer
+   `CAPTCHA_DRIVER`/`CAPTCHA_SITE_KEY` en el entorno en claro y `CAPTCHA_SECRET_KEY` en el bloque
+   `secrets` del servidor (`ecs.tf`) — ningún cambio de IAM en este segundo paso, así que sí puede ir
+   por `deploy-beta.yaml`.
+
+Invertir el orden deja al servidor con el bloque `secrets` apuntando a un ARN que el rol de ejecución
+todavía no puede leer, y la tarea falla con `ResourceInitializationError` antes de arrancar — mismo
+motivo que el orden del §10 y del §11.
+
+### Encender la verificación de correo
+
+Sin relación de encendido con esto: la verificación de correo obligatoria es la etapa 3 de §9
+(`email_verification_required = true`), que espera a que SES salga del sandbox (etapa 2 de ese mismo
+apartado) y a que cada cuenta existente quede marcada como verificada en la base de datos. El
+anti-bot y la verificación de correo resuelven problemas distintos — bots creando cuentas vs.
+direcciones que nadie confirmó que existen — y se encienden por separado, en el orden que el founder
+decida.
+
+### Volver atrás
+
+Quitar las tres líneas de `terraform.tfvars` (o las tres `-var`) y aplicar. `captcha_driver` vuelve a
+`""`, `CaptchaGuard` deja de rechazar nada y el alta vuelve a comportarse como hoy sin reconstruir
+ninguna imagen. Igual que en §10, Secrets Manager no borra `captcha-secret-key` al momento: lo
+programa para borrar con un periodo de recuperación (7 a 30 días); volver a encenderlo con el mismo
+nombre dentro de ese periodo falla, así que hay que restaurarlo
+(`aws secretsmanager restore-secret --secret-id aos-crm/<entorno>/captcha-secret-key`) o esperar a
+que venza el periodo. Apagarlo también destruye el statement `read-captcha-secret` del rol de
+ejecución — un cambio de IAM igual que encenderlo, así que pasa otra vez por el founder y
+`deploy-beta.yaml` lo para por el mismo motivo que un primer encendido.
