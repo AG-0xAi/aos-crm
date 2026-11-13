@@ -12,6 +12,8 @@ import {
 } from 'test/integration/graphql/suites/workflow/utils/core-workflow.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import { waitForAllJobsToFinish } from 'test/integration/utils/wait-for-all-jobs-to-finish.util';
+import { isDefined } from 'twenty-shared/utils';
 
 import {
   SEED_APPLE_WORKSPACE_ID,
@@ -150,20 +152,19 @@ describe('cross-workspace isolation: workflows', () => {
         result.data?.runCoreWorkflowVersion as { workflowRunId: string } | null
       )?.workflowRunId;
 
-      // Either the mutation was refused outright, or it answered without
-      // creating a run attributed to Apple's version -- both are isolation;
-      // a 2xx that actually created the run is the leak.
-      if (runId) {
-        const runsAfterThisAttempt = await countRunsForVersion(
-          coreWorkflowVersionId,
-        );
+      // Refused unconditionally: the call errors, or it answers without a
+      // runId. A 2xx that actually hands back a runId is the leak, whether
+      // or not a run shows up under that id -- never a passing case.
+      expect(result.errors !== undefined || !isDefined(runId)).toBe(true);
 
-        expect(runsAfterThisAttempt).toBe(runsBefore);
-      } else {
-        expect(result.errors).toBeDefined();
-      }
+      // Draining before counting catches a run that only materializes once
+      // the queue processes it, not just one created synchronously by the
+      // mutation itself.
+      await waitForAllJobsToFinish();
+      expect(await countRunsForVersion(coreWorkflowVersionId)).toBe(runsBefore);
     }
 
+    await waitForAllJobsToFinish();
     expect(await countRunsForVersion(coreWorkflowVersionId)).toBe(runsBefore);
   });
 
@@ -197,15 +198,74 @@ describe('cross-workspace isolation: workflows', () => {
     expect(stillActive.status).toBe('ACTIVE');
   });
 
-  it("the webhook trigger addressed to YCombinator's workspace id does not run Apple's workflow, and Apple's own workspace id does", async () => {
+  it("YCombinator's credentials cannot update Apple's workflow trigger or re-activate its version through GraphQL, which stay unchanged", async () => {
+    const before = await findCoreWorkflowVersion({ coreWorkflowVersionId });
+
+    for (const token of [ycAccessToken, ycApiKeyToken]) {
+      const updated = await rawCoreWorkflowRequest(
+        `
+          mutation ($input: UpdateCoreWorkflowVersionTriggerInput!) {
+            updateCoreWorkflowVersionTrigger(input: $input) { trigger }
+          }
+        `,
+        {
+          input: {
+            coreWorkflowVersionId,
+            trigger: {
+              name: 'tampered by YCombinator',
+              type: 'WEBHOOK',
+              settings: {
+                outputSchema: {},
+                httpMethod: 'POST',
+                authentication: null,
+              },
+              nextStepIds: [],
+              position: { x: 0, y: 0 },
+            },
+          },
+        },
+        token,
+      );
+
+      expect(updated.errors).toBeDefined();
+
+      const activated = await rawCoreWorkflowRequest(
+        `
+          mutation ($id: UUID!) { activateCoreWorkflowVersion(coreWorkflowVersionId: $id) }
+        `,
+        { id: coreWorkflowVersionId },
+        token,
+      );
+
+      expect(activated.errors).toBeDefined();
+    }
+
+    const after = await findCoreWorkflowVersion({ coreWorkflowVersionId });
+
+    expect(after.trigger).toEqual(before.trigger);
+    expect(after.status).toBe(before.status);
+  });
+
+  it("the webhook trigger addressed to YCombinator's workspace id does not run Apple's workflow, on GET or POST, and Apple's own workspace id does", async () => {
     const runsBefore = await countRunsForVersion(coreWorkflowVersionId);
 
-    const wrongWorkspace = await request(`http://localhost:${APP_PORT}`).get(
+    const wrongWorkspaceGet = await request(`http://localhost:${APP_PORT}`).get(
       `/webhooks/workflows/${SEED_YCOMBINATOR_WORKSPACE_ID}/${coreWorkflowId}`,
     );
 
-    expect(wrongWorkspace.status).toBeGreaterThanOrEqual(400);
-    expect(wrongWorkspace.status).toBeLessThan(500);
+    expect(wrongWorkspaceGet.status).toBeGreaterThanOrEqual(400);
+    expect(wrongWorkspaceGet.status).toBeLessThan(500);
+
+    const wrongWorkspacePost = await request(`http://localhost:${APP_PORT}`)
+      .post(
+        `/webhooks/workflows/${SEED_YCOMBINATOR_WORKSPACE_ID}/${coreWorkflowId}`,
+      )
+      .send({});
+
+    expect(wrongWorkspacePost.status).toBeGreaterThanOrEqual(400);
+    expect(wrongWorkspacePost.status).toBeLessThan(500);
+
+    await waitForAllJobsToFinish();
     expect(await countRunsForVersion(coreWorkflowVersionId)).toBe(runsBefore);
 
     const correctWorkspace = await request(`http://localhost:${APP_PORT}`).get(
