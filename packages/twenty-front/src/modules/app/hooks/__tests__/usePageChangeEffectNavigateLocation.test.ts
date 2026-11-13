@@ -576,3 +576,57 @@ describe('usePageChangeEffectNavigateLocation — suspended workspace settings p
     expect(usePageChangeEffectNavigateLocation()).toEqual(res);
   });
 });
+
+describe('usePageChangeEffectNavigateLocation — DPA generator gating', () => {
+  it.each([
+    { loc: AppPath.Dpa, isDpaGeneratorEnabled: false, res: AppPath.NotFound },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpa),
+      isDpaGeneratorEnabled: false,
+      res: AppPath.NotFound,
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpaNew),
+      isDpaGeneratorEnabled: false,
+      res: AppPath.NotFound,
+    },
+    {
+      loc: AppPath.Dpa,
+      isDpaGeneratorEnabled: true,
+      res: getSettingsPath(SettingsPath.LegalDpa),
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpa),
+      isDpaGeneratorEnabled: true,
+      res: undefined,
+    },
+    {
+      loc: getSettingsPath(SettingsPath.LegalDpaNew),
+      isDpaGeneratorEnabled: true,
+      res: undefined,
+    },
+  ])(
+    'with flag $isDpaGeneratorEnabled returns $res from $loc',
+    ({ loc, isDpaGeneratorEnabled, res }) => {
+      setupMockIsMatchingLocation(loc);
+      setupMockOnboardingStatus(OnboardingStatus.COMPLETED);
+      setupMockIsWorkspaceActivationStatusEqualsTo(false);
+      setupMockIsLogged(true);
+      setupMockIsOnAWorkspace(true);
+      setupMockUseQuery();
+      setupMockUseLocation(loc as AppPath);
+      setupMockState(
+        undefined,
+        undefined,
+        undefined,
+        { id: 'mock-workspace-id' },
+        true,
+        true,
+        false,
+        isDpaGeneratorEnabled,
+      );
+
+      expect(usePageChangeEffectNavigateLocation()).toEqual(res);
+    },
+  );
+});
