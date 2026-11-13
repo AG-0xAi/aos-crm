@@ -126,6 +126,19 @@ describe('buildMcpServerInstructions', () => {
     expect(instructions).toContain('workflow-building — Build automations');
   });
 
+  it('should name betty-guia and the greeting trigger (R3)', () => {
+    const instructions = buildMcpServerInstructions({
+      objectNames: 'companies',
+      actionToolNames: ['send_email'],
+      isDirectMode: false,
+    });
+
+    expect(instructions).toContain('betty-guia');
+    expect(instructions).toContain(
+      'greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature',
+    );
+  });
+
   it('should point direct mode at the listed tools instead of the meta-tools', () => {
     const directInstructions = buildMcpServerInstructions({
       objectNames: 'companies',
