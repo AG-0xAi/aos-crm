@@ -109,6 +109,23 @@ describe('buildMcpServerInstructions', () => {
     expect(instructions).not.toContain('Available skills');
   });
 
+  it('should render each skill name with its description', () => {
+    const instructions = buildMcpServerInstructions({
+      objectNames: 'companies',
+      actionToolNames: ['send_email'],
+      skills: [
+        { name: 'data-manipulation', description: 'Find and update records' },
+        { name: 'workflow-building', description: 'Build automations' },
+      ],
+      isDirectMode: false,
+    });
+
+    expect(instructions).toContain(
+      'data-manipulation — Find and update records',
+    );
+    expect(instructions).toContain('workflow-building — Build automations');
+  });
+
   it('should point direct mode at the listed tools instead of the meta-tools', () => {
     const directInstructions = buildMcpServerInstructions({
       objectNames: 'companies',
