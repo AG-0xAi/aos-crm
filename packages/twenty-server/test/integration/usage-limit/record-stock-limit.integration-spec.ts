@@ -20,6 +20,7 @@ import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder
 
 const SCHEMA_NAME = getWorkspaceSchemaName(SEED_APPLE_WORKSPACE_ID);
 const HEADROOM = 2;
+const STATS_QUIET_WINDOW_MS = 12_000;
 const STATS_FLUSH_TIMEOUT_MS = 30_000;
 
 describe('Record stock limit', () => {
@@ -97,19 +98,21 @@ describe('Record stock limit', () => {
   };
 
   const waitForStatsToSettle = async (): Promise<number> => {
-    let previous = await countRecords();
+    let current = await countRecords();
+    let stableSince = Date.now();
 
-    for (;;) {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
+    while (Date.now() - stableSince < STATS_QUIET_WINDOW_MS) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
 
-      const current = await countRecords();
+      const next = await countRecords();
 
-      if (current === previous) {
-        return current;
+      if (next !== current) {
+        current = next;
+        stableSince = Date.now();
       }
-
-      previous = current;
     }
+
+    return current;
   };
 
   const dropKeys = async (pattern: string) => {
@@ -177,7 +180,7 @@ describe('Record stock limit', () => {
 
     await refreshUsageLimitsCache();
     await dropStockCounter();
-  }, STATS_FLUSH_TIMEOUT_MS + 5_000);
+  }, STATS_QUIET_WINDOW_MS + STATS_FLUSH_TIMEOUT_MS);
 
   afterEach(async () => {
     if (createdRocketIds.length > 0) {
