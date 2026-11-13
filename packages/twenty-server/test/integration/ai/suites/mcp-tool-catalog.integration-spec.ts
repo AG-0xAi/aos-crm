@@ -109,6 +109,7 @@ const META_MODE_TOOL_NAMES = [
   'list_object_metadata_names',
   'list_skills',
   'load_skills',
+  'search_use_cases',
 ];
 
 const DIRECT_MODE_PATH = '/mcp?mode=direct';
