@@ -319,7 +319,7 @@ describe('MCP tool catalog (integration)', () => {
       expect(toolNames).toContain('start_betty_guide');
     });
 
-    it('returns the betty-guia guide content when called', async () => {
+    it('returns firstMessage and guideSummary when called', async () => {
       const result = await callMcpTool(adminApiKeyToken, 'start_betty_guide', {
         name: 'Andrés',
       });
@@ -327,12 +327,14 @@ describe('MCP tool catalog (integration)', () => {
       expect(result.isError).toBe(false);
 
       const output = JSON.parse(result.content[0].text) as {
-        guide: string;
+        firstMessage: string;
+        guideSummary: string;
         profileNote: string | null;
         nextStep: string;
       };
 
-      expect(output.guide).toContain('Conóceme');
+      expect(output.firstMessage).toContain('Andrés');
+      expect(output.guideSummary).toContain('search_use_cases');
       expect(output).toHaveProperty('profileNote');
       expect(output.profileNote).toBeNull();
       expect(output.nextStep.length).toBeGreaterThan(0);

@@ -406,8 +406,15 @@ El disparador vive ahora en la propia herramienta, no solo en el texto de las in
 asistente la llame sin que se lo pidan por su nombre. Las instrucciones del servidor repiten el
 mismo disparador en sus primeras líneas, antes del resto del mapa de herramientas, para que un
 cliente que pondera poco el campo `instructions` lo vea de todos modos. `start_betty_guide`
-devuelve en una sola llamada el contenido de la skill `betty-guia` y, si existe, la nota de perfil
-de la persona (ver «Qué guarda» más abajo) — ya no hace falta el salto `list_skills`/`load_skills`.
+devuelve en una sola llamada `firstMessage` (el saludo con la primera pregunta de Conóceme, listo
+para enviarse como respuesta completa y sin menús), `guideSummary` (guía corta de unos 1 200
+caracteres, no la skill entera), `fullGuide` (una línea que remite a `load_skills` con `betty-guia`
+si hace falta el detalle) y, si existe, la nota de perfil de la persona (ver «Qué guarda» más
+abajo). Con nota de perfil, `firstMessage` saluda, cita la primera línea de la nota y pregunta si
+sigue siendo así. La descripción de la herramienta y `nextStep` piden responder solo con
+`firstMessage`, traducido si la persona escribió en otro idioma, sin listar opciones.
+El servidor anuncia sus iconos en `initialize` con los PNG primero (512x512 y 180x180) y el SVG al
+final: ChatGPT no pinta iconos SVG, así que muestra el PNG. Solo se anuncian por https.
 Esa misma skill sigue apareciendo en `prompts/list` con el título «Conóceme» para invocarla a mano.
 
 ### Qué hace la guía
