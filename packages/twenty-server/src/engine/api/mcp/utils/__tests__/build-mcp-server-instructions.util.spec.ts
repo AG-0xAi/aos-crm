@@ -1,5 +1,6 @@
 import { LIST_OBJECT_METADATA_NAMES_TOOL_NAME } from 'src/engine/api/mcp/tools/list-object-metadata-names.tool';
 import { LIST_SKILLS_TOOL_NAME } from 'src/engine/api/mcp/tools/list-skills.tool';
+import { START_BETTY_GUIDE_TOOL_NAME } from 'src/engine/api/mcp/tools/start-betty-guide.tool';
 import { buildMcpServerInstructions } from 'src/engine/api/mcp/utils/build-mcp-server-instructions.util';
 import {
   EXECUTE_TOOL_TOOL_NAME,
@@ -76,6 +77,7 @@ describe('buildMcpServerInstructions', () => {
       LIST_OBJECT_METADATA_NAMES_TOOL_NAME,
       LIST_SKILLS_TOOL_NAME,
       GET_TOOL_CATALOG_TOOL_NAME,
+      START_BETTY_GUIDE_TOOL_NAME,
     ]) {
       expect(instructions).toContain(toolName);
     }
@@ -137,6 +139,23 @@ describe('buildMcpServerInstructions', () => {
     expect(instructions).toContain(
       'greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature',
     );
+  });
+
+  it('should put the start_betty_guide greeting trigger in the first lines, ahead of the tool map', () => {
+    const instructions = buildMcpServerInstructions({
+      objectNames: 'companies',
+      actionToolNames: ['send_email'],
+      isDirectMode: false,
+    });
+
+    const lines = instructions.split('\n');
+    const triggerLineIndex = lines.findIndex((line) =>
+      line.includes('start_betty_guide'),
+    );
+
+    expect(triggerLineIndex).toBeGreaterThanOrEqual(0);
+    expect(triggerLineIndex).toBeLessThan(5);
+    expect(lines[triggerLineIndex]).toContain('hola, hello, hi');
   });
 
   it('should point direct mode at the listed tools instead of the meta-tools', () => {

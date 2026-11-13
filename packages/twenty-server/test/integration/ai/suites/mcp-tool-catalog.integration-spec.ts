@@ -110,6 +110,7 @@ const META_MODE_TOOL_NAMES = [
   'list_skills',
   'load_skills',
   'search_use_cases',
+  'start_betty_guide',
 ];
 
 const DIRECT_MODE_PATH = '/mcp?mode=direct';
@@ -298,6 +299,43 @@ describe('MCP tool catalog (integration)', () => {
 
       // Proves the empty ROLE category is gating rather than a broken catalog
       expect(catalog[ToolCategory.DATABASE_CRUD]?.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('start_betty_guide', () => {
+    it('is listed in direct mode tools/list', async () => {
+      const toolNames = (
+        await listMcpTools(adminApiKeyToken, DIRECT_MODE_PATH)
+      ).map((tool) => tool.name);
+
+      expect(toolNames).toContain('start_betty_guide');
+    });
+
+    it('is listed in plain tools/list, not only behind get_tool_catalog', async () => {
+      const toolNames = (await listMcpTools(adminApiKeyToken, '/mcp')).map(
+        (tool) => tool.name,
+      );
+
+      expect(toolNames).toContain('start_betty_guide');
+    });
+
+    it('returns the betty-guia guide content when called', async () => {
+      const result = await callMcpTool(adminApiKeyToken, 'start_betty_guide', {
+        name: 'Andrés',
+      });
+
+      expect(result.isError).toBe(false);
+
+      const output = JSON.parse(result.content[0].text) as {
+        guide: string;
+        profileNote: string | null;
+        nextStep: string;
+      };
+
+      expect(output.guide).toContain('Conóceme');
+      expect(output).toHaveProperty('profileNote');
+      expect(output.profileNote).toBeNull();
+      expect(output.nextStep.length).toBeGreaterThan(0);
     });
   });
 
