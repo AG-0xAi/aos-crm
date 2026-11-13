@@ -103,20 +103,21 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
     }
   });
 
-  it("REST: YCombinator's credentials cannot find Apple's person by filter on the marker", async () => {
+  it("REST: YCombinator's credentials cannot find Apple's person by filter on its id", async () => {
     const own = await makeRestApiRequest({
       method: 'get',
-      path: `/people?filter=lastName[eq]:${encodeURIComponent(PERSON_LAST_NAME)}`,
+      path: `/people?filter=id[eq]:${personId}`,
     });
 
     expect(own.status).toBe(200);
     expect(own.body.data.people).toHaveLength(1);
     expect(own.body.data.people[0].id).toBe(personId);
+    expect(JSON.stringify(own.body)).toContain(PERSON_LAST_NAME);
 
     for (const bearer of [ycAccessToken, ycApiKeyToken]) {
       const foreign = await makeRestApiRequest({
         method: 'get',
-        path: `/people?filter=lastName[eq]:${encodeURIComponent(PERSON_LAST_NAME)}`,
+        path: `/people?filter=id[eq]:${personId}`,
         bearer,
       });
 
