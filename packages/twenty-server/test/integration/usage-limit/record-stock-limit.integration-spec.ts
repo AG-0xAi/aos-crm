@@ -2,7 +2,6 @@ import { createManyOperationFactory } from 'test/integration/graphql/utils/creat
 import { deleteManyOperationFactory } from 'test/integration/graphql/utils/delete-many-operation-factory.util';
 import { destroyManyOperationFactory } from 'test/integration/graphql/utils/destroy-many-operation-factory.util';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
-import { expectEventually } from 'test/integration/utils/expect-eventually.util';
 import { getAppProviderByClassName } from 'test/integration/utils/get-app-provider-by-class-name.util';
 import { getCoreRepository } from 'test/integration/utils/get-core-repository.util';
 
@@ -97,14 +96,6 @@ describe('Record stock limit', () => {
     return Number(row.quantity);
   };
 
-  const waitForRecordCount = (expected: number) =>
-    expectEventually(
-      async () => {
-        expect(await countRecords()).toBe(expected);
-      },
-      { timeoutMs: STATS_FLUSH_TIMEOUT_MS },
-    );
-
   const waitForStatsToSettle = async (): Promise<number> => {
     let previous = await countRecords();
 
@@ -148,15 +139,22 @@ describe('Record stock limit', () => {
     expect(response.body.errors).toBeUndefined();
   };
 
+  const deleteRecordLimits = () =>
+    usageLimitRepository.delete({
+      workspaceId: SEED_APPLE_WORKSPACE_ID,
+      resourceType: UsageResourceType.RECORD,
+    });
+
   beforeAll(async () => {
     usageLimitRepository =
       getCoreRepository<UsageLimitEntity>(UsageLimitEntity);
     redis = await createClient({ url: process.env.REDIS_URL }).connect();
+  });
 
-    await usageLimitRepository.delete({
-      workspaceId: SEED_APPLE_WORKSPACE_ID,
-      resourceType: UsageResourceType.RECORD,
-    });
+  beforeEach(async () => {
+    await deleteRecordLimits();
+    await refreshUsageLimitsCache();
+
     baselineRecordCount = await waitForStatsToSettle();
 
     const [usageLimit] = await usageLimitRepository.save([
@@ -178,10 +176,6 @@ describe('Record stock limit', () => {
     usageLimitId = usageLimit.id;
 
     await refreshUsageLimitsCache();
-  });
-
-  beforeEach(async () => {
-    await waitForRecordCount(baselineRecordCount);
     await dropStockCounter();
   }, STATS_FLUSH_TIMEOUT_MS + 5_000);
 
