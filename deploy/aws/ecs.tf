@@ -160,16 +160,20 @@ locals {
     # encrypted but not verifying RDS's certificate chain. Verifying it
     # would need a core change, out of this spec (AWS_DEPLOYMENT_PLAN.md).
     PG_SSL_ALLOW_SELF_SIGNED = "true"
-    # CRM-042: off by default, unchanged sign-up behaviour. Empty
-    # CAPTCHA_DRIVER makes CaptchaDriverFactory.getCurrentDriver()
-    # (captcha-driver.factory.ts) return null, so CaptchaGuard
-    # (captcha.guard.ts) never refuses a request and no key is read.
-    # CAPTCHA_SITE_KEY is public (Turnstile embeds it in client-side HTML),
-    # so it rides this plain block same as CAPTCHA_DRIVER; the secret key
-    # does not -- see app_secrets below.
+  }
+
+  # CRM-042: off by default, unchanged sign-up behaviour. The variables are
+  # left out of the environment entirely while captcha_driver is empty:
+  # config-variables.ts validates CAPTCHA_DRIVER as an enum and rejects an
+  # empty string at boot, so CAPTCHA_DRIVER="" stops the server from
+  # starting (seen on the 13/11 beta apply). Unset, the factory returns no
+  # driver and CaptchaGuard never refuses a request. CAPTCHA_SITE_KEY is
+  # public (Turnstile embeds it in client-side HTML); the secret key rides
+  # app_secrets below.
+  captcha_env = var.captcha_driver != "" ? {
     CAPTCHA_DRIVER   = var.captcha_driver
     CAPTCHA_SITE_KEY = var.captcha_site_key
-  }
+  } : {}
 
   # The ECS "secrets" block resolves each entry's `valueFrom` through
   # ecs_task_execution (iam.tf) at container start; none of these ever sit
@@ -258,7 +262,7 @@ resource "aws_ecs_task_definition" "migrate" {
       essential = true
       command   = ["true"]
       environment = [
-        for k, v in merge(local.privacy_env, {
+        for k, v in merge(local.privacy_env, local.captcha_env, {
           DISABLE_DB_MIGRATIONS          = "false"
           DISABLE_CRON_JOBS_REGISTRATION = "false"
         }) : { name = k, value = v }
@@ -300,7 +304,7 @@ resource "aws_ecs_task_definition" "server" {
       # the server service must never race it or redo an 8.6 min boot on
       # every replica.
       environment = [
-        for k, v in merge(local.privacy_env, {
+        for k, v in merge(local.privacy_env, local.captcha_env, {
           NODE_PORT                      = tostring(var.container_port)
           DISABLE_DB_MIGRATIONS          = "true"
           DISABLE_CRON_JOBS_REGISTRATION = "true"
@@ -335,7 +339,7 @@ resource "aws_ecs_task_definition" "worker" {
       essential = true
       command   = ["yarn", "worker:prod"]
       environment = [
-        for k, v in merge(local.privacy_env, {
+        for k, v in merge(local.privacy_env, local.captcha_env, {
           DISABLE_DB_MIGRATIONS          = "true"
           DISABLE_CRON_JOBS_REGISTRATION = "true"
         }) : { name = k, value = v }
