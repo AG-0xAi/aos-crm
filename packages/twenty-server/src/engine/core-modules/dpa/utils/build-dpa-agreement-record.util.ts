@@ -1,4 +1,4 @@
-import { getDpaRegionConfig } from 'src/engine/core-modules/dpa/config/dpa-region-config.constant';
+import { DPA_PROCESSOR_ENTITY_NAME } from 'src/engine/core-modules/dpa/config/dpa-region-config.constant';
 import { DPA_TEMPLATE_VERSION } from 'src/engine/core-modules/dpa/constants/dpa-template-version.constant';
 import { type DpaAgreementEntity } from 'src/engine/core-modules/dpa/entities/dpa-agreement.entity';
 import { type DpaAgreementType } from 'src/engine/core-modules/dpa/enums/dpa-agreement-type.enum';
@@ -21,14 +21,12 @@ type BuildDpaAgreementRecordArgs = {
 export const buildDpaAgreementRecord = (
   args: BuildDpaAgreementRecordArgs,
 ): Partial<DpaAgreementEntity> => {
-  const config = getDpaRegionConfig(args.region);
-
   return {
     workspaceId: args.workspaceId,
     type: args.type,
     templateVersion: DPA_TEMPLATE_VERSION,
     region: args.region,
-    processorEntity: config.values.PROCESSOR_ENTITY,
+    processorEntity: DPA_PROCESSOR_ENTITY_NAME,
     acceptedAt: args.acceptedAt,
     acceptedByUserId: args.acceptedByUserId,
     acceptedByEmail: args.acceptedByEmail,

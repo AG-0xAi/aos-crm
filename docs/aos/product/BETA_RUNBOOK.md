@@ -765,3 +765,30 @@ siempre un humano en su propio PC quien lo dispare.
   operador.
 - **Copias de seguridad** del volumen de PostgreSQL: fuera de este track. Antes de que los amigos
   metan datos de verdad, es la siguiente pregunta que hay que resolver.
+
+## 14. El generador de DPA (Legal) — apagado hasta revisión del abogado
+
+Settings › Legal (`SettingsPath.LegalDpa`, `packages/twenty-front/src/pages/settings/legal/`) ofrece
+un generador de Data Processing Agreement heredado de Twenty. El documento que produce —
+`packages/twenty-server/src/engine/core-modules/dpa/constants/dpa-template.constant.ts` y
+`subprocessors.json` — nombra a un tercero como Responsable del tratamiento: `Twenty.com PBC` y su
+filial `Twenty.com SAS`, con DPO real de Twenty (Stéphanie Joly, `privacy@twenty.com`), un firmante
+pre-firmado (Félix Malfait, CEO de Twenty) y enlaces a `trust.twenty.com`. No es neutral: es el
+contrato de Twenty, no el de AOS Holding.
+
+Por eso está apagado por defecto detrás de `IS_DPA_GENERATOR_ENABLED` (`false` si no se configura):
+sin esa variable en `true`, Settings › Legal no tiene ruta ni entrada, y las queries/mutación de
+GraphQL (`dpaPreview`, `generateSignedDpa`) devuelven error. El nombre del Processor está fijado a
+`AOS Holding`; su dirección (`DPA_PROCESSOR_ADDRESS`) y su contacto de privacidad
+(`DPA_PROCESSOR_CONTACT`) salen de configuración, vacíos por defecto, y el generador se niega a
+producir cualquier documento mientras falten.
+
+**Eso no basta para encender la función.** Configurar esas dos variables NO corrige el resto de la
+plantilla: el cuerpo del contrato (encabezados, Anexos A/B/C, cláusulas de transferencia
+internacional, "Government and Law Enforcement Requests", etc.) sigue nombrando literalmente a
+"Twenty", "Twenty PBC", "Twenty SAS", `privacy@twenty.com` y `trust.twenty.com` en decenas de sitios
+que no son campos de fusión — no se tocó ese texto porque reescribir una DPA es trabajo legal, no de
+ingeniería. Antes de poner `IS_DPA_GENERATOR_ENABLED=true` en cualquier entorno, el abogado del
+founder tiene que revisar y aprobar la plantilla completa para AOS Holding (incluida la lista de
+sub-procesadores de `subprocessors.json`, que hoy describe los proveedores de Twenty). Solo entonces
+se configuran `DPA_PROCESSOR_ADDRESS` y `DPA_PROCESSOR_CONTACT` y se enciende la variable.
