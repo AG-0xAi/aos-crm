@@ -5,7 +5,10 @@ import { deleteLogicFunction } from 'test/integration/metadata/suites/logic-func
 import { executeLogicFunction } from 'test/integration/metadata/suites/logic-function/utils/execute-logic-function.util';
 import { findOneLogicFunction } from 'test/integration/metadata/suites/logic-function/utils/find-one-logic-function.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 
 // CRM-038: CODE steps run through a logic function (LOGIC_FUNCTION_TYPE=LOCAL
 // in .env.test, so it is reachable here, not disabled as in a bare-bones
@@ -34,6 +37,8 @@ describe('cross-workspace isolation: CODE steps (logic functions)', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await deleteLogicFunction({
       expectToFail: false,
       input: { id: logicFunctionId },
