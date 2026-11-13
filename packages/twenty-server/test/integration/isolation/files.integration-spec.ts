@@ -7,6 +7,7 @@ import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graph
 import { uploadFileWithDirectUpload } from 'test/integration/graphql/utils/upload-file-with-direct-upload.util';
 import { makeMetadataApiRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import { updateFeatureFlag } from 'test/integration/metadata/suites/utils/update-feature-flag.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import {
   generateYCombinatorAdminApiKeyToken,
@@ -298,6 +299,11 @@ describe('cross-workspace isolation: files', () => {
       );
 
       expect(foreign.body.data?.attachment ?? null).toBeNull();
+      expectNoLeak(foreign.body, {
+        id: attachmentId,
+        name: 'isolation-attachment',
+        marker: MARKER,
+      });
     }
   });
 

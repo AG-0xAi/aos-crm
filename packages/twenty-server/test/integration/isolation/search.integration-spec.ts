@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import gql from 'graphql-tag';
 import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graphql-api-request.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
 import {
   generateYCombinatorAdminApiKeyToken,
@@ -172,6 +173,14 @@ describe('cross-workspace isolation: search', () => {
       const foreignHits = await searchForOrThrow(MARKER, token);
 
       expect(foreignHits).toEqual([]);
+
+      for (const [id, name] of [
+        [companyId, COMPANY_NAME],
+        [personId, PERSON_LAST_NAME],
+        [noteId, NOTE_TITLE],
+      ]) {
+        expectNoLeak(foreignHits, { id, name, marker: MARKER });
+      }
     }
   });
 });
