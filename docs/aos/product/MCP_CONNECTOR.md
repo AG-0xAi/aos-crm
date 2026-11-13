@@ -392,12 +392,23 @@ workspace, aunque comparta el mismo despliegue. Lo prueba
 
 ### Cómo arranca
 
-La persona abre una conversación nueva en su ChatGPT o Claude con el conector de Betty activo y
-escribe algo como «Hola Betty, soy Andrés» (o se presenta, pregunta qué puede hacer Betty, o
-describe un problema sin nombrar una función concreta). Las instrucciones del servidor le dicen al
-asistente que, ante cualquiera de esos cuatro disparadores, cargue la skill estándar `betty-guia`
-con `load_skills`. Esa misma skill aparece en `prompts/list` con el título «Conóceme», así que
-también se puede invocar a mano desde el menú `/` del cliente (CRM-040).
+En **ChatGPT**, la persona abre una conversación nueva con el conector de Betty activo y escribe
+algo como «Hola @Betty, soy Andrés» (o se presenta, pregunta qué puede hacer Betty, o describe un
+problema sin nombrar una función concreta). ChatGPT solo enruta el saludo al conector cuando la
+persona menciona `@Betty` explícitamente — sin esa mención, lo trata como charla y nunca llama a
+ninguna herramienta.
+
+En **Claude**, basta con invocar el prompt «Conóceme» desde el menú `/` del cliente (CRM-040); no
+necesita la mención porque la herramienta ya está en su lista.
+
+El disparador vive ahora en la propia herramienta, no solo en el texto de las instrucciones:
+`tools/list` ofrece `start_betty_guide`, de solo lectura, con una descripción escrita para que el
+asistente la llame sin que se lo pidan por su nombre. Las instrucciones del servidor repiten el
+mismo disparador en sus primeras líneas, antes del resto del mapa de herramientas, para que un
+cliente que pondera poco el campo `instructions` lo vea de todos modos. `start_betty_guide`
+devuelve en una sola llamada el contenido de la skill `betty-guia` y, si existe, la nota de perfil
+de la persona (ver «Qué guarda» más abajo) — ya no hace falta el salto `list_skills`/`load_skills`.
+Esa misma skill sigue apareciendo en `prompts/list` con el título «Conóceme» para invocarla a mano.
 
 ### Qué hace la guía
 
@@ -425,4 +436,7 @@ reescribe esa misma nota en vez de crear una segunda.
 ### Workspaces creados antes de este track
 
 El comando `upgrade:2-51:add-betty-guia-skill` añade la skill a los workspaces que no la tenían,
-sin duplicarla si ya existe (segunda corrida: no-op).
+sin duplicarla si ya existe (segunda corrida: no-op). `upgrade:2-51:update-betty-guia-skill-content`
+reescribe el contenido en los workspaces que ya la tenían de antes de CRM-047, para que dejen de
+pedirle al asistente que busque la nota de perfil por su cuenta; también es no-op si el contenido ya
+coincide con el catálogo.

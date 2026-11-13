@@ -1964,9 +1964,9 @@ Guía una conversación corta para entender el trabajo y el negocio de la person
 
 ## Antes de empezar
 
-Busca primero una nota titulada «Mi perfil de trabajo con Betty» en el espacio. Si existe, retómala en vez de empezar de cero: resume en una frase lo que ya sabes y confirma si sigue vigente o cambió algo, en lugar de repetir todas las preguntas.
+start_betty_guide ya te devolvió, junto con esta guía, el contenido de la nota «Mi perfil de trabajo con Betty» si existe en el espacio (campo profileNote). Si vino con contenido, retómalo en vez de empezar de cero: resume en una frase lo que ya sabes y confirma si sigue vigente o cambió algo, en lugar de repetir todas las preguntas.
 
-Si no existe, empieza la conversación.
+Si profileNote vino vacío, empieza la conversación.
 
 ## Cómo preguntar
 

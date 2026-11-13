@@ -30,6 +30,10 @@ import {
   createSearchUseCasesTool,
   SEARCH_USE_CASES_TOOL_NAME,
 } from 'src/engine/api/mcp/tools/search-use-cases.tool';
+import {
+  createStartBettyGuideTool,
+  START_BETTY_GUIDE_TOOL_NAME,
+} from 'src/engine/api/mcp/tools/start-betty-guide.tool';
 import { type McpAnnotatedTool } from 'src/engine/api/mcp/types/mcp-annotated-tool.type';
 import { type McpCoreQueryContext } from 'src/engine/api/mcp/types/mcp-core-query-context.type';
 import { type McpInitializeResult } from 'src/engine/api/mcp/types/mcp-initialize-result.type';
@@ -79,6 +83,7 @@ import {
 } from 'src/engine/twenty-orm/types/role-permission-config.type';
 import { buildAgentRoleIdsBySource } from 'src/engine/twenty-orm/utils/build-agent-role-ids-by-source.util';
 import { buildUserRoleIdsBySource } from 'src/engine/twenty-orm/utils/build-user-role-ids-by-source.util';
+import { WorkspaceOrmManager } from 'src/engine/twenty-orm/workspace-orm.manager';
 import { WorkspaceManyOrAllFlatEntityMapsCacheService } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.service';
 import { SkillService } from 'src/engine/metadata-modules/skill/skill.service';
 import { UserRoleService } from 'src/engine/metadata-modules/user-role/user-role.service';
@@ -119,6 +124,7 @@ export class McpProtocolService {
     private readonly flatEntityMapsCacheService: WorkspaceManyOrAllFlatEntityMapsCacheService,
     private readonly workspaceCacheService: WorkspaceCacheService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
+    private readonly workspaceOrmManager: WorkspaceOrmManager,
   ) {}
 
   private async handleInitialize(
@@ -363,6 +369,15 @@ export class McpProtocolService {
       },
       [SEARCH_USE_CASES_TOOL_NAME]: {
         ...createSearchUseCasesTool(),
+        annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
+      },
+      [START_BETTY_GUIDE_TOOL_NAME]: {
+        ...createStartBettyGuideTool(
+          this.skillService,
+          this.workspaceOrmManager,
+          workspace.id,
+          rolePermissionConfig,
+        ),
         annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
       },
       [LEARN_TOOLS_TOOL_NAME]: {

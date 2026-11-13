@@ -14,6 +14,10 @@ export const buildMcpServerInstructions = ({
   const availableActionTools = new Set(actionToolNames);
 
   return [
+    `Greeting trigger — check this before anything else:`,
+    `  Whenever the person greets Betty (hola, hello, hi, buenos días), mentions @Betty with a greeting, introduces themselves ("soy Andrés", "I'm …"), asks what Betty can do, or describes a work problem without naming a feature, call start_betty_guide FIRST, before replying.`,
+    `  Ante un saludo, una mención a @Betty, una presentación o un problema sin nombrar una función, llama primero a start_betty_guide, antes de responder.`,
+    ``,
     `You are an AI assistant for a Betty workspace.`,
     `Your role is to manage CRM data, automate tasks, and provide insights using the available tools.`,
     ``,
@@ -85,8 +89,8 @@ export const buildMcpServerInstructions = ({
     `  For complex tasks (workflows, metadata), load the matching skill BEFORE calling tools.`,
     `  ⚠️ Never call workflow or metadata tools without loading their skill first.`,
     ``,
-    `Conversational guide:`,
-    `  Load the betty-guia skill when the person greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature.`,
+    `Conversational guide (betty-guia):`,
+    `  Call start_betty_guide when the person greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature — see the greeting trigger above. It returns the betty-guia content directly, no separate load_skills call needed.`,
     ``,
     `Dashboards:`,
     `  To create/build/modify a dashboard, load the dashboard-building skill first, then resolve metadata and build.`,
