@@ -26,6 +26,10 @@ import {
   createListSkillsTool,
   LIST_SKILLS_TOOL_NAME,
 } from 'src/engine/api/mcp/tools/list-skills.tool';
+import {
+  createSearchUseCasesTool,
+  SEARCH_USE_CASES_TOOL_NAME,
+} from 'src/engine/api/mcp/tools/search-use-cases.tool';
 import { type McpAnnotatedTool } from 'src/engine/api/mcp/types/mcp-annotated-tool.type';
 import { type McpCoreQueryContext } from 'src/engine/api/mcp/types/mcp-core-query-context.type';
 import { type McpInitializeResult } from 'src/engine/api/mcp/types/mcp-initialize-result.type';
@@ -355,6 +359,10 @@ export class McpProtocolService {
       },
       [LIST_SKILLS_TOOL_NAME]: {
         ...createListSkillsTool(this.skillService, workspace.id),
+        annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
+      },
+      [SEARCH_USE_CASES_TOOL_NAME]: {
+        ...createSearchUseCasesTool(),
         annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
       },
       [LEARN_TOOLS_TOOL_NAME]: {

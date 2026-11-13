@@ -47,6 +47,9 @@ export const STANDARD_SKILL = {
   enrich: {
     universalIdentifier: '20202020-2f85-4a6c-91b3-8e7d0c2b5f49',
   },
+  'betty-guia': {
+    universalIdentifier: '20202020-f5a7-43d7-95c4-4966da6a547a',
+  },
 } as const satisfies Record<
   string,
   {

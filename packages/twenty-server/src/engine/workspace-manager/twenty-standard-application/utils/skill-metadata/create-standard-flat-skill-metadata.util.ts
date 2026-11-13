@@ -1941,6 +1941,63 @@ Anything you found that has no field to live in belongs in a note on the record,
         isSystem: false,
       },
     }),
+
+  'betty-guia': (args: Omit<CreateStandardSkillArgs, 'context'>) =>
+    createStandardSkillFlatMetadata({
+      ...args,
+      context: {
+        skillName: 'betty-guia',
+        name: 'betty-guia',
+        label: i18nLabel(msg({ message: `Conóceme`, context: 'skill.label' })),
+        description: i18nLabel(
+          msg({
+            message: `Use when the person greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature — leads a short guided conversation and proposes concrete paths from the use case catalog`,
+            context: 'skill.description',
+          }),
+        ),
+        icon: 'IconCompass',
+        content: `# Conóceme
+
+Answer in the language the person uses — Spanish or English.
+
+Guía una conversación corta para entender el trabajo y el negocio de la persona, y proponerle caminos concretos con Betty a partir del catálogo de casos. La persona nunca tiene que aprenderse el catálogo: tú traduces lo que cuenta en prompts y conectores concretos.
+
+## Antes de empezar
+
+Busca primero una nota titulada «Mi perfil de trabajo con Betty» en el espacio. Si existe, retómala en vez de empezar de cero: resume en una frase lo que ya sabes y confirma si sigue vigente o cambió algo, en lugar de repetir todas las preguntas.
+
+Si no existe, empieza la conversación.
+
+## Cómo preguntar
+
+- Saluda a la persona por su nombre.
+- Haz una sola pregunta a la vez. Nunca lances un cuestionario.
+- Construye la siguiente pregunta sobre la respuesta anterior — no sigas un guion fijo.
+- Cubre, en el orden que tenga sentido según las respuestas, estas dimensiones: a qué se dedica, cómo consigue clientes, cómo lleva sus contactos y tareas pendientes, correo y reuniones, embudo de ventas, contenido, equipo, y qué herramientas usa ya.
+- No hace falta cubrir las ocho dimensiones a fondo: entre 3 y 5 respuestas suele bastar para proponer caminos útiles.
+
+## Proponer caminos
+
+Después de 3 a 5 respuestas, llama a \`search_use_cases\` con lo que ya sabes (texto libre describiendo la necesidad, y los filtros de categoría, persona o conector que calcen). Nunca inventes un caso, una plantilla, una habilidad o un límite que no venga de esa búsqueda — si el catálogo no trae algo, dilo así.
+
+Con los resultados, propón 2 o 3 caminos. Para cada uno:
+- el prompt exacto que puede pegar, tal como lo trae el caso;
+- qué conectores externos añadir a su ChatGPT o Claude (por ejemplo Gmail, Google Calendar, Drive, o un generador de imagen o vídeo) y qué hace esa combinación;
+- los prerequisitos y los límites, con honestidad — si algo no está disponible en la beta o depende de una pieza que falta, dilo antes de que lo descubra sola.
+
+Ofrece encadenar varios casos en un sistema cuando tenga sentido (por ejemplo, captura de leads → puntuación → secuencia de correo), en vez de presentarlos solo como piezas sueltas.
+
+## Consentimiento
+
+No construyas nada — ni un flujo, ni un campo, ni una vista — sin que la persona lo pida explícitamente. Proponer no es construir: espera un «sí, hazlo» antes de tocar nada.
+
+## Guardar el perfil
+
+Antes de guardar o actualizar la nota «Mi perfil de trabajo con Betty», pide permiso. Si la persona acepta, escribe un resumen breve: las dimensiones que cubriste, los caminos que eligió y los conectores que decidió añadir. Si la nota ya existe, actualízala — nunca crees una segunda.`,
+        isCustom: false,
+        isSystem: true,
+      },
+    }),
 } satisfies {
   [P in AllStandardSkillName]: (
     args: Omit<CreateStandardSkillArgs, 'context'>,

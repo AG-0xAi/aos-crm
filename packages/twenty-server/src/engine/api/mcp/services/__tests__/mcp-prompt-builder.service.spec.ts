@@ -4,7 +4,9 @@ import { McpException } from 'src/engine/api/mcp/exceptions/mcp.exception';
 import { McpPromptBuilderService } from 'src/engine/api/mcp/services/mcp-prompt-builder.service';
 import { CodeInterpreterService } from 'src/engine/core-modules/code-interpreter/code-interpreter.service';
 import { LOAD_SKILL_TOOL_NAME } from 'src/engine/core-modules/tool-provider/tools';
+import { isDefined } from 'twenty-shared/utils';
 import { SkillService } from 'src/engine/metadata-modules/skill/skill.service';
+import { computeTwentyStandardApplicationAllFlatEntityMaps } from 'src/engine/workspace-manager/twenty-standard-application/utils/twenty-standard-application-all-flat-entity-maps.constant';
 
 const buildSkill = (name: string, description: string | null = null) => ({
   name,
@@ -80,6 +82,30 @@ describe('McpPromptBuilderService', () => {
       expect(prompts.map((prompt) => prompt.name)).toEqual([
         'workspace-a-custom-skill',
       ]);
+    });
+  });
+
+  describe('listPrompts (R3.1)', () => {
+    it('includes betty-guia as "Conóceme", via the real standard skill catalog', async () => {
+      const { allFlatEntityMaps } =
+        computeTwentyStandardApplicationAllFlatEntityMaps({
+          now: '2026-01-01T00:00:00.000Z',
+          workspaceId: '20202020-0000-0000-0000-000000000001',
+          twentyStandardApplicationId: '20202020-0000-0000-0000-0000000000a1',
+        });
+      const standardSkills = Object.values(
+        allFlatEntityMaps.flatSkillMaps.byUniversalIdentifier,
+      ).filter(isDefined);
+
+      skillService.findAllFlatSkills.mockResolvedValue(standardSkills as never);
+      codeInterpreterService.isEnabled.mockReturnValue(false);
+
+      const prompts = await service.listPrompts('workspace-a');
+      const bettyGuiaPrompt = prompts.find(
+        (prompt) => prompt.name === 'betty-guia',
+      );
+
+      expect(bettyGuiaPrompt?.title).toBe('Conóceme');
     });
   });
 

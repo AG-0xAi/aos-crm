@@ -387,3 +387,42 @@ Instrucciones y prompts se construyen a partir de las skills de **ese** workspac
 skill personalizada de un workspace nunca aparece en las instrucciones ni en el menú de otro
 workspace, aunque comparta el mismo despliegue. Lo prueba
 `mcp-instruction-builder.service.spec.ts` y `mcp-prompt-builder.service.spec.ts`.
+
+## 10. CRM-044 — la guía conversacional («Conóceme»)
+
+### Cómo arranca
+
+La persona abre una conversación nueva en su ChatGPT o Claude con el conector de Betty activo y
+escribe algo como «Hola Betty, soy Andrés» (o se presenta, pregunta qué puede hacer Betty, o
+describe un problema sin nombrar una función concreta). Las instrucciones del servidor le dicen al
+asistente que, ante cualquiera de esos cuatro disparadores, cargue la skill estándar `betty-guia`
+con `load_skills`. Esa misma skill aparece en `prompts/list` con el título «Conóceme», así que
+también se puede invocar a mano desde el menú `/` del cliente (CRM-040).
+
+### Qué hace la guía
+
+Hace una pregunta a la vez sobre el trabajo de la persona — a qué se dedica, cómo consigue
+clientes, cómo lleva contactos y tareas, correo y reuniones, embudo, contenido, equipo y
+herramientas que ya usa —, cada pregunta construida sobre la respuesta anterior. Tras 3 a 5
+respuestas llama a la herramienta de solo lectura `search_use_cases` (texto libre más los filtros
+opcionales `category`, `persona` y `connector`) contra el catálogo de casos que viaja con el
+servidor, y propone 2 o 3 caminos con el prompt exacto para pegar, los conectores externos a sumar
+en el chat (Gmail, Google Calendar, Drive, un generador de imagen o vídeo…) y los prerequisitos y
+límites reales. No construye nada sin que la persona lo pida explícitamente.
+
+`search_use_cases` nunca toca los datos de este workspace: solo busca en el catálogo estático
+empaquetado en el servidor (`engine/api/mcp/catalog/`), por eso dos workspaces distintos reciben
+exactamente el mismo catálogo.
+
+### Qué guarda
+
+Con permiso de la persona, la guía resume lo aprendido — las dimensiones cubiertas, los caminos
+elegidos, los conectores a añadir — en una nota de **ese mismo workspace** titulada «Mi perfil de
+trabajo con Betty». En la siguiente conversación, la guía busca esa nota primero y retoma desde
+ahí en vez de repetir las preguntas. Nada sale del workspace, y una actualización posterior
+reescribe esa misma nota en vez de crear una segunda.
+
+### Workspaces creados antes de este track
+
+El comando `upgrade:2-51:add-betty-guia-skill` añade la skill a los workspaces que no la tenían,
+sin duplicarla si ya existe (segunda corrida: no-op).
