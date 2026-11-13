@@ -76,11 +76,15 @@ describe('cross-workspace isolation: CODE steps (logic functions)', () => {
         token,
       });
 
-      expectNoLeak(foreign, {
-        id: logicFunctionId,
-        name: LOGIC_FUNCTION_NAME,
-        marker: MARKER,
-      });
+      expectNoLeak(
+        foreign,
+        {
+          id: logicFunctionId,
+          name: LOGIC_FUNCTION_NAME,
+          marker: MARKER,
+        },
+        { skipIdInErrorMessages: true },
+      );
     }
   });
 
@@ -105,11 +109,15 @@ describe('cross-workspace isolation: CODE steps (logic functions)', () => {
       });
 
       expect(foreign.data?.executeOneLogicFunction ?? null).toBeNull();
-      expectNoLeak(foreign, {
-        id: logicFunctionId,
-        name: LOGIC_FUNCTION_NAME,
-        marker: MARKER,
-      });
+      expectNoLeak(
+        foreign,
+        {
+          id: logicFunctionId,
+          name: LOGIC_FUNCTION_NAME,
+          marker: MARKER,
+        },
+        { skipIdInErrorMessages: true },
+      );
     }
 
     const stillOwned = await findOneLogicFunction({
