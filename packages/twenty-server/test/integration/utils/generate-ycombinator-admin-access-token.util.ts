@@ -11,14 +11,15 @@ import { USER_DATA_SEED_IDS } from 'src/engine/workspace-manager/dev-seeder/core
 // through the real AccessTokenService rather than hand-assembled, and
 // through Tim, who is the seeded admin of YCombinator
 // (dev-seeder-permissions.service.ts).
-export const generateYCombinatorAdminAccessToken = async (): Promise<string> => {
-  const { token } = await getAppProviderByClassName<AccessTokenService>(
-    'AccessTokenService',
-  ).generateAccessToken({
-    userId: USER_DATA_SEED_IDS.TIM,
-    workspaceId: SEED_YCOMBINATOR_WORKSPACE_ID,
-    authProvider: AuthProviderEnum.Password,
-  });
+export const generateYCombinatorAdminAccessToken =
+  async (): Promise<string> => {
+    const { token } = await getAppProviderByClassName<AccessTokenService>(
+      'AccessTokenService',
+    ).generateAccessToken({
+      userId: USER_DATA_SEED_IDS.TIM,
+      workspaceId: SEED_YCOMBINATOR_WORKSPACE_ID,
+      authProvider: AuthProviderEnum.Password,
+    });
 
-  return token;
-};
+    return token;
+  };

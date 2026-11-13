@@ -225,7 +225,7 @@ describe('cross-workspace isolation: records (REST and GraphQL)', () => {
         marker: MARKER,
       });
 
-      for (const [operation, mutation] of [
+      for (const [, mutation] of [
         [
           'updateCompany',
           gql`

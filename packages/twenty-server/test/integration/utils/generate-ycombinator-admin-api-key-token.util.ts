@@ -14,32 +14,34 @@ import { SEED_YCOMBINATOR_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-
 // SEED_YCOMBINATOR_WORKSPACE_ID). This creates a REAL, separate API key
 // scoped to YCombinator instead, with the admin role YCombinator's own
 // seeding did attach per-workspace, through the real ApiKeyService.
-export const generateYCombinatorAdminApiKeyToken = async (): Promise<string> => {
-  const ycAccessToken = await generateYCombinatorAdminAccessToken();
-  const adminRole = await findOneRoleByLabel({
-    label: 'Admin',
-    token: ycAccessToken,
-  });
+export const generateYCombinatorAdminApiKeyToken =
+  async (): Promise<string> => {
+    const ycAccessToken = await generateYCombinatorAdminAccessToken();
+    const adminRole = await findOneRoleByLabel({
+      label: 'Admin',
+      token: ycAccessToken,
+    });
 
-  const apiKeyService = getAppProviderByClassName<ApiKeyService>('ApiKeyService');
+    const apiKeyService =
+      getAppProviderByClassName<ApiKeyService>('ApiKeyService');
 
-  const apiKey = await apiKeyService.create({
-    workspaceId: SEED_YCOMBINATOR_WORKSPACE_ID,
-    name: 'CRM-038 isolation YCombinator admin key',
-    expiresAt: new Date(Date.now() + 3600_000),
-    revokedAt: null,
-    roleId: adminRole.id,
-  });
+    const apiKey = await apiKeyService.create({
+      workspaceId: SEED_YCOMBINATOR_WORKSPACE_ID,
+      name: 'CRM-038 isolation YCombinator admin key',
+      expiresAt: new Date(Date.now() + 3600_000),
+      revokedAt: null,
+      roleId: adminRole.id,
+    });
 
-  const credentials = await apiKeyService.generateApiKeyToken(
-    SEED_YCOMBINATOR_WORKSPACE_ID,
-    apiKey.id,
-    apiKey.expiresAt,
-  );
+    const credentials = await apiKeyService.generateApiKeyToken(
+      SEED_YCOMBINATOR_WORKSPACE_ID,
+      apiKey.id,
+      apiKey.expiresAt,
+    );
 
-  if (!credentials) {
-    throw new Error('Could not mint the YCombinator admin API key token');
-  }
+    if (!credentials) {
+      throw new Error('Could not mint the YCombinator admin API key token');
+    }
 
-  return credentials.token;
-};
+    return credentials.token;
+  };
