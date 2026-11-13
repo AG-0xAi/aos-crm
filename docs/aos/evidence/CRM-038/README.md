@@ -42,7 +42,7 @@ not just a single field.
 | --- | --- | --- | --- | --- | --- |
 | Read version | `/graphql` `coreWorkflowVersionById` | `workflows.integration-spec.ts` | "... cannot read Apple's workflow version by id, and Apple's own token can" | Apple: version returned, ACTIVE | YCombinator: null |
 | Run via core workflow API | `/graphql` `runCoreWorkflowVersion` | `workflows.integration-spec.ts` | "... cannot run Apple's workflow version through the core workflow GraphQL API" | n/a (checked via run count) | YCombinator: refused unconditionally (GraphQL error or no runId); run count unchanged for both attempts, re-checked after draining the queue |
-| Deactivate / delete | `/graphql` `deactivateCoreWorkflowVersion`, `deleteCoreWorkflows` | `workflows.integration-spec.ts` | "... cannot deactivate or delete Apple's workflow, which stays active" | n/a (checked via re-read) | YCombinator: GraphQL error on both; version still ACTIVE after |
+| Deactivate / delete | `/graphql` `deactivateCoreWorkflowVersion`, `deleteCoreWorkflows` | `workflows.integration-spec.ts` | "... cannot deactivate or delete Apple's workflow, which stays active" | n/a (checked via re-read) | YCombinator: GraphQL error on deactivate; `deleteCoreWorkflows` on a foreign id answers with an empty list instead of erroring (a no-op, not a leak) -- the test asserts that empty list rather than assuming an error; version still ACTIVE after either way |
 | Update trigger / activate | `/graphql` `updateCoreWorkflowVersionTrigger`, `activateCoreWorkflowVersion` | `workflows.integration-spec.ts` | "... cannot update Apple's workflow trigger or re-activate its version through GraphQL, which stay unchanged" | n/a (checked via re-read) | YCombinator: GraphQL error on both; trigger and status unchanged |
 | Webhook trigger, GET and POST | `GET`/`POST /webhooks/workflows/:workspaceId/:workflowId` | `workflows.integration-spec.ts` | "the webhook trigger addressed to YCombinator's workspace id does not run Apple's workflow, on GET or POST, and Apple's own workspace id does" | Apple's workspace id, GET: 200, run created | YCombinator's workspace id with Apple's workflow id, GET and POST: 4xx; run count unchanged after draining the queue |
 | Background job (run queue) | `RunWorkflowJob` on `MessageQueue.workflowQueue`, reached via `runCoreWorkflowVersion` (manual trigger) | `background-jobs.integration-spec.ts` | "A's manual run enqueues the real background job, writes its WorkflowRun only to Apple's schema, and it stays invisible to YCombinator" | Apple's own credential, after draining: run visible, count incremented | YCombinator token and API key, explicit query for that `coreWorkflowVersionId`: 0 runs, before and after the job runs |
@@ -57,6 +57,13 @@ not just a single field.
 | Dashboard tool | `execute_tool` → `list_dashboards` | `mcp.integration-spec.ts` | "... list_dashboards does not surface Apple's dashboard to YCombinator" | Apple: title present | YCombinator: title absent |
 | View tool | `execute_tool` → `get_views` | `mcp.integration-spec.ts` | "... get_views does not surface Apple's view to YCombinator" | Apple: name present | YCombinator: name absent |
 | Skills | `list_skills`, `load_skills` (direct `tools/call`, not wrapped by `execute_tool`) | `mcp.integration-spec.ts` | "list_skills and load_skills do not surface Apple's custom skill to YCombinator" | Apple: skill name listed | YCombinator: name absent from `list_skills`; `load_skills` by name returns zero skills, no label leak |
+
+There is no dedicated "run workflow" MCP tool (`src/modules/workflow/workflow-tools/tools/`
+has no `run_*` tool) -- the only workflow mutation tools are `update_workflow_version_trigger`,
+`activate_workflow_version`, `deactivate_workflow_version`, `delete_workflow`, step/edge
+CRUD tools and `update_workflow_agent`. The two tested above are the ones a workflow-running
+agent would actually call; the rest manage the same `coreWorkflowVersionId`/`coreWorkflowId`
+scoping and would fail the same way on a foreign id, so they are not each given a separate test.
 
 ## Background jobs
 
