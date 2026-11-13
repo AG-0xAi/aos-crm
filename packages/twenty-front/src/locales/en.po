@@ -29943,3 +29943,97 @@ msgstr "Custom connectors are added on claude.ai on the web or in the desktop ap
 msgid "The URL must be your workspace's address ending in \"/mcp\"."
 msgstr "The URL must be your workspace's address ending in \"/mcp\"."
 
+#. js-lingui-id: zqHLl/
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Gmail / Google Workspace"
+msgstr "Gmail / Google Workspace"
+
+#. js-lingui-id: 08Rlh9
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Outlook.com / Hotmail"
+msgstr "Outlook.com / Hotmail"
+
+#. js-lingui-id: PHzQ+i
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Microsoft 365 (business)"
+msgstr "Microsoft 365 (business)"
+
+#. js-lingui-id: SSMYWP
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "iCloud"
+msgstr "iCloud"
+
+#. js-lingui-id: B7apf1
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Yahoo"
+msgstr "Yahoo"
+
+#. js-lingui-id: vMhpcB
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Zoho"
+msgstr "Zoho"
+
+#. js-lingui-id: 0gJXEt
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Other / own domain"
+msgstr "Other / own domain"
+
+#. js-lingui-id: UmeI0e
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Turn on 2-step verification in your Google account, then create an app password and paste it here."
+msgstr "Turn on 2-step verification in your Google account, then create an app password and paste it here."
+
+#. js-lingui-id: m9tcQd
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Turn on 2-step verification in your Microsoft account, then create an app password and paste it here."
+msgstr "Turn on 2-step verification in your Microsoft account, then create an app password and paste it here."
+
+#. js-lingui-id: E0VpC3
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Create an app password in your Microsoft security info page and paste it here."
+msgstr "Create an app password in your Microsoft security info page and paste it here."
+
+#. js-lingui-id: YsCUTa
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "If your company has blocked this access, your administrator must enable IMAP and SMTP for your account."
+msgstr "If your company has blocked this access, your administrator must enable IMAP and SMTP for your account."
+
+#. js-lingui-id: 73OlHv
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Create an app-specific password in your Apple account and paste it here."
+msgstr "Create an app-specific password in your Apple account and paste it here."
+
+#. js-lingui-id: VTeTQa
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Generate an app password in your Yahoo account security page and paste it here."
+msgstr "Generate an app password in your Yahoo account security page and paste it here."
+
+#. js-lingui-id: tKu9Ji
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Generate an application-specific password in your Zoho account security page and paste it here."
+msgstr "Generate an application-specific password in your Zoho account security page and paste it here."
+
+#. js-lingui-id: JEMFsV
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Choose your email provider."
+msgstr "Choose your email provider."
+
+#. js-lingui-id: Rpw6ot
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Enter your email and password. We fill in the rest."
+msgstr "Enter your email and password. We fill in the rest."
+
+#. js-lingui-id: vI2S7B
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Create an app password"
+msgstr "Create an app password"
+
+#. js-lingui-id: VNgKZz
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Advanced settings"
+msgstr "Advanced settings"
+
+#. js-lingui-id: 9aVlF2
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Change provider"
+msgstr "Change provider"
