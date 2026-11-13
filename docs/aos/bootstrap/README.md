@@ -1,6 +1,9 @@
 # AOS-CRM: radiografía inicial
 
-Fecha: 27 de octubre de 2026. Estado: **inspección estática; bootstrap incompleto**.
+Fecha: 27 de octubre de 2026. Estado en ese momento: **inspección estática; bootstrap incompleto**.
+**El estado medido de hoy, con lo satisfecho y lo pendiente de cada requisito del contrato de
+cierre (CRM-041), está en [DELIVERY.md](DELIVERY.md).** El resto de este documento y los que enlaza
+siguen siendo la fotografía de esa fecha, conservada como fue escrita.
 
 Twenty está incorporado en este mismo checkout, con su historial, sobre `twenty/v2.51.0`, commit `15e4826d3b5fc5867baeabeeb42b253892b2d4da`. No se han instalado dependencias, iniciado servicios, creado usuarios ni conectado cuentas externas. El fork remoto es `AG-0xAi/aos-crm`, con `origin` en ese fork y `upstream` en Twenty. El control de procedencia y sus casos negativos pasaron; no equivalen a pruebas de aplicación.
 
@@ -8,6 +11,7 @@ Esta carpeta documenta lo observado y el trabajo propuesto. No acredita aceptaci
 
 | Documento | Contenido |
 | --- | --- |
+| [DELIVERY.md](DELIVERY.md) | Estado medido de hoy frente al contrato de cierre (CRM-041): qué satisface cada requisito y qué sigue pendiente |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Componentes, fronteras, datos y arranque declarado |
 | [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | Hallazgos confirmados, riesgos y cobertura pendiente |
 | [DEPENDENCY_AUDIT.md](DEPENDENCY_AUDIT.md) | Consulta del lockfile a OSV y clasificación inicial |
