@@ -14,6 +14,17 @@ import { SEED_YCOMBINATOR_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-
 // SEED_YCOMBINATOR_WORKSPACE_ID). This creates a REAL, separate API key
 // scoped to YCombinator instead, with the admin role YCombinator's own
 // seeding did attach per-workspace, through the real ApiKeyService.
+const createdApiKeyIds: string[] = [];
+
+export const revokeYCombinatorAdminApiKeys = async (): Promise<void> => {
+  const apiKeyService =
+    getAppProviderByClassName<ApiKeyService>('ApiKeyService');
+
+  for (const apiKeyId of createdApiKeyIds.splice(0)) {
+    await apiKeyService.revoke(apiKeyId, SEED_YCOMBINATOR_WORKSPACE_ID);
+  }
+};
+
 export const generateYCombinatorAdminApiKeyToken =
   async (): Promise<string> => {
     const ycAccessToken = await generateYCombinatorAdminAccessToken();
@@ -32,6 +43,8 @@ export const generateYCombinatorAdminApiKeyToken =
       revokedAt: null,
       roleId: adminRole.id,
     });
+
+    createdApiKeyIds.push(apiKey.id);
 
     const credentials = await apiKeyService.generateApiKeyToken(
       SEED_YCOMBINATOR_WORKSPACE_ID,

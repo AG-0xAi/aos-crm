@@ -10,8 +10,12 @@ import {
   findCoreWorkflowVersion,
   updateCoreWorkflowVersionTrigger,
 } from 'test/integration/graphql/suites/workflow/utils/core-workflow.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 import { waitForAllJobsToFinish } from 'test/integration/utils/wait-for-all-jobs-to-finish.util';
 import { isDefined } from 'twenty-shared/utils';
 
@@ -105,6 +109,8 @@ describe('cross-workspace isolation: workflows', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await deleteCoreWorkflows({ coreWorkflowIds: [coreWorkflowId] });
   });
 
@@ -131,6 +137,11 @@ describe('cross-workspace isolation: workflows', () => {
         | undefined;
 
       expect(result ?? null).toBeNull();
+      expectNoLeak(foreign, {
+        id: coreWorkflowVersionId,
+        name: `Isolation workflow ${MARKER}`,
+        marker: MARKER,
+      });
     }
   });
 
@@ -283,6 +294,8 @@ describe('cross-workspace isolation: workflows', () => {
     expect(correctWorkspace.status).toBe(200);
     expect(correctWorkspace.body.success).toBe(true);
     expect(correctWorkspace.body.workflowRunId).toBeDefined();
+
+    await waitForAllJobsToFinish();
     expect(await countRunsForVersion(coreWorkflowVersionId)).toBe(
       runsBefore + 1,
     );

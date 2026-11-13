@@ -7,8 +7,12 @@ import { makeGraphqlApiRequest } from 'test/integration/graphql/utils/make-graph
 import { uploadFileWithDirectUpload } from 'test/integration/graphql/utils/upload-file-with-direct-upload.util';
 import { makeMetadataApiRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import { updateFeatureFlag } from 'test/integration/metadata/suites/utils/update-feature-flag.util';
+import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 import { getAppProviderByClassName } from 'test/integration/utils/get-app-provider-by-class-name.util';
 import { FeatureFlagKey } from 'twenty-shared/types';
 import { isDefined } from 'twenty-shared/utils';
@@ -139,6 +143,8 @@ describe('cross-workspace isolation: files', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await makeGraphqlApiRequest({
       query: gql`
         mutation DestroyIsolationFiles($attachmentId: UUID!, $noteId: UUID!) {
@@ -293,6 +299,11 @@ describe('cross-workspace isolation: files', () => {
       );
 
       expect(foreign.body.data?.attachment ?? null).toBeNull();
+      expectNoLeak(foreign.body, {
+        id: attachmentId,
+        name: 'isolation-attachment',
+        marker: MARKER,
+      });
     }
   });
 

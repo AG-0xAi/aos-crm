@@ -6,7 +6,7 @@ export const expectNoLeak = (
   body: unknown,
   foreign: { id?: string | null; name?: string | null; marker: string },
 ): void => {
-  const serialized = JSON.stringify(body);
+  const serialized = JSON.stringify(body ?? null);
 
   if (foreign.id) {
     expect(serialized).not.toContain(foreign.id);

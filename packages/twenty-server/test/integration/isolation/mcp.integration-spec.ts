@@ -15,7 +15,10 @@ import { createSkill } from 'test/integration/metadata/suites/skill/utils/create
 import { deleteSkill } from 'test/integration/metadata/suites/skill/utils/delete-skill.util';
 import { makeMetadataApiRequest } from 'test/integration/metadata/suites/utils/make-metadata-api-request.util';
 import { generateYCombinatorAdminAccessToken } from 'test/integration/utils/generate-ycombinator-admin-access-token.util';
-import { generateYCombinatorAdminApiKeyToken } from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
+import {
+  generateYCombinatorAdminApiKeyToken,
+  revokeYCombinatorAdminApiKeys,
+} from 'test/integration/utils/generate-ycombinator-admin-api-key-token.util';
 import { expectNoLeak } from 'test/integration/isolation/utils/expect-no-leak.util';
 import { ViewType } from 'twenty-shared/types';
 
@@ -182,6 +185,8 @@ describe('cross-workspace isolation: MCP tools', () => {
   });
 
   afterAll(async () => {
+    await revokeYCombinatorAdminApiKeys();
+
     await deleteSkill({ expectToFail: false, input: { id: skillId } });
 
     await makeGraphqlApiRequest({
