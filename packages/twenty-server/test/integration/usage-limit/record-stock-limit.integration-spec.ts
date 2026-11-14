@@ -20,12 +20,13 @@ import { SEED_APPLE_WORKSPACE_ID } from 'src/engine/workspace-manager/dev-seeder
 
 const SCHEMA_NAME = getWorkspaceSchemaName(SEED_APPLE_WORKSPACE_ID);
 const HEADROOM = 2;
-const STATS_FLUSH_TIMEOUT_MS = 30_000;
+const STATS_QUIET_WINDOW_MS = 12_000;
+const STATS_SETTLE_TIMEOUT_MS = 60_000;
+const HOOK_TIMEOUT_MS = STATS_SETTLE_TIMEOUT_MS + 15_000;
 
 describe('Record stock limit', () => {
   let usageLimitRepository: Repository<UsageLimitEntity>;
   let redis: Awaited<ReturnType<typeof createClient>>;
-  let usageLimitId: string;
   let baselineRecordCount: number;
   const createdRocketIds: string[] = [];
 
@@ -97,19 +98,28 @@ describe('Record stock limit', () => {
   };
 
   const waitForStatsToSettle = async (): Promise<number> => {
-    let previous = await countRecords();
+    const startedAt = Date.now();
+    let current = await countRecords();
+    let stableSince = Date.now();
 
-    for (;;) {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-
-      const current = await countRecords();
-
-      if (current === previous) {
-        return current;
+    while (Date.now() - stableSince < STATS_QUIET_WINDOW_MS) {
+      if (Date.now() - startedAt > STATS_SETTLE_TIMEOUT_MS) {
+        throw new Error(
+          `Record statistics did not settle within ${STATS_SETTLE_TIMEOUT_MS} ms (last count ${current})`,
+        );
       }
 
-      previous = current;
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+      const next = await countRecords();
+
+      if (next !== current) {
+        current = next;
+        stableSince = Date.now();
+      }
     }
+
+    return current;
   };
 
   const dropKeys = async (pattern: string) => {
@@ -139,18 +149,25 @@ describe('Record stock limit', () => {
     expect(response.body.errors).toBeUndefined();
   };
 
+  const deleteRecordLimits = () =>
+    usageLimitRepository.delete({
+      workspaceId: SEED_APPLE_WORKSPACE_ID,
+      resourceType: UsageResourceType.RECORD,
+    });
+
   beforeAll(async () => {
     usageLimitRepository =
       getCoreRepository<UsageLimitEntity>(UsageLimitEntity);
     redis = await createClient({ url: process.env.REDIS_URL }).connect();
+  });
 
-    await usageLimitRepository.delete({
-      workspaceId: SEED_APPLE_WORKSPACE_ID,
-      resourceType: UsageResourceType.RECORD,
-    });
+  beforeEach(async () => {
+    await deleteRecordLimits();
+    await refreshUsageLimitsCache();
+
     baselineRecordCount = await waitForStatsToSettle();
 
-    const [usageLimit] = await usageLimitRepository.save([
+    await usageLimitRepository.save([
       {
         workspaceId: SEED_APPLE_WORKSPACE_ID,
         resourceType: UsageResourceType.RECORD,
@@ -166,22 +183,9 @@ describe('Record stock limit', () => {
       },
     ]);
 
-    usageLimitId = usageLimit.id;
-
-    await refreshUsageLimitsCache();
-  });
-
-  beforeEach(async () => {
-    // Other suites share the seeded workspace and may leave records behind, so
-    // the limit is rebased on the settled count instead of a one-off baseline.
-    baselineRecordCount = await waitForStatsToSettle();
-    await usageLimitRepository.update(
-      { id: usageLimitId },
-      { limitValue: baselineRecordCount + HEADROOM },
-    );
     await refreshUsageLimitsCache();
     await dropStockCounter();
-  }, STATS_FLUSH_TIMEOUT_MS + 5_000);
+  }, HOOK_TIMEOUT_MS);
 
   afterEach(async () => {
     if (createdRocketIds.length > 0) {
@@ -194,7 +198,7 @@ describe('Record stock limit', () => {
   });
 
   afterAll(async () => {
-    await usageLimitRepository.delete({ id: usageLimitId });
+    await deleteRecordLimits();
     await refreshUsageLimitsCache();
     await dropStockCounter();
     await redis.quit();
