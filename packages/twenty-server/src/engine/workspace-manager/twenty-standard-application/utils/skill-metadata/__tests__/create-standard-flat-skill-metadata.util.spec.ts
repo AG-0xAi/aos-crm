@@ -37,3 +37,28 @@ describe('betty-guia standard skill', () => {
     expect(bettyGuia?.content).toContain('search_use_cases');
   });
 });
+
+describe('conectar-correo standard skill', () => {
+  const { allFlatEntityMaps } =
+    computeTwentyStandardApplicationAllFlatEntityMaps({
+      now: '2026-01-01T00:00:00.000Z',
+      workspaceId: WORKSPACE_ID,
+      twentyStandardApplicationId: STANDARD_APPLICATION_ID,
+    });
+
+  const skill =
+    allFlatEntityMaps.flatSkillMaps.byUniversalIdentifier[
+      STANDARD_SKILL['conectar-correo'].universalIdentifier
+    ];
+
+  it('is present in the standard skill set, titled "Conectar tu correo"', () => {
+    expect(skill?.name).toBe('conectar-correo');
+    expect(skill?.label).toBe('Conectar tu correo');
+  });
+
+  it('covers app passwords, key without spaces and Hostinger', () => {
+    expect(skill?.content).toContain('apppasswords');
+    expect(skill?.content).toContain('sin espacios');
+    expect(skill?.content).toContain('Hostinger');
+  });
+});

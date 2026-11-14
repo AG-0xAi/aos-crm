@@ -1998,6 +1998,90 @@ Antes de guardar o actualizar la nota «Mi perfil de trabajo con Betty», pide p
         isSystem: true,
       },
     }),
+  'conectar-correo': (args: Omit<CreateStandardSkillArgs, 'context'>) =>
+    createStandardSkillFlatMetadata({
+      ...args,
+      context: {
+        skillName: 'conectar-correo',
+        name: 'conectar-correo',
+        label: i18nLabel(
+          msg({ message: `Conectar tu correo`, context: 'skill.label' }),
+        ),
+        description: i18nLabel(
+          msg({
+            message: `Explica paso a paso cómo conectar una cuenta de correo a Betty según el proveedor, y qué hacer si no conecta.`,
+            context: 'skill.description',
+          }),
+        ),
+        icon: 'IconMail',
+        content: `# Conectar tu correo
+
+Answer in the language the person uses — Spanish or English.
+
+Explica cómo conectar una cuenta de correo a Betty y qué hacer si no conecta.
+
+## Cómo responder
+
+- Si no sabes qué proveedor usa la persona (Gmail, Outlook, iCloud, Yahoo, Zoho, Hostinger, Titan, GoDaddy u otro), pregúntalo primero.
+- Da solo los pasos de ese proveedor, numerados. No vuelques toda la guía.
+- Nunca pidas que peguen su contraseña ni la clave en el chat.
+
+## Dónde se conecta
+
+En Betty: Ajustes → Cuentas → Añadir cuenta → IMAP. Una fila de botones de proveedores rellena los servidores; la persona solo escribe su correo y su contraseña.
+
+## Gmail y Google Workspace
+
+1. Activa la verificación en dos pasos en myaccount.google.com/security.
+2. Crea una contraseña de aplicación en myaccount.google.com/apppasswords, llámala «Betty» y copia la clave de 16 letras.
+3. En Betty usa el botón Gmail, la dirección completa y la clave sin espacios como contraseña, no la contraseña de Gmail.
+
+Si la página de contraseñas de aplicación dice que no está disponible: la verificación en dos pasos está desactivada, un administrador de Workspace desactivó las contraseñas de aplicación, o la cuenta tiene la Protección avanzada activada.
+
+Google puede enviar un correo de «inicio de sesión bloqueado»; hay que abrirlo y confirmar que fue la persona.
+
+## Outlook.com y Hotmail
+
+Microsoft ya no acepta contraseñas ni contraseñas de aplicación para correo desde otras aplicaciones. Conectar con el inicio de sesión de Microsoft llegará pronto; hoy no hay forma de evitarlo.
+
+## Microsoft 365 (empresa)
+
+Recibir con contraseña ya está desactivado y enviar con contraseña se desactiva por defecto a finales de 2026. Solo si el administrador de la empresa mantiene IMAP y SMTP con contraseña habilitados, usa «Otro» con los servidores de Microsoft ya rellenados.
+
+## iCloud
+
+Usa una contraseña específica de app, que se crea en la página de la cuenta de Apple (Inicio de sesión y seguridad). El calendario también se conecta.
+
+## Yahoo
+
+Usa una contraseña de aplicación, que se crea en la página de seguridad de la cuenta de Yahoo.
+
+## Zoho
+
+Usa la contraseña normal, o una contraseña de aplicación si la verificación en dos pasos está activa. Las cuentas de empresa pueden usar imappro.zoho.com.
+
+## Hostinger, Titan y GoDaddy (Professional Email)
+
+Se usa la contraseña del buzón.
+- Hostinger: se cambia en hPanel → Correos → Buzones.
+- Titan: si la cuenta está en Europa y no conecta, en la configuración avanzada usa imap0101.titan.email y smtp0101.titan.email.
+- GoDaddy: la contraseña del correo, no la de la cuenta de GoDaddy. Si su correo de GoDaddy es en realidad Microsoft 365, usa ese botón.
+
+## Otro o dominio propio
+
+El proveedor de hosting da el servidor; normalmente mail.dominio.com, IMAP 993 y SMTP 465.
+
+## Errores comunes
+
+- Usar la contraseña normal en lugar de una contraseña de aplicación.
+- Dejar espacios en la clave.
+- Escribir un usuario que no es la dirección completa.
+- Puertos equivocados.
+- Un administrador de la empresa bloquea el acceso.`,
+        isCustom: false,
+        isSystem: false,
+      },
+    }),
 } satisfies {
   [P in AllStandardSkillName]: (
     args: Omit<CreateStandardSkillArgs, 'context'>,

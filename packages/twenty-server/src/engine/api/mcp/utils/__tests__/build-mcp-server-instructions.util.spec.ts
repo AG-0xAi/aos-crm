@@ -141,6 +141,16 @@ describe('buildMcpServerInstructions', () => {
     );
   });
 
+  it('should name conectar-correo for email connection questions', () => {
+    const instructions = buildMcpServerInstructions({
+      objectNames: 'companies',
+      actionToolNames: ['send_email'],
+      isDirectMode: false,
+    });
+
+    expect(instructions).toContain('conectar-correo');
+  });
+
   it('should put the start_betty_guide greeting trigger in the first lines, ahead of the tool map', () => {
     const instructions = buildMcpServerInstructions({
       objectNames: 'companies',

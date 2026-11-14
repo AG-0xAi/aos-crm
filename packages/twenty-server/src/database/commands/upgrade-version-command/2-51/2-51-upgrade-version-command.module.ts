@@ -8,6 +8,7 @@ import { BackfillStandardApplicationDefaultRoleCommand } from 'src/database/comm
 import { MigrateRichTextToTiptapCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1792748448862-migrate-rich-text-to-tiptap.command';
 import { BackfillWorkspaceCustomApplicationDefaultRoleCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1792755720300-backfill-workspace-custom-application-default-role.command';
 import { AddBettyGuiaSkillCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794567508947-add-betty-guia-skill.command';
+import { AddConectarCorreoSkillCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794643160842-add-conectar-correo-skill.command';
 import { UpdateBettyGuiaSkillContentCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794590000000-update-betty-guia-skill-content.command';
 import { ApplicationModule } from 'src/engine/core-modules/application/application.module';
 import { ConnectedAccountMetadataModule } from 'src/engine/metadata-modules/connected-account/connected-account-metadata.module';
@@ -31,6 +32,7 @@ import { WorkspaceMigrationModule } from 'src/engine/workspace-manager/workspace
     BackfillWorkspaceCustomApplicationDefaultRoleCommand,
     AddBettyGuiaSkillCommand,
     UpdateBettyGuiaSkillContentCommand,
+    AddConectarCorreoSkillCommand,
   ],
 })
 export class V2_51_UpgradeVersionCommandModule {}

@@ -106,6 +106,9 @@ describe('McpPromptBuilderService', () => {
       );
 
       expect(bettyGuiaPrompt?.title).toBe('Conóceme');
+      expect(
+        prompts.find((prompt) => prompt.name === 'conectar-correo')?.title,
+      ).toBe('Conectar tu correo');
     });
   });
 
