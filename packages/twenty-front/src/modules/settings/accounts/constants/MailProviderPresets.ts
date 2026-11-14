@@ -9,6 +9,8 @@ import { EmailConnectionSecurity } from '~/generated-metadata/graphql';
 export type MailProviderPreset = {
   id: string;
   label: MessageDescriptor;
+  passwordSignIn?: 'supported' | 'unsupported';
+  unsupportedNotice?: MessageDescriptor;
   helpLine?: MessageDescriptor;
   extraNote?: MessageDescriptor;
   appPasswordUrl?: string;
@@ -21,7 +23,9 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'google',
     label: msg`Gmail / Google Workspace`,
-    helpLine: msg`Turn on 2-step verification in your Google account, then create an app password and paste it here.`,
+    passwordSignIn: 'supported',
+    helpLine: msg`You need 2-step verification turned on and an app password.`,
+    extraNote: msg`In Google Workspace, your administrator may have turned off app passwords.`,
     appPasswordUrl: 'https://myaccount.google.com/apppasswords',
     IMAP: buildMailProviderServer(
       'imap.gmail.com',
@@ -37,8 +41,8 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'outlook',
     label: msg`Outlook.com / Hotmail`,
-    helpLine: msg`Turn on 2-step verification in your Microsoft account, then create an app password and paste it here.`,
-    appPasswordUrl: 'https://account.live.com/proofs/AppPassword',
+    passwordSignIn: 'unsupported',
+    unsupportedNotice: msg`Microsoft no longer allows connecting Outlook.com and Hotmail accounts with a password. Soon you will be able to connect yours by signing in with your Microsoft account.`,
     IMAP: buildMailProviderServer(
       'outlook.office365.com',
       993,
@@ -53,9 +57,8 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'microsoft365',
     label: msg`Microsoft 365 (business)`,
-    helpLine: msg`Create an app password in your Microsoft security info page and paste it here.`,
-    extraNote: msg`If your company has blocked this access, your administrator must enable IMAP and SMTP for your account.`,
-    appPasswordUrl: 'https://mysignins.microsoft.com/security-info',
+    passwordSignIn: 'unsupported',
+    unsupportedNotice: msg`Microsoft 365 no longer allows receiving email with a password, and sending with a password is turned off at the end of 2026. Soon you will be able to connect yours by signing in with your Microsoft account. If your company keeps IMAP and SMTP with a password enabled, use "Other".`,
     IMAP: buildMailProviderServer(
       'outlook.office365.com',
       993,
@@ -70,6 +73,7 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'icloud',
     label: msg`iCloud`,
+    passwordSignIn: 'supported',
     helpLine: msg`Create an app-specific password in your Apple account and paste it here.`,
     appPasswordUrl: 'https://account.apple.com/account/manage',
     IMAP: buildMailProviderServer(
@@ -91,6 +95,7 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'yahoo',
     label: msg`Yahoo`,
+    passwordSignIn: 'supported',
     helpLine: msg`Generate an app password in your Yahoo account security page and paste it here.`,
     appPasswordUrl: 'https://login.yahoo.com/myaccount/security/app-password',
     IMAP: buildMailProviderServer(
@@ -107,6 +112,7 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
   {
     id: 'zoho',
     label: msg`Zoho`,
+    passwordSignIn: 'supported',
     helpLine: msg`Generate an application-specific password in your Zoho account security page and paste it here.`,
     appPasswordUrl: 'https://accounts.zoho.com/home#security/app_password',
     IMAP: buildMailProviderServer(

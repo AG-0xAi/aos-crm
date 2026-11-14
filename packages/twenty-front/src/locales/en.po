@@ -29973,30 +29973,35 @@ msgstr "Yahoo"
 msgid "Zoho"
 msgstr "Zoho"
 
+#. js-lingui-id: U5P1kq
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "You need 2-step verification turned on and an app password."
+msgstr "You need 2-step verification turned on and an app password."
+
+#. js-lingui-id: 9Ew3a6
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "In Google Workspace, your administrator may have turned off app passwords."
+msgstr "In Google Workspace, your administrator may have turned off app passwords."
+
+#. js-lingui-id: /37whm
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Microsoft no longer allows connecting Outlook.com and Hotmail accounts with a password. Soon you will be able to connect yours by signing in with your Microsoft account."
+msgstr "Microsoft no longer allows connecting Outlook.com and Hotmail accounts with a password. Soon you will be able to connect yours by signing in with your Microsoft account."
+
+#. js-lingui-id: +IXtf+
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Microsoft 365 no longer allows receiving email with a password, and sending with a password is turned off at the end of 2026. Soon you will be able to connect yours by signing in with your Microsoft account. If your company keeps IMAP and SMTP with a password enabled, use \"Other\"."
+msgstr "Microsoft 365 no longer allows receiving email with a password, and sending with a password is turned off at the end of 2026. Soon you will be able to connect yours by signing in with your Microsoft account. If your company keeps IMAP and SMTP with a password enabled, use \"Other\"."
+
+#. js-lingui-id: WU5el7
+#: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
+msgid "Use \"Other\" with manual details"
+msgstr "Use \"Other\" with manual details"
+
 #. js-lingui-id: 0gJXEt
 #: src/modules/settings/accounts/constants/MailProviderPresets.ts
 msgid "Other / own domain"
 msgstr "Other / own domain"
-
-#. js-lingui-id: UmeI0e
-#: src/modules/settings/accounts/constants/MailProviderPresets.ts
-msgid "Turn on 2-step verification in your Google account, then create an app password and paste it here."
-msgstr "Turn on 2-step verification in your Google account, then create an app password and paste it here."
-
-#. js-lingui-id: m9tcQd
-#: src/modules/settings/accounts/constants/MailProviderPresets.ts
-msgid "Turn on 2-step verification in your Microsoft account, then create an app password and paste it here."
-msgstr "Turn on 2-step verification in your Microsoft account, then create an app password and paste it here."
-
-#. js-lingui-id: E0VpC3
-#: src/modules/settings/accounts/constants/MailProviderPresets.ts
-msgid "Create an app password in your Microsoft security info page and paste it here."
-msgstr "Create an app password in your Microsoft security info page and paste it here."
-
-#. js-lingui-id: YsCUTa
-#: src/modules/settings/accounts/constants/MailProviderPresets.ts
-msgid "If your company has blocked this access, your administrator must enable IMAP and SMTP for your account."
-msgstr "If your company has blocked this access, your administrator must enable IMAP and SMTP for your account."
 
 #. js-lingui-id: 73OlHv
 #: src/modules/settings/accounts/constants/MailProviderPresets.ts

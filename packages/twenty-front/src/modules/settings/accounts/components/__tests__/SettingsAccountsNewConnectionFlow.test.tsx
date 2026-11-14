@@ -95,3 +95,62 @@ it('enables CalDAV for iCloud', async () => {
 
   expect(latestForm.getValues('CALDAV.host')).toBe('caldav.icloud.com');
 });
+
+it.each([
+  [
+    'Outlook.com / Hotmail',
+    /Outlook\.com and Hotmail accounts with a password/,
+  ],
+  [
+    'Microsoft 365 (business)',
+    /Microsoft 365 no longer allows receiving email/,
+  ],
+])('shows a notice and no password field for %s', async (label, notice) => {
+  renderFlow();
+
+  await userEvent.click(screen.getByRole('button', { name: label }));
+
+  expect(screen.getByText(notice)).toBeVisible();
+  expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Email Address')).not.toBeInTheDocument();
+});
+
+it.each([
+  ['Outlook.com / Hotmail', 'outlook.office365.com', 'smtp-mail.outlook.com'],
+  ['Microsoft 365 (business)', 'outlook.office365.com', 'smtp.office365.com'],
+])(
+  'opens the prefilled full form from the notice for %s',
+  async (label, imap, smtp) => {
+    renderFlow();
+
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use "Other" with manual details' }),
+    );
+
+    expect(screen.getByLabelText('IMAP Server')).toHaveValue(imap);
+    expect(screen.getByLabelText('SMTP Server')).toHaveValue(smtp);
+  },
+);
+
+it('shows the 2-step verification and Workspace help for Gmail', async () => {
+  renderFlow();
+
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Gmail / Google Workspace' }),
+  );
+
+  expect(
+    screen.getByText(
+      'You need 2-step verification turned on and an app password.',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      'In Google Workspace, your administrator may have turned off app passwords.',
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Create an app password' }),
+  ).toHaveAttribute('href', 'https://myaccount.google.com/apppasswords');
+});
