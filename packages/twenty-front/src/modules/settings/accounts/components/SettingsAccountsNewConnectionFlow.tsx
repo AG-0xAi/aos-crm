@@ -16,6 +16,7 @@ import {
 } from '@/settings/accounts/hooks/useImapSmtpCaldavConnectionForm';
 import { SettingsTextInput } from '@/ui/input/components/SettingsTextInput';
 import { ACCOUNT_TYPES } from 'twenty-shared/constants';
+import { Callout } from 'twenty-ui/components/feedback';
 import { Section } from 'twenty-ui/components/layout';
 import { Button } from 'twenty-ui/primitives/input';
 import { MOBILE_VIEWPORT, themeCssVariables } from 'twenty-ui/theme';
@@ -67,8 +68,14 @@ export const SettingsAccountsNewConnectionFlow = ({
   const handle = useWatch({ control, name: 'handle' });
   const password = useWatch({ control, name: 'IMAP.password' });
 
+  const isUnsupported =
+    preset !== null && preset.passwordSignIn === 'unsupported';
+
   const isSimple =
-    preset !== null && preset.id !== OTHER_MAIL_PROVIDER_ID && !showAdvanced;
+    preset !== null &&
+    preset.id !== OTHER_MAIL_PROVIDER_ID &&
+    !isUnsupported &&
+    !showAdvanced;
 
   useEffect(() => {
     if (!isSimple) return;
@@ -114,6 +121,30 @@ export const SettingsAccountsNewConnectionFlow = ({
             </Button>
           ))}
         </StyledGrid>
+      </Section.Root>
+    );
+  }
+
+  if (isUnsupported && !showAdvanced) {
+    return (
+      <Section.Root>
+        <StyledForm>
+          <Callout
+            status="warning"
+            title={i18n._(preset.label)}
+            description={
+              preset.unsupportedNotice && i18n._(preset.unsupportedNotice)
+            }
+          />
+          <StyledActions>
+            <Button variant="outline" onClick={() => setShowAdvanced(true)}>
+              {t`Use "Other" with manual details`}
+            </Button>
+            <Button variant="link" onClick={() => setPreset(null)}>
+              {t`Change provider`}
+            </Button>
+          </StyledActions>
+        </StyledForm>
       </Section.Root>
     );
   }
