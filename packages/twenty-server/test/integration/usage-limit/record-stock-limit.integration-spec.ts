@@ -27,7 +27,6 @@ const HOOK_TIMEOUT_MS = STATS_SETTLE_TIMEOUT_MS + 15_000;
 describe('Record stock limit', () => {
   let usageLimitRepository: Repository<UsageLimitEntity>;
   let redis: Awaited<ReturnType<typeof createClient>>;
-  let usageLimitId: string;
   let baselineRecordCount: number;
   const createdRocketIds: string[] = [];
 
@@ -168,7 +167,7 @@ describe('Record stock limit', () => {
 
     baselineRecordCount = await waitForStatsToSettle();
 
-    const [usageLimit] = await usageLimitRepository.save([
+    await usageLimitRepository.save([
       {
         workspaceId: SEED_APPLE_WORKSPACE_ID,
         resourceType: UsageResourceType.RECORD,
@@ -183,8 +182,6 @@ describe('Record stock limit', () => {
         burstValue: null,
       },
     ]);
-
-    usageLimitId = usageLimit.id;
 
     await refreshUsageLimitsCache();
     await dropStockCounter();
