@@ -127,6 +127,54 @@ export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
     ),
   },
   {
+    id: 'hostinger',
+    label: msg`Hostinger`,
+    passwordSignIn: 'supported',
+    helpLine: msg`Use your mailbox password. If you don't remember it, change it in hPanel, under Emails, Mailboxes.`,
+    IMAP: buildMailProviderServer(
+      'imap.hostinger.com',
+      993,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+    SMTP: buildMailProviderServer(
+      'smtp.hostinger.com',
+      465,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+  },
+  {
+    id: 'titan',
+    label: msg`Titan Email`,
+    passwordSignIn: 'supported',
+    helpLine: msg`Use your mailbox password. If your account is hosted in Europe and won't connect, change the servers to imap0101.titan.email and smtp0101.titan.email in Advanced settings.`,
+    IMAP: buildMailProviderServer(
+      'imap.titan.email',
+      993,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+    SMTP: buildMailProviderServer(
+      'smtp.titan.email',
+      465,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+  },
+  {
+    id: 'godaddy',
+    label: msg`GoDaddy (Professional Email)`,
+    passwordSignIn: 'supported',
+    helpLine: msg`Use your email password, not your GoDaddy account password. If your GoDaddy email is Microsoft 365, choose Microsoft 365.`,
+    IMAP: buildMailProviderServer(
+      'imap.secureserver.net',
+      993,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+    SMTP: buildMailProviderServer(
+      'smtpout.secureserver.net',
+      465,
+      EmailConnectionSecurity.SSL_TLS,
+    ),
+  },
+  {
     id: OTHER_MAIL_PROVIDER_ID,
     label: msg`Other / own domain`,
   },
