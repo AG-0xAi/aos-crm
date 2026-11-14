@@ -50,6 +50,9 @@ export const STANDARD_SKILL = {
   'betty-guia': {
     universalIdentifier: '20202020-f5a7-43d7-95c4-4966da6a547a',
   },
+  'conectar-correo': {
+    universalIdentifier: '20202020-b3d8-4e5a-8c17-2a9f6d41e0c3',
+  },
 } as const satisfies Record<
   string,
   {

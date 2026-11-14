@@ -91,6 +91,7 @@ export const buildMcpServerInstructions = ({
     ``,
     `Conversational guide (betty-guia):`,
     `  Call start_betty_guide when the person greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature — see the greeting trigger above. It returns the betty-guia content directly, no separate load_skills call needed.`,
+    `  Load the conectar-correo skill when the person asks how to connect an email account, or says their email will not connect.`,
     ``,
     `Dashboards:`,
     `  To create/build/modify a dashboard, load the dashboard-building skill first, then resolve metadata and build.`,
