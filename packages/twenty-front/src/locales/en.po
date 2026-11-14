@@ -30042,3 +30042,33 @@ msgstr "Advanced settings"
 #: src/modules/settings/accounts/components/SettingsAccountsNewConnectionFlow.tsx
 msgid "Change provider"
 msgstr "Change provider"
+
+#. js-lingui-id: naq3YO
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Hostinger"
+msgstr "Hostinger"
+
+#. js-lingui-id: fxYTHF
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Titan Email"
+msgstr "Titan Email"
+
+#. js-lingui-id: b+k3Zf
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "GoDaddy (Professional Email)"
+msgstr "GoDaddy (Professional Email)"
+
+#. js-lingui-id: Zd5hC+
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Use your mailbox password. If you don't remember it, change it in hPanel, under Emails, Mailboxes."
+msgstr "Use your mailbox password. If you don't remember it, change it in hPanel, under Emails, Mailboxes."
+
+#. js-lingui-id: eOSYRl
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Use your mailbox password. If your account is hosted in Europe and won't connect, change the servers to imap0101.titan.email and smtp0101.titan.email in Advanced settings."
+msgstr "Use your mailbox password. If your account is hosted in Europe and won't connect, change the servers to imap0101.titan.email and smtp0101.titan.email in Advanced settings."
+
+#. js-lingui-id: m6nY1U
+#: src/modules/settings/accounts/constants/MailProviderPresets.ts
+msgid "Use your email password, not your GoDaddy account password. If your GoDaddy email is Microsoft 365, choose Microsoft 365."
+msgstr "Use your email password, not your GoDaddy account password. If your GoDaddy email is Microsoft 365, choose Microsoft 365."
