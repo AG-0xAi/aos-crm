@@ -124,7 +124,11 @@ jobs:
         uses: ./.github/actions/upgrade-mutation-guard
         with:
           base_sha: ${{ steps.merged-base.outputs.sha }}
-          allow_previous_version_mutation: ${{ contains(github.event.pull_request.labels.*.name, 'ci:allow-previous-version-upgrade-mutation') }}
+          # Betty pins the fork to 2.51.0 and never takes the upstream version
+          # bump, so its own upgrade commands always land in the tagged 2-51
+          # directory. On betty/factory that is expected; the append-only
+          # timestamp check below still applies.
+          allow_previous_version_mutation: ${{ contains(github.event.pull_request.labels.*.name, 'ci:allow-previous-version-upgrade-mutation') || github.base_ref == 'betty/factory' || github.ref == 'refs/heads/betty/factory' }}
           allow_next_version_mutation: ${{ contains(github.event.pull_request.labels.*.name, 'ci:allow-next-version-upgrade-mutation') }}
 
   server-validation:
