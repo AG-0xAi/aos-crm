@@ -154,3 +154,49 @@ it('shows the 2-step verification and Workspace help for Gmail', async () => {
     screen.getByRole('link', { name: 'Create an app password' }),
   ).toHaveAttribute('href', 'https://myaccount.google.com/apppasswords');
 });
+
+it.each([
+  [
+    'Hostinger',
+    'imap.hostinger.com',
+    'smtp.hostinger.com',
+    'ana@hostinger.test',
+  ],
+  ['Titan Email', 'imap.titan.email', 'smtp.titan.email', 'ana@titan.test'],
+  [
+    'GoDaddy (Professional Email)',
+    'imap.secureserver.net',
+    'smtpout.secureserver.net',
+    'ana@godaddy.test',
+  ],
+])(
+  'fills %s servers, copies the email to usernames and only asks for email and password',
+  async (label, imap, smtp, email) => {
+    renderFlow();
+
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    await userEvent.type(screen.getByLabelText('Email Address'), email);
+    await userEvent.type(screen.getByLabelText('Password'), 'secret');
+
+    expect(screen.queryByLabelText('IMAP Server')).not.toBeInTheDocument();
+    expect(latestForm.getValues()).toEqual({
+      name: '',
+      handle: email,
+      IMAP: {
+        host: imap,
+        port: 993,
+        connectionSecurity: 'SSL_TLS',
+        username: email,
+        password: 'secret',
+      },
+      SMTP: {
+        host: smtp,
+        port: 465,
+        connectionSecurity: 'SSL_TLS',
+        username: email,
+        password: 'secret',
+      },
+      CALDAV: DEFAULT_PROTOCOL_VALUES.CALDAV,
+    });
+  },
+);
