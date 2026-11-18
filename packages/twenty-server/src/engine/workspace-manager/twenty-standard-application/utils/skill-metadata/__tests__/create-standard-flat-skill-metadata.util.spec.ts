@@ -36,6 +36,19 @@ describe('betty-guia standard skill', () => {
   it('tells the assistant to call search_use_cases', () => {
     expect(bettyGuia?.content).toContain('search_use_cases');
   });
+
+  it('offers the Finanzas template only when list_templates shows it, and installs only on consent', () => {
+    const content = bettyGuia?.content ?? '';
+
+    expect(content).toContain('list_templates');
+    expect(content).toContain('Organizar mis cuentas y finanzas personales');
+    expect(content).toContain('quiero llevar mis gastos');
+    expect(content).toContain('registra esta compra');
+    expect(content).toContain('ayúdame a organizar mis finanzas');
+    expect(content).toContain('Si no aparece, nunca la ofrezcas');
+    expect(content).toContain('install_template');
+    expect(content).toContain('consentimiento explícito');
+  });
 });
 
 describe('conectar-correo standard skill', () => {

@@ -98,4 +98,17 @@ describe('searchBettyUseCases', () => {
 
     expect(withLimits).toBeDefined();
   });
+
+  it('R7: returns the finance cases in Spanish and in English', () => {
+    const spanish = search({ query: '¿qué entra antes del alquiler?' });
+    const receipt = search({ query: 'receipt photo expense' });
+    const budget = search({ query: 'presupuesto mensual' });
+
+    expect(spanish[0].category).toBe('Finanzas');
+    expect(receipt[0].category).toBe('Finanzas');
+    expect(budget[0].category).toBe('Finanzas');
+    expect(
+      BETTY_USE_CASES.filter((useCase) => useCase.category === 'Finanzas'),
+    ).toHaveLength(3);
+  });
 });

@@ -5,12 +5,16 @@ import { McpInstructionBuilderService } from 'src/engine/api/mcp/services/mcp-in
 import { McpPromptBuilderService } from 'src/engine/api/mcp/services/mcp-prompt-builder.service';
 import { McpProtocolService } from 'src/engine/api/mcp/services/mcp-protocol.service';
 import { McpToolExecutorService } from 'src/engine/api/mcp/services/mcp-tool-executor.service';
+import { ApplicationInstallModule } from 'src/engine/core-modules/application/application-install/application-install.module';
+import { ApplicationLookupModule } from 'src/engine/core-modules/application/application-lookup/application-lookup.module';
+import { ApplicationRegistrationLookupModule } from 'src/engine/core-modules/application/application-registration/application-registration-lookup/application-registration-lookup.module';
 import { ApiKeyModule } from 'src/engine/core-modules/api-key/api-key.module';
 import { MetricsModule } from 'src/engine/core-modules/metrics/metrics.module';
 import { TokenModule } from 'src/engine/core-modules/auth/token/token.module';
 import { ToolProviderModule } from 'src/engine/core-modules/tool-provider/tool-provider.module';
 import { JwtAuthGuard } from 'src/engine/guards/jwt-auth.guard';
 import { WorkspaceManyOrAllFlatEntityMapsCacheModule } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.module';
+import { PermissionsModule } from 'src/engine/metadata-modules/permissions/permissions.module';
 import { SkillModule } from 'src/engine/metadata-modules/skill/skill.module';
 import { UserRoleModule } from 'src/engine/metadata-modules/user-role/user-role.module';
 import { WorkspaceCacheStorageModule } from 'src/engine/workspace-cache-storage/workspace-cache-storage.module';
@@ -20,6 +24,10 @@ import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache
 @Module({
   imports: [
     ApiKeyModule,
+    ApplicationInstallModule,
+    ApplicationLookupModule,
+    ApplicationRegistrationLookupModule,
+    PermissionsModule,
     MetricsModule,
     TokenModule,
     WorkspaceCacheStorageModule,

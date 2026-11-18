@@ -91,6 +91,7 @@ export const buildMcpServerInstructions = ({
     ``,
     `Conversational guide (betty-guia):`,
     `  Call start_betty_guide when the person greets Betty, introduces themselves, asks what Betty can do, or describes a problem without naming a feature — see the greeting trigger above. It returns the betty-guia content directly, no separate load_skills call needed.`,
+    `  Templates: list_templates() returns the ready-made apps registered on this server (for example finanzas) and whether each is installed in this workspace; install_template({ templateId }) installs one in this workspace only. Offer «Organizar mis cuentas y finanzas personales» only if list_templates shows finanzas, also when the person says «quiero llevar mis gastos», «registra esta compra» or «ayúdame a organizar mis finanzas». Ask for explicit consent before installing, never call install_template without a clear yes in this conversation, then offer the entry points it returns. Pide consentimiento explícito antes de instalar.`,
     `  Load the conectar-correo skill when the person asks how to connect an email account, or says their email will not connect.`,
     ``,
     `Dashboards:`,
