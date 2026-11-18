@@ -187,4 +187,22 @@ describe('buildMcpServerInstructions', () => {
       'Tools for objects or app functions created during this session only appear after reconnecting',
     );
   });
+
+  it('names the template tools and requires explicit consent before installing', () => {
+    const instructions = buildMcpServerInstructions({
+      objectNames: 'companies',
+      actionToolNames: ['send_email'],
+      isDirectMode: false,
+    });
+
+    expect(instructions).toContain('list_templates');
+    expect(instructions).toContain('install_template');
+    expect(instructions).toContain(
+      'Ask for explicit consent before installing',
+    );
+    expect(instructions).toContain(
+      'Organizar mis cuentas y finanzas personales',
+    );
+    expect(instructions).toContain('registra esta compra');
+  });
 });

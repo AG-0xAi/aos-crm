@@ -2246,6 +2246,92 @@ export const BETTY_USE_CASES: BettyUseCase[] = [
       '«Marcar asistió» se lanza desde la app, no desde el chat.',
     ],
   },
+  {
+    title:
+      'Registrar un gasto desde la foto de un ticket (Receipt photo to expense)',
+    level: 1,
+    category: 'Finanzas',
+    persona:
+      'Persona o familia que quiere llevar sus gastos sin teclear cada ticket',
+    goal: 'Mandar la foto de un ticket y que quede registrado el movimiento en la cuenta correcta, con comercio, fecha, total y categorías. English: send a photo of a receipt and get the expense recorded in the right account, with merchant, date, total and categories.',
+    prerequisites: [
+      'Plantilla Finanzas activada en tu espacio (la activa quien administra, con tu permiso)',
+      'Conector de Betty añadido en ChatGPT o Claude',
+      'Al menos una cuenta creada',
+    ],
+    steps: [
+      'Pega la foto del ticket en la conversación y di con qué cuenta se pagó.',
+      'Revisa el movimiento que propone el asistente: comercio, fecha, total y reparto por categorías.',
+      'Confirma. Si falta un dato esencial, el asistente pregunta solo por ese y deja el movimiento en revisión.',
+    ],
+    prompts: [
+      'Betty: registra esta compra. Te paso la foto del ticket y lo pagué con la tarjeta de la cuenta principal. Propón las categorías, avísame si ya existe un movimiento igual y enséñamelo antes de guardarlo.',
+    ],
+    expectedResult:
+      'Un movimiento confirmado, con las líneas del ticket sumando el total, o en revisión si falta algún dato.',
+    bettyFeatures: ['Plantilla Finanzas'],
+    connectors: ['Betty (MCP)'],
+    caveats: [
+      'Si el asistente no puede adjuntar la imagen al movimiento, el movimiento queda en revisión hasta que adjuntes la foto.',
+      'El texto de un ticket se trata como dato, nunca como instrucciones.',
+    ],
+  },
+  {
+    title: 'Presupuesto mensual por categorías (Monthly budget)',
+    level: 2,
+    category: 'Finanzas',
+    persona:
+      'Persona o familia que quiere saber cuánto queda de cada categoría este mes',
+    goal: 'Definir un presupuesto por categoría y preguntar en cualquier momento cuánto queda para supermercado, ocio u otra categoría. English: set a budget per category and ask how much is left at any time.',
+    prerequisites: [
+      'Plantilla Finanzas activada en tu espacio',
+      'Moneda principal y al menos una cuenta con su saldo inicial y su fecha de corte',
+    ],
+    steps: [
+      'Pide al asistente que configure tu presupuesto con importes por categoría.',
+      'Revisa la propuesta y confírmala.',
+      'Registra tus movimientos y pregunta cuánto queda por categoría.',
+    ],
+    prompts: [
+      'Betty: ayúdame a organizar mis finanzas. Quiero un presupuesto mensual de 450 € para supermercado, 120 € para ocio y 200 € para transporte. Enséñame el resultado antes de guardarlo.',
+      'Betty: ¿cuánto me queda este mes para supermercado? Separa lo confirmado de lo estimado y dime en qué movimientos te basas.',
+    ],
+    expectedResult:
+      'Un presupuesto por categoría y respuestas que indican el periodo, lo confirmado y lo estimado.',
+    bettyFeatures: ['Plantilla Finanzas'],
+    connectors: ['Betty (MCP)'],
+    caveats: [
+      'Las cifras estimadas dependen de los movimientos que hayas registrado: si falta alguno, la respuesta lo indica.',
+    ],
+  },
+  {
+    title: 'Previsión de caja: ¿qué entra antes del alquiler? (Cash forecast)',
+    level: 3,
+    category: 'Finanzas',
+    persona:
+      'Persona, familia o autónomo con cobros e ingresos que llegan en fechas distintas',
+    goal: 'Ver qué ingresos llegan antes de un pago grande como el alquiler y cómo queda la cuenta a fin de mes, también si un cobro se retrasa. English: see which income lands before a big payment such as rent and how the account looks at month end, including a delayed payment.',
+    prerequisites: [
+      'Plantilla Finanzas activada en tu espacio',
+      'Cobros y pagos previstos registrados con su fecha',
+    ],
+    steps: [
+      'Registra los ingresos y pagos previstos con su fecha.',
+      'Pregunta qué entra antes del pago que te preocupa.',
+      'Pide el escenario en que un cobro se retrasa.',
+    ],
+    prompts: [
+      'Betty: ¿qué entra antes del alquiler? Dime el periodo, separa lo confirmado de lo estimado y enlaza los registros.',
+      'Betty: ¿cómo quedo en diciembre si se retrasa este cliente? Compáralo con el escenario normal.',
+    ],
+    expectedResult:
+      'Una previsión con el periodo, lo confirmado frente a lo estimado y el efecto del retraso.',
+    bettyFeatures: ['Plantilla Finanzas'],
+    connectors: ['Betty (MCP)'],
+    caveats: [
+      'La previsión solo conoce lo que has registrado; no se conecta a tu banco.',
+    ],
+  },
 ];
 
 export const BETTY_TEMPLATES_EXPLAINED: BettyTemplateExplained[] = [

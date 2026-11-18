@@ -10,6 +10,7 @@ import { BackfillWorkspaceCustomApplicationDefaultRoleCommand } from 'src/databa
 import { AddBettyGuiaSkillCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794567508947-add-betty-guia-skill.command';
 import { AddConectarCorreoSkillCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794643160842-add-conectar-correo-skill.command';
 import { UpdateBettyGuiaSkillContentCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794590000000-update-betty-guia-skill-content.command';
+import { OfferFinanzasInBettyGuiaSkillCommand } from 'src/database/commands/upgrade-version-command/2-51/2-51-workspace-command-1794990000000-offer-finanzas-in-betty-guia-skill.command';
 import { ApplicationModule } from 'src/engine/core-modules/application/application.module';
 import { ConnectedAccountMetadataModule } from 'src/engine/metadata-modules/connected-account/connected-account-metadata.module';
 import { WorkspaceCacheModule } from 'src/engine/workspace-cache/workspace-cache.module';
@@ -33,6 +34,7 @@ import { WorkspaceMigrationModule } from 'src/engine/workspace-manager/workspace
     AddBettyGuiaSkillCommand,
     UpdateBettyGuiaSkillContentCommand,
     AddConectarCorreoSkillCommand,
+    OfferFinanzasInBettyGuiaSkillCommand,
   ],
 })
 export class V2_51_UpgradeVersionCommandModule {}

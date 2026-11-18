@@ -7,6 +7,7 @@ import { assertUnreachable, isDefined } from 'twenty-shared/utils';
 
 import { MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-closed-world-read-only-tool-annotations.constant';
 import { MCP_EXCLUDED_TOOL_NAMES } from 'src/engine/api/mcp/constants/mcp-excluded-tool-names.constant';
+import { MCP_CLOSED_WORLD_WRITE_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-closed-world-write-tool-annotations.constant';
 import { MCP_EXECUTE_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-execute-tool-annotations.const';
 import { MCP_OPEN_WORLD_READ_ONLY_TOOL_ANNOTATIONS } from 'src/engine/api/mcp/constants/mcp-open-world-read-only-tool-annotations.constant';
 import { MCP_PROTOCOL_VERSION } from 'src/engine/api/mcp/constants/mcp-protocol-version.const';
@@ -26,6 +27,14 @@ import {
   createListSkillsTool,
   LIST_SKILLS_TOOL_NAME,
 } from 'src/engine/api/mcp/tools/list-skills.tool';
+import {
+  createInstallTemplateTool,
+  INSTALL_TEMPLATE_TOOL_NAME,
+} from 'src/engine/api/mcp/tools/install-template.tool';
+import {
+  createListTemplatesTool,
+  LIST_TEMPLATES_TOOL_NAME,
+} from 'src/engine/api/mcp/tools/list-templates.tool';
 import {
   createSearchUseCasesTool,
   SEARCH_USE_CASES_TOOL_NAME,
@@ -55,6 +64,9 @@ import { parseMcpToolCallParams } from 'src/engine/api/mcp/utils/parse-mcp-tool-
 import { wrapJsonRpcResponse } from 'src/engine/api/mcp/utils/wrap-jsonrpc-response.util';
 import { ApiKeyRoleService } from 'src/engine/core-modules/api-key/services/api-key-role.service';
 import { type FlatApiKey } from 'src/engine/core-modules/api-key/types/flat-api-key.type';
+import { ApplicationInstallService } from 'src/engine/core-modules/application/application-install/application-install.service';
+import { ApplicationLookupService } from 'src/engine/core-modules/application/application-lookup/application-lookup.service';
+import { ApplicationRegistrationLookupService } from 'src/engine/core-modules/application/application-registration/application-registration-lookup/application-registration-lookup.service';
 import { type FlatApplication } from 'src/engine/core-modules/application/types/flat-application.type';
 import { type WorkspaceAuthContext } from 'src/engine/core-modules/auth/types/workspace-auth-context.type';
 import { ExceptionHandlerService } from 'src/engine/core-modules/exception-handler/exception-handler.service';
@@ -85,6 +97,7 @@ import { buildAgentRoleIdsBySource } from 'src/engine/twenty-orm/utils/build-age
 import { buildUserRoleIdsBySource } from 'src/engine/twenty-orm/utils/build-user-role-ids-by-source.util';
 import { WorkspaceOrmManager } from 'src/engine/twenty-orm/workspace-orm.manager';
 import { WorkspaceManyOrAllFlatEntityMapsCacheService } from 'src/engine/metadata-modules/flat-entity/services/workspace-many-or-all-flat-entity-maps-cache.service';
+import { PermissionsService } from 'src/engine/metadata-modules/permissions/permissions.service';
 import { SkillService } from 'src/engine/metadata-modules/skill/skill.service';
 import { UserRoleService } from 'src/engine/metadata-modules/user-role/user-role.service';
 import { handleException } from 'src/engine/utils/global-exception-handler.util';
@@ -125,6 +138,10 @@ export class McpProtocolService {
     private readonly workspaceCacheService: WorkspaceCacheService,
     private readonly exceptionHandlerService: ExceptionHandlerService,
     private readonly workspaceOrmManager: WorkspaceOrmManager,
+    private readonly permissionsService: PermissionsService,
+    private readonly applicationInstallService: ApplicationInstallService,
+    private readonly applicationRegistrationLookupService: ApplicationRegistrationLookupService,
+    private readonly applicationLookupService: ApplicationLookupService,
   ) {}
 
   private async handleInitialize(
@@ -379,6 +396,32 @@ export class McpProtocolService {
           rolePermissionConfig,
         ),
         annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
+      },
+      [LIST_TEMPLATES_TOOL_NAME]: {
+        ...createListTemplatesTool({
+          workspaceId: workspace.id,
+          applicationRegistrationLookupService:
+            this.applicationRegistrationLookupService,
+          applicationLookupService: this.applicationLookupService,
+        }),
+        annotations: MCP_CLOSED_WORLD_READ_ONLY_TOOL_ANNOTATIONS,
+      },
+      [INSTALL_TEMPLATE_TOOL_NAME]: {
+        ...createInstallTemplateTool({
+          caller: {
+            workspaceId: workspace.id,
+            userWorkspaceId: options?.userWorkspaceId,
+            apiKeyId: options?.apiKey?.id,
+            applicationId: options?.application?.id,
+            agentId: options?.agentId,
+          },
+          permissionsService: this.permissionsService,
+          applicationInstallService: this.applicationInstallService,
+          applicationRegistrationLookupService:
+            this.applicationRegistrationLookupService,
+          applicationLookupService: this.applicationLookupService,
+        }),
+        annotations: MCP_CLOSED_WORLD_WRITE_TOOL_ANNOTATIONS,
       },
       [LEARN_TOOLS_TOOL_NAME]: {
         ...createLearnToolsTool(this.toolRegistry, toolContext, {
