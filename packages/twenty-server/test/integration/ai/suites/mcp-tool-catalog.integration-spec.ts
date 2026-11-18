@@ -105,9 +105,11 @@ const listMcpTools = async (
 const META_MODE_TOOL_NAMES = [
   'execute_tool',
   'get_tool_catalog',
+  'install_template',
   'learn_tools',
   'list_object_metadata_names',
   'list_skills',
+  'list_templates',
   'load_skills',
   'search_use_cases',
   'start_betty_guide',
@@ -338,6 +340,75 @@ describe('MCP tool catalog (integration)', () => {
       expect(output).toHaveProperty('profileNote');
       expect(output.profileNote).toBeNull();
       expect(output.nextStep.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Betty templates', () => {
+    const callTemplateTool = async (
+      toolName: string,
+      toolArguments: object,
+    ) => {
+      const result = await callMcpTool(
+        adminApiKeyToken,
+        toolName,
+        toolArguments,
+      );
+
+      return {
+        isError: result.isError,
+        output: JSON.parse(result.content[0].text) as {
+          templates?: { id: string }[];
+          success?: boolean;
+          status?: string;
+        },
+      };
+    };
+
+    it('lists list_templates and install_template on plain /mcp and in direct mode', async () => {
+      for (const path of ['/mcp', DIRECT_MODE_PATH]) {
+        const toolNames = (await listMcpTools(adminApiKeyToken, path)).map(
+          (tool) => tool.name,
+        );
+
+        expect(toolNames).toEqual(
+          expect.arrayContaining(['list_templates', 'install_template']),
+        );
+      }
+    });
+
+    it('does not list finanzas when it is not registered on the server', async () => {
+      const { isError, output } = await callTemplateTool('list_templates', {});
+
+      expect(isError).toBe(false);
+      expect(output.templates?.map((template) => template.id)).not.toContain(
+        'finanzas',
+      );
+    });
+
+    it('refuses to install finanzas when it is not registered, and installs nothing', async () => {
+      const { isError, output } = await callTemplateTool('install_template', {
+        templateId: 'finanzas',
+      });
+
+      expect(isError).toBe(true);
+      expect(output.success).toBe(false);
+      expect(output.status).toBe('unknown_template');
+
+      const after = await callTemplateTool('list_templates', {});
+
+      expect(
+        after.output.templates?.map((template) => template.id),
+      ).not.toContain('finanzas');
+    });
+
+    it('refuses an id that is not in the catalog', async () => {
+      const { isError, output } = await callTemplateTool('install_template', {
+        templateId: 'not-a-template',
+      });
+
+      expect(isError).toBe(true);
+      expect(output.success).toBe(false);
+      expect(output.status).toBe('unknown_template');
     });
   });
 
